@@ -5,11 +5,10 @@
  * settings-API endpoint for the storefront logo, only the one for admin's
  * own console branding (/admin/settings/logo).
  */
-export const BRAND_NAME = 'Spice & Dry Fruits';
-// VITE_BRAND_LOGO_URL (set at build time) overrides the hosted logo, so a new
-// deployment can point at its own /uploads/... copy instead of the old host.
-export const BRAND_LOGO_URL =
-  import.meta.env.VITE_BRAND_LOGO_URL ||
-  'https://5star.alimstech.com/spice-api/backend/public/uploads/branding/2026/08/b5a20af59afb73c66516bb7552658271.png';
-export const BRAND_LOGO_ALT = 'Spice & Dry Fruits';
-export const BRAND_LOGO_HEIGHT = 38;
+export const BRAND_NAME = '5 Star Spices';
+// Bundled with the app (public/brand/), so it loads instantly on the website
+// and offline inside the Android app. VITE_BRAND_LOGO_URL (build time) can
+// still point somewhere else.
+export const BRAND_LOGO_URL = import.meta.env.VITE_BRAND_LOGO_URL || '/brand/logo-192.png';
+export const BRAND_LOGO_ALT = '5 Star — Since 1984';
+export const BRAND_LOGO_HEIGHT = 44;
