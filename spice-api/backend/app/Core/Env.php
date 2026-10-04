@@ -7,6 +7,12 @@ namespace App\Core;
 /**
  * Minimal .env reader. Values are cached in a static array; the process
  * environment is never mutated, so nothing leaks into shell_exec children.
+ *
+ * A key missing from .env falls back to the real process environment. On
+ * shared hosting the .env file is the only source and nothing changes; on a
+ * container platform (Railway, Docker) there is no .env at all and every
+ * setting arrives as an environment variable. A value present in .env always
+ * wins, so an existing server behaves exactly as before.
  */
 final class Env
 {
@@ -49,7 +55,17 @@ final class Env
 
     public static function get(string $key, ?string $default = null): ?string
     {
-        return self::$values[$key] ?? $default;
+        if (array_key_exists($key, self::$values)) {
+            return self::$values[$key];
+        }
+
+        $fromProcess = getenv($key);
+
+        if ($fromProcess !== false) {
+            return $fromProcess;
+        }
+
+        return $_ENV[$key] ?? $default;
     }
 
     public static function int(string $key, int $default): int

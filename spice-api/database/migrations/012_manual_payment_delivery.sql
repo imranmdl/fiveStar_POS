@@ -51,3 +51,7 @@ ON DUPLICATE KEY UPDATE
     `description` = VALUES(`description`),
     `is_public`   = VALUES(`is_public`),
     `version`     = `settings`.`version` + 1;
+
+INSERT INTO `schema_migrations` (`migration`, `batch`, `applied_by`)
+VALUES ('012_manual_payment_delivery', 12, 'migration-runner')
+ON DUPLICATE KEY UPDATE `applied_date` = `applied_date`;

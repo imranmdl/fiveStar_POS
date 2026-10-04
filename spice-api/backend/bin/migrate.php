@@ -8,6 +8,7 @@ declare(strict_types=1);
  *   php bin/migrate.php              Apply all pending migrations, then seeds.
  *   php bin/migrate.php --status     Show applied / pending migrations.
  *   php bin/migrate.php --seed-only  Re-run seeds (they are idempotent).
+ *   php bin/migrate.php --no-seed    Apply pending migrations, skip seeds.
  *   php bin/migrate.php --rollback   Roll back the most recent migration.
  *
  * Statements are split on semicolons at end of line, which is compatible with
@@ -246,7 +247,10 @@ if (!in_array('--seed-only', $options, true)) {
     }
 }
 
-$seedFiles = glob($seedDir . '/*.sql') ?: [];
+// --no-seed: apply migrations only. Container deploys use this on every boot
+// after the first, because the catalog/promotion seeds re-assert their demo
+// rows (names, prices, status) and would undo an administrator's edits.
+$seedFiles = in_array('--no-seed', $options, true) ? [] : (glob($seedDir . '/*.sql') ?: []);
 sort($seedFiles);
 
 foreach ($seedFiles as $file) {
