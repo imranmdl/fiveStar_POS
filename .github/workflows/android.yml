@@ -43,7 +43,7 @@ jobs:
         working-directory: 5star-frontend
 
     env:
-      API_BASE: ${{ inputs.api_base || vars.API_BASE_URL }}
+      API_BASE: ${{ inputs.api_base || vars.API_BASE_URL || 'https://fivestarpos-production.up.railway.app/api/v1' }}
       VERSION_CODE: ${{ github.run_number }}
       VERSION_NAME: 1.0.${{ github.run_number }}
 
