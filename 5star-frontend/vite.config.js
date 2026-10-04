@@ -16,6 +16,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // The Android app (Capacitor) ships its files inside the APK; a service
+      // worker there only risks serving a stale shell after an app update.
+      disable: process.env.CAPACITOR_BUILD === '1',
       registerType: 'autoUpdate',
       devOptions: { enabled: true },
       includeAssets: ['favicon.svg'],

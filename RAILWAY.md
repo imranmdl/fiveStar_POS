@@ -159,9 +159,35 @@ full Hostinger dump — its schema contains MariaDB-only definitions. Instead:
   Migrations are forward-only on boot; a down-migration is a manual
   `php bin/migrate.php --rollback` over `railway ssh`.
 - **Replicas:** keep 1 — the volume attaches to a single instance.
-- **Android app (Capacitor):** the in-app WebView is not on your domain, so
-  build it with `VITE_API_BASE=https://<domain>/api/v1` and add its origin
-  (`https://localhost`) to `CORS_ALLOWED_ORIGINS`.
+- **Android app (Capacitor):** built by GitHub Actions
+  (`.github/workflows/android.yml`) — see "Android app" below.
+
+## Android app
+
+The app is the same React frontend packaged with Capacitor, talking to this
+Railway API over HTTPS. Because the app's WebView origin is `https://localhost`
+(not your domain), the API must allow it:
+
+1. **Railway** → app service → Variables: `CORS_ALLOWED_ORIGINS=https://localhost`
+   (comma-separate more origins if needed), then deploy.
+2. **GitHub** → repo → Settings → Secrets and variables → Actions → Variables:
+   `API_BASE_URL=https://<your-domain>/api/v1`.
+3. **GitHub** → Actions → *Android app* → **Run workflow** (it also runs on
+   every push to `main` that touches `5star-frontend/`).
+4. Open the finished run → **Artifacts** → download
+   `5star-android-debug-…` → unzip → install the `.apk` on the phone
+   (allow "install unknown apps" for your browser/file manager).
+
+The debug APK is fine for staff phones (till, mobile barcode inward). For the
+Play Store you need a signed build: create a keystore once
+(`keytool -genkeypair -v -keystore 5star.keystore -alias 5star -keyalg RSA -keysize 2048 -validity 10000`),
+keep it safe — losing it means you can never update the app — and add the
+four `ANDROID_*` secrets listed at the top of the workflow. Runs on `main`
+then also produce a signed `.apk` and `.aab` (upload the `.aab` to Play
+Console).
+
+The app has the server address built in, so if the domain changes, update
+`API_BASE_URL` and rebuild.
 
 ## What changed in the repo for this
 
