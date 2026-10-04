@@ -62,6 +62,10 @@ final class BannerController extends BaseController
             'link_value' => 'nullable|string|max:255',
             'cta_label' => 'nullable|string|max:60',
             'display_order' => 'nullable|int|min:1|max:9999',
+            'eyebrow' => 'nullable|string|max:60',
+            'promo_code' => 'nullable|string|max:40',
+            'bg_color' => 'nullable|string|max:7',
+            'text_color' => 'nullable|string|max:7',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date',
         ]);
@@ -93,6 +97,10 @@ final class BannerController extends BaseController
             'link_value' => 'nullable|string|max:255',
             'cta_label' => 'nullable|string|max:60',
             'display_order' => 'nullable|int|min:1|max:9999',
+            'eyebrow' => 'nullable|string|max:60',
+            'promo_code' => 'nullable|string|max:40',
+            'bg_color' => 'nullable|string|max:7',
+            'text_color' => 'nullable|string|max:7',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date',
             'is_active' => 'nullable|boolean',
@@ -111,6 +119,28 @@ final class BannerController extends BaseController
     }
 
     /** DELETE /api/v1/admin/banners/{uuid} */
+    /** POST /api/v1/admin/banners/{uuid}/image — multipart field `image`. */
+    public function replaceImage(Request $request): Response
+    {
+        if (!isset($request->files['image'])) {
+            throw new HttpException('Choose an image to upload.', 422, ['image' => ['Upload the banner image.']]);
+        }
+
+        return Response::success(
+            ['banner' => $this->banners->replaceImage((string) $request->routeParam('uuid'), $request->files['image'], $request)],
+            'Banner image saved'
+        );
+    }
+
+    /** DELETE /api/v1/admin/banners/{uuid}/image — back to a text banner. */
+    public function removeImage(Request $request): Response
+    {
+        return Response::success(
+            ['banner' => $this->banners->removeImage((string) $request->routeParam('uuid'), $request)],
+            'Banner image removed'
+        );
+    }
+
     public function destroy(Request $request): Response
     {
         $this->banners->delete((string) $request->routeParam('uuid'), $request);

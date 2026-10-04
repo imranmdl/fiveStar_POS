@@ -1,32 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
-import { cardFromListItem, rupees } from '../../lib/store';
-import { AddControl, ProductMedia } from '../../components/customer/ProductCard';
+import { cardFromListItem } from '../../lib/store';
+import ProductCard from '../../components/customer/ProductCard';
 
 const EMPTY_FORM = { business_name: '', contact_name: '', contact_mobile: '', estimated_quantity: '', requirements: '' };
-
-function GiftCard({ product }) {
-  const href = `/product/${product.slug}`;
-  return (
-    <div className="sf-gift">
-      <Link to={href} aria-label={product.name}>
-        <ProductMedia image={product.image} tint={product.tint} label={product.size} alt={product.name} />
-      </Link>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <Link to={href} className="sf-gift__name">{product.name}</Link>
-        {product.short && <span className="sf-gift__short">{product.short}</span>}
-      </div>
-      <div className="sf-card__foot">
-        <div className="sf-price">
-          <span className="sf-price__now" style={{ fontSize: 18 }}>{rupees(product.price)}</span>
-          {product.off > 0 && <span className="sf-price__mrp">{rupees(product.mrp)}</span>}
-        </div>
-        <AddControl product={product} />
-      </div>
-    </div>
-  );
-}
 
 export default function Gifting() {
   const [gifts, setGifts] = useState([]);
@@ -65,23 +42,26 @@ export default function Gifting() {
   const fieldMessages = error && typeof error.fieldMessages === 'function' ? error.fieldMessages() : [];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 64, paddingBottom: 80 }}>
-      <section className="sf-wrap" style={{ paddingTop: 44, display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <>
+      <section className="sf-hero-dark">
         <span className="sf-eyebrow">Gift boxes</span>
-        <h1 className="sf-hero__title" style={{ fontSize: 'clamp(36px, 6vw, 60px)', maxWidth: '15ch' }}>Gifting &amp; bulk orders</h1>
-        <p className="sf-lead" style={{ fontSize: 17, maxWidth: '56ch' }}>
+        <h1>Gifting &amp; bulk orders</h1>
+        <p>
           Diwali hampers for a team, wedding favours, a standing order for an office pantry. Tell us what you need and we
           will send a price — usually the same working day.
         </p>
       </section>
 
       {gifts.length > 0 && (
-        <section className="sf-wrap sf-gifts-grid">
-          {gifts.map((product) => <GiftCard key={product.uuid} product={product} />)}
+        <section className="sf-panel">
+          <div className="sf-panel__head"><h2 className="sf-h2">Ready-made gift boxes</h2></div>
+          <div className="sf-giftgrid">
+            {gifts.map((product) => <ProductCard key={product.uuid} product={product} />)}
+          </div>
         </section>
       )}
 
-      <section className="sf-wrap">
+      <section className="sf-panel sf-panel--pad" id="enquiry">
         <div className="sf-enquiry">
           <div className="sf-enquiry__aside">
             <h2 className="sf-h2">Ordering 25 or more?</h2>
@@ -95,7 +75,7 @@ export default function Gifting() {
           <div className="sf-enquiry__form">
             {reference ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 0' }}>
-                <span className="sf-h3" style={{ fontSize: 24 }}>Thank you — we have your enquiry</span>
+                <span className="sf-h2">Thank you — we have your enquiry</span>
                 <span style={{ font: '400 15px/1.55 var(--sf-text)', color: 'var(--sf-ink-2)' }}>
                   Reference <b>{reference}</b>. We will send a quotation to the mobile number you gave us, usually the same working day.
                 </span>
@@ -124,7 +104,7 @@ export default function Gifting() {
                   />
                 </label>
                 <div className="sf-field--full" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                  <button type="submit" className="sf-btn sf-btn--red sf-btn--xl" disabled={busy}>{busy ? 'Sending…' : 'Send enquiry'}</button>
+                  <button type="submit" className="sf-btn sf-btn--red sf-btn--lg" disabled={busy}>{busy ? 'Sending…' : 'SEND ENQUIRY'}</button>
                   <span className="sf-muted" style={{ fontSize: 14 }}>No account needed.</span>
                 </div>
               </form>
@@ -132,6 +112,6 @@ export default function Gifting() {
           </div>
         </div>
       </section>
-    </div>
+    </>
   );
 }

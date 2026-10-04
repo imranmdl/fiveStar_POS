@@ -49,6 +49,7 @@ use App\Controllers\Api\V1\ShipmentController;
 use App\Controllers\Api\V1\StaffController;
 use App\Controllers\Api\V1\StockAuditController;
 use App\Controllers\Api\V1\StoreReviewController;
+use App\Controllers\Api\V1\StorefrontController;
 use App\Controllers\Api\V1\SupportController;
 use App\Controllers\Api\V1\VariantOptionController;
 use App\Controllers\Api\V1\VendorController;
@@ -130,6 +131,9 @@ return static function (Router $router): void {
         $router->post('/store-reviews', [StoreReviewController::class, 'store'], ['throttle:5,3600']);
 
         $router->get('/banners', [BannerController::class, 'index'], ['throttle:300,60']);
+        // Storefront look (header colours, announcement, banner speed) — edited
+        // from the admin console's Storefront appearance page.
+        $router->get('/storefront/theme', [StorefrontController::class, 'theme'], ['throttle:300,60']);
         $router->post('/banners/{uuid}/click', [BannerController::class, 'click'], ['throttle:60,60']);
 
         // A campaign page. Public and unauthenticated: an advert points at it,
@@ -810,6 +814,15 @@ return static function (Router $router): void {
         );
         $router->patch('/admin/banners/{uuid}', [BannerController::class, 'update'], $administrator);
         $router->delete('/admin/banners/{uuid}', [BannerController::class, 'destroy'], $administrator);
+        $router->post(
+            '/admin/banners/{uuid}/image',
+            [BannerController::class, 'replaceImage'],
+            array_merge($administrator, ['throttle:60,600'])
+        );
+        $router->delete('/admin/banners/{uuid}/image', [BannerController::class, 'removeImage'], $administrator);
+
+        $router->get('/admin/storefront/theme', [StorefrontController::class, 'adminTheme'], $administrator);
+        $router->patch('/admin/storefront/theme', [StorefrontController::class, 'update'], $administrator);
 
         // ===================================================================
         // Admin Privilege Management — access control screens gated by their

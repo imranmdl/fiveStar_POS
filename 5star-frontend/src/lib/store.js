@@ -79,6 +79,8 @@ export function cardFromListItem(item) {
     off,
     size: item.has_size_options ? '' : packLabel(weight.min),
     multiple: Number(pricing.variant_count || 1) > 1,
+    rating: Number(item.rating?.average || 0),
+    reviews: Number(item.rating?.count || 0),
   };
 }
 
@@ -90,11 +92,19 @@ export const TRUST_POINTS = [
 ];
 
 export const SORTS = [
-  ['relevance', 'Recommended'],
-  ['popularity', 'Popular'],
-  ['price_low', 'Price: low to high'],
-  ['price_high', 'Price: high to low'],
-  ['discount', 'Biggest discount'],
+  ['relevance', 'Relevance'],
+  ['popularity', 'Popularity'],
+  ['price_low', 'Price — Low to High'],
+  ['price_high', 'Price — High to Low'],
+  ['discount', 'Discount'],
+];
+
+/** Price bands for the Shop filters (min, max; null = open-ended). */
+export const PRICE_BANDS = [
+  ['u200', 'Under ₹200', null, 200],
+  ['200-500', '₹200 – ₹500', 200, 500],
+  ['500-1000', '₹500 – ₹1,000', 500, 1000],
+  ['o1000', 'Over ₹1,000', 1000, null],
 ];
 
 /**

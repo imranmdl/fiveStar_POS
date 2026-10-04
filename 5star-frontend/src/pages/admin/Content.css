@@ -8,7 +8,7 @@
 
 .content-grid {
   display: grid;
-  grid-template-columns: 7fr 5fr;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
   gap: 16px;
   align-items: start;
 }
