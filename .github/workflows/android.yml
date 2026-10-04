@@ -1,0 +1,141 @@
+name: Android app
+
+# Builds the 5Star Android app (Capacitor wrapper around 5star-frontend) and
+# attaches the APK to the workflow run as a downloadable artifact.
+#
+# One-time setup — repo Settings → Secrets and variables → Actions:
+#   Variables:
+#     API_BASE_URL          https://<your-railway-domain>/api/v1   (required)
+#     BRAND_LOGO_URL        optional, same as Railway's VITE_BRAND_LOGO_URL
+#   Secrets (optional — only for a signed Play Store build):
+#     ANDROID_KEYSTORE_BASE64   base64 of your .jks/.keystore file
+#     ANDROID_KEYSTORE_PASSWORD
+#     ANDROID_KEY_ALIAS
+#     ANDROID_KEY_PASSWORD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "5star-frontend/**"
+      - ".github/workflows/android.yml"
+  pull_request:
+    paths:
+      - "5star-frontend/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+    inputs:
+      api_base:
+        description: "API base URL (overrides the API_BASE_URL variable), e.g. https://shop.example.com/api/v1"
+        required: false
+        type: string
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: 5star-frontend
+
+    env:
+      API_BASE: ${{ inputs.api_base || vars.API_BASE_URL }}
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: 1.0.${{ github.run_number }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check API address
+        run: |
+          if [ -z "$API_BASE" ]; then
+            echo "::error::Set the repository variable API_BASE_URL (e.g. https://your-app.up.railway.app/api/v1) or pass api_base when running this workflow."
+            exit 1
+          fi
+          case "$API_BASE" in
+            https://*/api/v1) echo "Building against $API_BASE" ;;
+            *) echo "::error::API_BASE_URL must be https://<domain>/api/v1 (got: $API_BASE)"; exit 1 ;;
+          esac
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: 5star-frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build web bundle for the app
+        env:
+          CAPACITOR_BUILD: "1"
+          VITE_API_BASE: ${{ env.API_BASE }}
+          VITE_BRAND_LOGO_URL: ${{ vars.BRAND_LOGO_URL }}
+        run: npm run build
+
+      - name: Copy bundle into the Android project
+        run: npx cap sync android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK (installable directly on phones)
+        working-directory: 5star-frontend/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug \
+            -PappVersionCode="$VERSION_CODE" -PappVersionName="$VERSION_NAME"
+          mv app/build/outputs/apk/debug/app-debug.apk "app/build/outputs/apk/debug/5star-$VERSION_NAME-debug.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 5star-android-debug-${{ env.VERSION_NAME }}
+          path: 5star-frontend/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      # ---- Signed release (Play Store), only when the keystore secrets exist ----
+      - name: Decode signing keystore
+        id: keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "No ANDROID_KEYSTORE_BASE64 secret: skipping the signed release build."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build signed release APK + AAB
+        if: steps.keystore.outputs.present == 'true' && github.event_name != 'pull_request'
+        working-directory: 5star-frontend/android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ./gradlew --no-daemon assembleRelease bundleRelease \
+            -PappVersionCode="$VERSION_CODE" -PappVersionName="$VERSION_NAME"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.keystore.outputs.present == 'true' && github.event_name != 'pull_request'
+        with:
+          name: 5star-android-release-${{ env.VERSION_NAME }}
+          path: |
+            5star-frontend/android/app/build/outputs/apk/release/*.apk
+            5star-frontend/android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore"

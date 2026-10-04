@@ -7,8 +7,9 @@ android {
         applicationId "com.fivestarspices.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // CI passes -PappVersionCode / -PappVersionName; local builds keep 1 / 1.0.
+        versionCode((project.findProperty('appVersionCode') ?: '1') as Integer)
+        versionName((project.findProperty('appVersionName') ?: '1.0') as String)
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +17,27 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Release signing comes from environment variables (set by CI from GitHub
+    // secrets). Without them the release build is simply left unsigned; the
+    // keystore itself never goes into the repository.
+    def releaseKeystore = System.getenv('ANDROID_KEYSTORE_PATH')
+    signingConfigs {
+        release {
+            if (releaseKeystore) {
+                storeFile file(releaseKeystore)
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (releaseKeystore) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
