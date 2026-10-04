@@ -21,7 +21,7 @@ export default defineConfig({
       disable: process.env.CAPACITOR_BUILD === '1',
       registerType: 'autoUpdate',
       devOptions: { enabled: true },
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.png', 'favicon-32.png', 'brand/logo-192.png'],
       manifest: {
         name: '5Star Spices',
         short_name: '5Star',
