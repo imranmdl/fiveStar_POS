@@ -1,0 +1,11 @@
+/* Stylesheets of the pre-redesign customer pages. Home, Product, Cart,
+   Checkout and Gifting no longer use them, but the account, orders, loyalty,
+   support, FAQ and invoice pages still rely on the shared helpers defined in
+   them (alerts, buttons, forms, order-summary rows). Loaded before
+   storefront.css so the new design wins wherever both apply. */
+@import '../components/customer/CustomerLayout.css';
+@import '../pages/customer/Home.css';
+@import '../pages/customer/Product.css';
+@import '../pages/customer/Cart.css';
+@import '../pages/customer/Checkout.css';
+@import '../pages/customer/Gifting.css';

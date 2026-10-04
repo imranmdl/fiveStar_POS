@@ -1,37 +1,35 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, ApiError, formatMoney } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
-import { useCartCount } from '../../hooks/useCartCount';
-import './Checkout.css';
+import { useCart } from '../../hooks/useCart';
+import { packLabel, rupees, tintFor } from '../../lib/store';
+import { ProductMedia } from '../../components/customer/ProductCard';
 
-function AddressCard({ address, selected, onSelect }) {
+const EMPTY_ADDRESS = {
+  contact_name: '', contact_mobile: '', address_line1: '', address_line2: '', city: '', state: '', pincode: '',
+};
+
+function AddressChoice({ address, selected, onSelect }) {
+  const line = [address.address_line1, address.address_line2, address.city, address.state, address.pincode]
+    .filter(Boolean).join(', ');
   return (
-    <label className="address-card">
-      <input type="radio" name="address" checked={selected} onChange={() => onSelect(address.uuid)} />
-      <span>
-        <span className="address-card__name">
-          {address.contact_name}
-          {address.is_default && <span className="address-card__badge">Default</span>}
-        </span>
-        <span className="address-card__line">
-          {[address.address_line1, address.address_line2, address.city, address.state, address.pincode]
-            .filter(Boolean)
-            .join(', ')}
-        </span>
-        <span className="address-card__line">{address.contact_mobile}</span>
+    <button type="button" className={`sf-choice ${selected ? 'is-active' : ''}`} onClick={() => onSelect(address.uuid)} aria-pressed={selected}>
+      <span className="sf-choice__text">
+        <b>{address.contact_name}{address.is_default ? ' · Default' : ''}</b>
+        <span>{line}</span>
+        <span>{address.contact_mobile}</span>
       </span>
-    </label>
+    </button>
   );
 }
 
-function NewAddressForm({ onSaved }) {
-  const [form, setForm] = useState({
-    contact_name: '', contact_mobile: '', address_line1: '', address_line2: '',
-    city: '', state: '', pincode: '',
-  });
+function NewAddressForm({ onSaved, onCancel }) {
+  const [form, setForm] = useState(EMPTY_ADDRESS);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+
+  const set = (field) => (event) => setForm((f) => ({ ...f, [field]: event.target.value }));
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -39,8 +37,8 @@ function NewAddressForm({ onSaved }) {
     setError(null);
     try {
       const response = await api.post('/addresses', form);
+      setForm(EMPTY_ADDRESS);
       onSaved(response.data.address.uuid);
-      setForm({ contact_name: '', contact_mobile: '', address_line1: '', address_line2: '', city: '', state: '', pincode: '' });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -48,103 +46,21 @@ function NewAddressForm({ onSaved }) {
     }
   }
 
-  function set(field) {
-    return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
-  }
-
   return (
-    <form className="address-form" onSubmit={handleSubmit}>
-      <h3>Add a delivery address</h3>
-      {error && <div className="form-error">{error}</div>}
-      <div className="address-form__grid">
-        <input placeholder="Full name" required value={form.contact_name} onChange={set('contact_name')} />
-        <input placeholder="Mobile number" required value={form.contact_mobile} onChange={set('contact_mobile')} />
-        <input className="full" placeholder="Address line 1" required value={form.address_line1} onChange={set('address_line1')} />
-        <input className="full" placeholder="Address line 2 (optional)" value={form.address_line2} onChange={set('address_line2')} />
-        <input placeholder="City" required value={form.city} onChange={set('city')} />
-        <input placeholder="State" required value={form.state} onChange={set('state')} />
-        <input placeholder="Pincode" required inputMode="numeric" value={form.pincode} onChange={set('pincode')} />
+    <form className="sf-form-grid" onSubmit={handleSubmit}>
+      {error && <div className="sf-error sf-field--full">{error}</div>}
+      <label className="sf-field">Full name<input required placeholder="Priya Sharma" autoComplete="name" value={form.contact_name} onChange={set('contact_name')} /></label>
+      <label className="sf-field">Mobile<input required inputMode="numeric" maxLength={10} placeholder="9876543210" autoComplete="tel-national" value={form.contact_mobile} onChange={set('contact_mobile')} /></label>
+      <label className="sf-field sf-field--full">Address<input required placeholder="House no., street, area" autoComplete="address-line1" value={form.address_line1} onChange={set('address_line1')} /></label>
+      <label className="sf-field sf-field--full">Landmark (optional)<input placeholder="Near…" autoComplete="address-line2" value={form.address_line2} onChange={set('address_line2')} /></label>
+      <label className="sf-field">Pincode<input required inputMode="numeric" maxLength={6} placeholder="560001" autoComplete="postal-code" value={form.pincode} onChange={set('pincode')} /></label>
+      <label className="sf-field">City<input required placeholder="Bengaluru" autoComplete="address-level2" value={form.city} onChange={set('city')} /></label>
+      <label className="sf-field">State<input required placeholder="Karnataka" autoComplete="address-level1" value={form.state} onChange={set('state')} /></label>
+      <div className="sf-field--full" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <button type="submit" className="sf-btn sf-btn--ink" disabled={busy}>{busy ? 'Saving…' : 'Save address'}</button>
+        {onCancel && <button type="button" className="sf-btn sf-btn--ghost" onClick={onCancel}>Cancel</button>}
       </div>
-      <button type="submit" className="btn-outline" disabled={busy}>{busy ? 'Saving…' : 'Save address'}</button>
     </form>
-  );
-}
-
-function SummaryPanel({ review, paymentMethod, onPaymentMethodChange, onPlace, placing }) {
-  const pricing = review.cart.pricing.summary;
-  const payment = review.cart.payment;
-  const checkout = review.checkout;
-
-  return (
-    <div className="order-summary">
-      <h2>Order summary</h2>
-      <dl className="order-summary__rows">
-        <dt>Items</dt>
-        <dd>{formatMoney(pricing.items_subtotal)}</dd>
-        {Number(pricing.order_discount) > 0 && (
-          <>
-            <dt className="order-summary__discount-label">Discount</dt>
-            <dd className="order-summary__discount-value">−{formatMoney(pricing.order_discount)}</dd>
-          </>
-        )}
-        <dt>Delivery</dt>
-        <dd>{Number(pricing.delivery_charge) === 0 ? <span className="text-success">Free</span> : formatMoney(pricing.delivery_charge)}</dd>
-      </dl>
-      <hr />
-      <div className="order-summary__total">
-        <span>Total</span><span>{formatMoney(pricing.grand_total)}</span>
-      </div>
-      <div className="order-summary__tax">Includes {formatMoney(pricing.tax_total)} GST</div>
-
-      {Number(payment.wallet_applied) > 0 && (
-        <>
-          <div className="order-summary__wallet">
-            <span>Wallet credit</span><span>−{formatMoney(payment.wallet_applied)}</span>
-          </div>
-          <div className="order-summary__total">
-            <span>To pay by UPI</span><span>{formatMoney(payment.amount_payable)}</span>
-          </div>
-        </>
-      )}
-
-      {checkout.cod_available && (
-        <div className="payment-method-choice">
-          <label className="payment-method-choice__label">How would you like to pay?</label>
-          <label className="payment-option">
-            <input type="radio" name="payment_method" value="upi" checked={paymentMethod === 'upi'} onChange={() => onPaymentMethodChange('upi')} />
-            <span>
-              <span className="payment-option__title">Pay by UPI</span>
-              <span className="payment-option__note">Scan a QR code or pay with any UPI app.</span>
-            </span>
-          </label>
-          <label className="payment-option">
-            <input type="radio" name="payment_method" value="cod" checked={paymentMethod === 'cod'} onChange={() => onPaymentMethodChange('cod')} />
-            <span>
-              <span className="payment-option__title">Cash on Delivery</span>
-              <span className="payment-option__note">
-                Pay {formatMoney(pricing.grand_total)} in cash when your order arrives. We confirm COD orders within a
-                few hours.
-              </span>
-            </span>
-          </label>
-        </div>
-      )}
-
-      {checkout.blockers.length > 0 && (
-        <div className="alert alert-warning">
-          <ul>{checkout.blockers.map((b) => <li key={b}>{b}</li>)}</ul>
-        </div>
-      )}
-
-      <button type="button" className="btn-marigold btn-block" disabled={checkout.blockers.length > 0 || placing} onClick={onPlace}>
-        {placing ? 'Placing your order…' : 'Place order'}
-      </button>
-      <p className="payment-method-note">
-        {paymentMethod === 'cod'
-          ? 'You will confirm with an OTP. Our team approves Cash on Delivery orders within a few hours; pay in cash when your order arrives.'
-          : 'You will confirm with an OTP, then pay by UPI. Your order is not confirmed until payment is received.'}
-      </p>
-    </div>
   );
 }
 
@@ -166,54 +82,84 @@ function OtpStep({ order, otp, onResend, onVerify, resending }) {
   }
 
   return (
-    <div className="checkout-centered">
-      <div className="checkout-card">
-        <h1>Confirm your order</h1>
-        <p className="text-muted">
-          Order <span className="fw-semibold">{order.order_number}</span>. We have sent a code to{' '}
-          {(otp && otp.sent_to) || 'your mobile'}.
-        </p>
-
-        {otp && otp.debug_otp && (
-          <div className="account-info">Development mode: your code is <span className="fw-semibold">{otp.debug_otp}</span>.</div>
-        )}
-
-        {error && <div className="form-error">{error}</div>}
-
-        <form onSubmit={handleSubmit}>
-          <label htmlFor="otp">Verification code</label>
-          <input
-            id="otp"
-            className="otp-input"
-            inputMode="numeric"
-            maxLength={6}
-            autoComplete="one-time-code"
-            required
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-          />
-          <button type="submit" className="btn-marigold btn-block" disabled={busy}>
-            {busy ? 'Verifying…' : 'Confirm and continue'}
-          </button>
-        </form>
-
-        <div className="checkout-centered__footer">
-          <button type="button" className="btn-link" onClick={onResend} disabled={resending}>
-            {resending ? 'Sending…' : 'Resend the code'}
-          </button>
-        </div>
-      </div>
+    <div className="sf-center">
+      <h1 className="sf-h1">Confirm your order</h1>
+      <p>Order <b>{order.order_number}</b>. We have sent a code to {(otp && otp.sent_to) || 'your mobile'}.</p>
+      {otp && otp.debug_otp && <div className="sf-status">Development mode: your code is <b>{otp.debug_otp}</b>.</div>}
+      <form className="sf-otp" onSubmit={handleSubmit}>
+        {error && <div className="sf-error">{error}</div>}
+        <label className="sf-field">
+          Verification code
+          <input inputMode="numeric" maxLength={6} autoComplete="one-time-code" required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
+        </label>
+        <button type="submit" className="sf-btn sf-btn--red sf-btn--lg" disabled={busy}>{busy ? 'Verifying…' : 'Confirm and continue'}</button>
+        <button type="button" className="sf-btn sf-btn--ghost" onClick={onResend} disabled={resending}>
+          {resending ? 'Sending…' : 'Resend the code'}
+        </button>
+      </form>
     </div>
+  );
+}
+
+function Summary({ review, paymentMethod, onPlace, placing }) {
+  const cart = review.cart;
+  const summary = cart.pricing.summary;
+  const payment = cart.payment || {};
+  const items = (cart.items || []).filter((item) => !item.is_saved_for_later);
+  const units = items.reduce((total, item) => total + Number(item.quantity || 0), 0);
+  const toPay = Number(payment.amount_payable ?? summary.grand_total);
+  const blockers = review.checkout.blockers || [];
+  const discount = Number(summary.order_discount || 0);
+
+  return (
+    <aside className="sf-summary" aria-label="Order summary">
+      <span className="sf-h3">{units} {units === 1 ? 'item' : 'items'}</span>
+      {items.map((item) => (
+        <div key={item.uuid} className="sf-mini-line">
+          <ProductMedia tint={tintFor(item.product.slug)} />
+          <div className="sf-mini-line__text">
+            <b>{item.product.name}</b>
+            <span>{packLabel(item.variant.weight_grams) || item.variant.name} × {item.quantity}</span>
+          </div>
+          <span>{rupees(item.line_total)}</span>
+        </div>
+      ))}
+      <div className="sf-summary__row" style={{ paddingTop: 14, borderTop: '1px solid var(--sf-line)' }}>
+        <span>Subtotal</span><span>{rupees(summary.items_subtotal)}</span>
+      </div>
+      {discount > 0 && <div className="sf-summary__row"><span>Discount</span><span className="sf-good">− {rupees(discount)}</span></div>}
+      <div className="sf-summary__row">
+        <span>Delivery</span><span>{Number(summary.delivery_charge) === 0 ? 'Free' : rupees(summary.delivery_charge)}</span>
+      </div>
+      {Number(payment.wallet_applied || 0) > 0 && (
+        <div className="sf-summary__row"><span>Wallet credit</span><span className="sf-good">− {rupees(payment.wallet_applied)}</span></div>
+      )}
+      <div className="sf-summary__row sf-summary__row--total"><span>To pay</span><span>{rupees(toPay)}</span></div>
+
+      {blockers.length > 0 && (
+        <div className="sf-error"><ul style={{ margin: 0, paddingLeft: 18 }}>{blockers.map((b) => <li key={b}>{b}</li>)}</ul></div>
+      )}
+
+      <button type="button" className="sf-btn sf-btn--red sf-btn--lg" disabled={blockers.length > 0 || placing} onClick={onPlace}>
+        {placing ? 'Placing your order…' : paymentMethod === 'upi' ? `Pay ${rupees(toPay)} with UPI` : `Place order · ${rupees(toPay)}`}
+      </button>
+      <span className="sf-small">
+        {paymentMethod === 'cod'
+          ? 'You will confirm with an OTP. We approve cash-on-delivery orders within a few hours; pay in cash on arrival.'
+          : 'You will confirm with an OTP, then pay by UPI. Nothing ships before payment is confirmed.'}
+      </span>
+    </aside>
   );
 }
 
 export default function Checkout() {
   const { signedIn, ready } = useAuth();
-  const { refresh: refreshCartCount } = useCartCount();
+  const { refresh: refreshCart } = useCart();
 
   const [review, setReview] = useState(null);
   const [addresses, setAddresses] = useState([]);
   const [selectedAddress, setSelectedAddress] = useState(null);
+  const [addingAddress, setAddingAddress] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('upi');
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState(null);
@@ -240,6 +186,10 @@ export default function Checkout() {
   }, []);
 
   useEffect(() => {
+    document.title = 'Checkout · 5 Star';
+  }, []);
+
+  useEffect(() => {
     if (!ready) return;
     if (!signedIn) {
       setStatus('signed-out');
@@ -255,20 +205,23 @@ export default function Checkout() {
       });
   }, [ready, signedIn, loadReview]);
 
+  useEffect(() => {
+    if (review && !review.checkout.cod_available && paymentMethod === 'cod') setPaymentMethod('upi');
+  }, [review, paymentMethod]);
+
   async function handleAddressChange(uuid) {
     setSelectedAddress(uuid);
-    setStatus('loading');
+    setAddingAddress(false);
     try {
       await loadReview(uuid);
-      setStatus('ready');
     } catch (err) {
       setError(err.message);
-      setStatus('error');
     }
   }
 
   async function handlePlaceOrder() {
     setPlacing(true);
+    setError(null);
     try {
       const response = await api.post('/checkout/place', {
         address_uuid: selectedAddress,
@@ -279,14 +232,13 @@ export default function Checkout() {
       setOrder(response.data.order);
       setOtpReference(response.data.otp && response.data.otp.reference_token);
       setOtp(response.data.otp);
-      refreshCartCount();
+      refreshCart();
       setPhase('otp');
+      window.scrollTo(0, 0);
     } catch (err) {
+      setError(err.message);
       if (err instanceof ApiError && err.status === 409) {
-        setError(err.message);
         await loadReview(selectedAddress);
-      } else {
-        setError(err.message);
       }
     } finally {
       setPlacing(false);
@@ -329,7 +281,7 @@ export default function Checkout() {
         if (o.status === 'confirmed') {
           setOrder(o);
           setPhase('confirmed');
-          refreshCartCount();
+          refreshCart();
           return;
         }
         if (o.status === 'cancelled') {
@@ -353,7 +305,7 @@ export default function Checkout() {
 
     if (response.data.fully_paid_by_wallet) {
       setPhase('confirmed');
-      refreshCartCount();
+      refreshCart();
       return;
     }
 
@@ -372,7 +324,7 @@ export default function Checkout() {
         if (o.payment_status === 'paid') {
           setOrder(o);
           setPhase('confirmed');
-          refreshCartCount();
+          refreshCart();
           return;
         }
         if (o.status === 'cancelled') {
@@ -393,54 +345,39 @@ export default function Checkout() {
   }
 
   if (!ready || status === 'loading') {
-    return <div className="page"><p className="state-message">Loading checkout…</p></div>;
+    return <div className="sf-page"><h1 className="sf-h1">Checkout</h1><p className="sf-muted">Loading checkout…</p></div>;
   }
 
   if (status === 'signed-out') {
     return (
-      <div className="page checkout-centered">
-        <div className="checkout-card checkout-card--center">
-          <h1>Please sign in to check out</h1>
-          <p className="text-muted">Your cart will be waiting.</p>
-          <Link className="btn-marigold" to="/account?next=/checkout">Sign in or create an account</Link>
-        </div>
+      <div className="sf-center">
+        <h1 className="sf-h1">Sign in to check out</h1>
+        <p>Your cart will be waiting. Signing in lets us send your order updates and keep your addresses.</p>
+        <Link className="sf-btn sf-btn--red sf-btn--xl" to="/account?next=/checkout">Sign in or create an account</Link>
+        <Link className="sf-btn sf-btn--ghost" to="/cart">Back to cart</Link>
       </div>
     );
   }
 
   if (status === 'error') {
-    return <div className="page"><p className="state-message state-message--error">Couldn't load checkout: {error}</p></div>;
+    return <div className="sf-page"><div className="sf-error">Checkout could not be loaded: {error}</div></div>;
   }
 
   if (phase === 'otp') {
-    return (
-      <div className="page">
-        <OtpStep order={order} otp={otp} onResend={handleResendOtp} onVerify={handleVerifyOtp} resending={resending} />
-      </div>
-    );
+    return <OtpStep order={order} otp={otp} onResend={handleResendOtp} onVerify={handleVerifyOtp} resending={resending} />;
   }
 
   if (phase === 'cod-wait') {
     return (
-      <div className="page checkout-centered">
-        <div className="checkout-card checkout-card--center">
-          <h1>Cash on Delivery selected</h1>
-          <p className="text-muted">Order {order.order_number}</p>
-          <div className="alert alert-light">
-            Our team reviews Cash on Delivery orders before they are prepared — usually within a few hours. You will
-            pay <strong>{formatMoney(order.amount_payable)}</strong> in cash when your order is delivered. No payment
-            is due now.
-          </div>
-          <div className="alert alert-light">
-            {pollStatus === 'cancelled' ? 'This order was cancelled.' : pollStatus === 'timeout' ? (
-              <>Still waiting on our team. We will message you as soon as it is approved. <Link to="/orders">Check your orders</Link></>
-            ) : 'Waiting for approval…'}
-          </div>
-          <p className="text-muted small">
-            You can close this page. We will message you as soon as your order is approved, and you can always check
-            its status under My Orders.
-          </p>
+      <div className="sf-center">
+        <h1 className="sf-h1">Cash on delivery selected</h1>
+        <p>Order <b>{order.order_number}</b>. Our team reviews cash-on-delivery orders before they are prepared — usually within a few hours. You will pay <b>{rupees(order.amount_payable)}</b> in cash when it arrives.</p>
+        <div className="sf-status">
+          {pollStatus === 'cancelled' ? 'This order was cancelled.' : pollStatus === 'timeout' ? (
+            <>Still waiting on our team. We will message you once it is approved. <Link to="/orders">Check your orders</Link></>
+          ) : 'Waiting for approval…'}
         </div>
+        <p className="sf-small">You can close this page — you can always check its status under My orders.</p>
       </div>
     );
   }
@@ -450,50 +387,40 @@ export default function Checkout() {
     const isQrImageUrl = isManual && typeof payment.qr_payload === 'string' && /^https?:\/\//i.test(payment.qr_payload);
 
     return (
-      <div className="page checkout-centered">
-        <div className="checkout-card checkout-card--center">
-          <h1>Pay {formatMoney(payment.amount)}</h1>
-          <p className="text-muted">Order {order.order_number}</p>
+      <div className="sf-center">
+        <h1 className="sf-h1">Pay {rupees(payment.amount)}</h1>
+        <p>Order <b>{order.order_number}</b></p>
 
-          {!isManual && payment.upi_intent_url && (
-            <a className="btn-marigold btn-block" href={payment.upi_intent_url}>Pay with a UPI app</a>
-          )}
+        {!isManual && payment.upi_intent_url && (
+          <a className="sf-btn sf-btn--red sf-btn--lg sf-btn--block" href={payment.upi_intent_url}>Pay with a UPI app</a>
+        )}
 
-          {isQrImageUrl && (
-            <>
-              <p className="text-muted small">Scan this QR code with any UPI app to pay.</p>
-              <img src={payment.qr_payload} alt="Payment QR code" className="payment-qr" />
-              {payment.upi_intent_url && (
-                <a className="btn-outline btn-block" href={payment.upi_intent_url}>Or pay with a UPI app</a>
-              )}
-              <p className="text-muted small">
-                After paying, keep your payment reference handy — our team verifies manual payments and confirms your
-                order, usually within a few hours.
-              </p>
-            </>
-          )}
+        {isQrImageUrl && (
+          <>
+            <p className="sf-small">Scan this QR code with GPay, PhonePe, Paytm or any UPI app.</p>
+            <img src={payment.qr_payload} alt="UPI payment QR code" className="sf-qr" />
+            {payment.upi_intent_url && (
+              <a className="sf-btn sf-btn--outline sf-btn--block" href={payment.upi_intent_url}>Or pay with a UPI app</a>
+            )}
+            <p className="sf-small">After paying, keep your payment reference handy — we verify manual payments and confirm your order, usually within a few hours.</p>
+          </>
+        )}
 
-          {!isManual && payment.qr_payload && !isQrImageUrl && (
-            <>
-              <p className="text-muted small">Or scan this with any UPI app.</p>
-              <div className="payment-qr-text">{payment.qr_payload}</div>
-            </>
-          )}
+        {!isManual && payment.qr_payload && !isQrImageUrl && (
+          <>
+            <p className="sf-small">Or scan this with any UPI app.</p>
+            <div className="sf-status" style={{ wordBreak: 'break-all' }}>{payment.qr_payload}</div>
+          </>
+        )}
 
-          <div className="alert alert-light">
-            {pollStatus === 'cancelled'
-              ? 'This order was cancelled because payment was not completed in time.'
-              : pollStatus === 'timeout-manual'
-                ? <>We have not confirmed your payment yet. Our team reviews manual payments within a few hours and will message you as soon as it is verified. <Link to="/orders">Check your orders</Link></>
-                : pollStatus === 'timeout-auto'
-                  ? <>We have not seen your payment yet. If money has left your account it will be matched automatically within a few minutes and we will message you. <Link to="/orders">Check your orders</Link></>
-                  : 'Waiting for your payment to be confirmed…'}
-          </div>
-
-          <p className="text-muted small">
-            You can close this page. Your order will be confirmed as soon as the payment reaches us, and we will send
-            you a message.
-          </p>
+        <div className="sf-status">
+          {pollStatus === 'cancelled'
+            ? 'This order was cancelled because payment was not completed in time.'
+            : pollStatus === 'timeout-manual'
+              ? <>We have not confirmed your payment yet. We review manual payments within a few hours and will message you. <Link to="/orders">Check your orders</Link></>
+              : pollStatus === 'timeout-auto'
+                ? <>We have not seen your payment yet. If money has left your account it will be matched within a few minutes. <Link to="/orders">Check your orders</Link></>
+                : 'Waiting for your payment to be confirmed…'}
         </div>
       </div>
     );
@@ -501,53 +428,87 @@ export default function Checkout() {
 
   if (phase === 'confirmed') {
     return (
-      <div className="page checkout-centered">
-        <div className="checkout-card checkout-card--center">
-          <div className="checkout-check">✓</div>
-          <h1>Your order is confirmed</h1>
-          <p className="text-muted">
-            Order {order.order_number}{order.invoice_number ? ` · Invoice ${order.invoice_number}` : ''}
-          </p>
-          <p className="text-muted small">We are preparing it now and will send tracking details as soon as it ships.</p>
-          <Link className="btn-marigold" to="/orders">View your orders</Link>
-          <Link className="btn-link" to="/">Continue shopping</Link>
+      <div className="sf-center">
+        <div className="sf-tick" aria-hidden="true">✓</div>
+        <h1 className="sf-h1" style={{ fontSize: 40 }}>Order placed</h1>
+        <p>
+          Order <b>{order.order_number}</b>
+          {order.grand_total ? ` · ${rupees(order.grand_total)}` : ''}
+          {order.invoice_number ? ` · Invoice ${order.invoice_number}` : ''}.
+          {' '}We'll send tracking details by SMS once it's dispatched, usually within 24 hours.
+        </p>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <Link className="sf-btn sf-btn--ink sf-btn--xl" to="/shop">Continue shopping</Link>
+          <Link className="sf-btn sf-btn--outline sf-btn--xl" to="/orders">View your orders</Link>
         </div>
       </div>
     );
   }
 
+  const delivery = review.cart.pricing.delivery || {};
+  const deliveryCharge = Number(review.cart.pricing.summary.delivery_charge || 0);
+  const codAvailable = Boolean(review.checkout.cod_available);
+  const showForm = addingAddress || addresses.length === 0;
+
   return (
-    <div className="page checkout-page">
-      <h1 className="page-title">Checkout</h1>
-      {error && <div className="form-error">{error}</div>}
-      <div className="checkout-layout">
-        <div className="checkout-main">
-          <div className="checkout-panel">
-            <h2>Deliver to</h2>
-            <div className="address-list">
-              {addresses.length === 0 && <div className="text-muted small">No saved addresses yet.</div>}
-              {addresses.map((address) => (
-                <AddressCard
-                  key={address.uuid}
-                  address={address}
-                  selected={selectedAddress === address.uuid}
-                  onSelect={handleAddressChange}
-                />
-              ))}
+    <div className="sf-page">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <Link to="/cart" className="sf-muted" style={{ fontSize: 14, fontWeight: 500 }}>← Back to cart</Link>
+        <h1 className="sf-h1">Checkout</h1>
+      </div>
+      {error && <div className="sf-error">{error}</div>}
+
+      <div className="sf-split">
+        <div className="sf-split__main sf-steps">
+          <section className="sf-step">
+            <span className="sf-h3">1. Delivery address</span>
+            {addresses.length > 0 && (
+              <div className="sf-choices">
+                {addresses.map((address) => (
+                  <AddressChoice key={address.uuid} address={address} selected={selectedAddress === address.uuid} onSelect={handleAddressChange} />
+                ))}
+              </div>
+            )}
+            {showForm ? (
+              <NewAddressForm onSaved={handleAddressChange} onCancel={addresses.length > 0 ? () => setAddingAddress(false) : null} />
+            ) : (
+              <div><button type="button" className="sf-link-btn" onClick={() => setAddingAddress(true)}>+ Add a new address</button></div>
+            )}
+          </section>
+
+          <section className="sf-step">
+            <span className="sf-h3">2. Delivery</span>
+            <div className="sf-choices">
+              <div className="sf-choice is-active">
+                <span className="sf-choice__text">
+                  <b>Standard delivery</b>
+                  <span>
+                    {delivery.is_serviceable && delivery.estimated_days && delivery.estimated_days.max
+                      ? `${delivery.estimated_days.min}–${delivery.estimated_days.max} days`
+                      : 'Choose an address to see timing'}
+                  </span>
+                </span>
+                <span className="sf-choice__side">{deliveryCharge === 0 ? 'Free' : rupees(deliveryCharge)}</span>
+              </div>
             </div>
-            <NewAddressForm onSaved={handleAddressChange} />
-          </div>
+          </section>
+
+          <section className="sf-step">
+            <span className="sf-h3">3. Payment</span>
+            <div className="sf-choices">
+              <button type="button" className={`sf-choice ${paymentMethod === 'upi' ? 'is-active' : ''}`} aria-pressed={paymentMethod === 'upi'} onClick={() => setPaymentMethod('upi')}>
+                <span className="sf-choice__text"><b>UPI</b><span>GPay, PhonePe, Paytm or any UPI app</span></span>
+              </button>
+              {codAvailable && (
+                <button type="button" className={`sf-choice ${paymentMethod === 'cod' ? 'is-active' : ''}`} aria-pressed={paymentMethod === 'cod'} onClick={() => setPaymentMethod('cod')}>
+                  <span className="sf-choice__text"><b>Cash on delivery</b><span>Pay in cash when your order arrives</span></span>
+                </button>
+              )}
+            </div>
+          </section>
         </div>
 
-        <div className="checkout-summary">
-          <SummaryPanel
-            review={review}
-            paymentMethod={paymentMethod}
-            onPaymentMethodChange={setPaymentMethod}
-            onPlace={handlePlaceOrder}
-            placing={placing}
-          />
-        </div>
+        <Summary review={review} paymentMethod={paymentMethod} onPlace={handlePlaceOrder} placing={placing} />
       </div>
     </div>
   );

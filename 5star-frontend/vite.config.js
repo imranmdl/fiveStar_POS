@@ -23,11 +23,11 @@ export default defineConfig({
       devOptions: { enabled: true },
       includeAssets: ['favicon.png', 'favicon-32.png', 'brand/logo-192.png'],
       manifest: {
-        name: '5Star Spices',
-        short_name: '5Star',
+        name: '5 Star Spices & Dry Fruits',
+        short_name: '5 Star',
         description: 'Spices, dry fruits and groceries — shop online, or sign in to run the store.',
-        theme_color: '#2b2a5c',
-        background_color: '#2b2a5c',
+        theme_color: '#2a2829',
+        background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
         icons: [

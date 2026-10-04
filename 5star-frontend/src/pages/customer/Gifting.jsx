@@ -1,157 +1,137 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, ApiError } from '../../lib/api';
-import './Gifting.css';
+import { api } from '../../lib/api';
+import { cardFromListItem, rupees } from '../../lib/store';
+import { AddControl, ProductMedia } from '../../components/customer/ProductCard';
 
-const EMPTY_FORM = {
-  business_name: '', contact_name: '', contact_mobile: '', contact_email: '',
-  requirements: '', estimated_quantity: '', estimated_budget: '', expected_delivery_date: '',
-  delivery_pincode: '', gstin: '',
-};
+const EMPTY_FORM = { business_name: '', contact_name: '', contact_mobile: '', estimated_quantity: '', requirements: '' };
+
+function GiftCard({ product }) {
+  const href = `/product/${product.slug}`;
+  return (
+    <div className="sf-gift">
+      <Link to={href} aria-label={product.name}>
+        <ProductMedia image={product.image} tint={product.tint} label={product.size} alt={product.name} />
+      </Link>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <Link to={href} className="sf-gift__name">{product.name}</Link>
+        {product.short && <span className="sf-gift__short">{product.short}</span>}
+      </div>
+      <div className="sf-card__foot">
+        <div className="sf-price">
+          <span className="sf-price__now" style={{ fontSize: 18 }}>{rupees(product.price)}</span>
+          {product.off > 0 && <span className="sf-price__mrp">{rupees(product.mrp)}</span>}
+        </div>
+        <AddControl product={product} />
+      </div>
+    </div>
+  );
+}
 
 export default function Gifting() {
+  const [gifts, setGifts] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [enquiryNumber, setEnquiryNumber] = useState(null);
+  const [reference, setReference] = useState(null);
 
-  function set(field) {
-    return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
-  }
+  useEffect(() => {
+    document.title = 'Gift boxes & bulk orders · 5 Star';
+    api.get('/products', { category: 'gift-packs', per_page: 12, sort: 'popularity' })
+      .then((payload) => setGifts((payload.data || []).map(cardFromListItem)))
+      .catch(() => setGifts([]));
+  }, []);
+
+  const set = (field) => (event) => setForm((f) => ({ ...f, [field]: event.target.value }));
 
   async function handleSubmit(event) {
     event.preventDefault();
     setBusy(true);
     setError(null);
-
     const payload = {};
     Object.entries(form).forEach(([key, value]) => {
-      if (value !== '') payload[key] = value;
+      if (String(value).trim() !== '') payload[key] = value;
     });
-
     try {
       const response = await api.post('/bulk-orders/enquiries', payload);
-      setEnquiryNumber(response.data.enquiry.enquiry_number);
+      setReference(response.data.enquiry.enquiry_number);
     } catch (err) {
+      setError(err);
+    } finally {
       setBusy(false);
-      if (err instanceof ApiError && err.status === 422) {
-        setError(err);
-      } else {
-        setError(err);
-      }
     }
   }
 
-  if (enquiryNumber) {
-    return (
-      <div className="page">
-        <div className="gifting-thanks">
-          <h1>Thank you — we have your enquiry</h1>
-          <p>Reference <b>{enquiryNumber}</b></p>
-          <p className="text-muted">
-            We will send a quotation to the mobile number you gave us, usually the same working day. Keep the
-            reference handy if you call.
-          </p>
-          <Link className="btn-marigold" to="/">Back to the shop</Link>
-        </div>
-      </div>
-    );
-  }
+  const fieldMessages = error && typeof error.fieldMessages === 'function' ? error.fieldMessages() : [];
 
   return (
-    <div className="page gifting-page">
-      <div className="gifting-layout">
-        <div className="gifting-main">
-          <h1 className="page-title">Gifting &amp; bulk orders</h1>
-          <p className="text-muted">
-            Diwali hampers for a team, wedding favours, a standing order for an office pantry. Tell us what you need
-            and we will send a price — usually the same working day.
-          </p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 64, paddingBottom: 80 }}>
+      <section className="sf-wrap" style={{ paddingTop: 44, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <span className="sf-eyebrow">Gift boxes</span>
+        <h1 className="sf-hero__title" style={{ fontSize: 'clamp(36px, 6vw, 60px)', maxWidth: '15ch' }}>Gifting &amp; bulk orders</h1>
+        <p className="sf-lead" style={{ fontSize: 17, maxWidth: '56ch' }}>
+          Diwali hampers for a team, wedding favours, a standing order for an office pantry. Tell us what you need and we
+          will send a price — usually the same working day.
+        </p>
+      </section>
 
-          <form className="checkout-panel" onSubmit={handleSubmit}>
-            {error && (
-              <div className="form-error">
-                <div>{error.message}</div>
-                {error.fieldMessages && error.fieldMessages().length > 0 && (
-                  <ul>{error.fieldMessages().map((m) => <li key={m}>{m}</li>)}</ul>
-                )}
-              </div>
-            )}
+      {gifts.length > 0 && (
+        <section className="sf-wrap sf-gifts-grid">
+          {gifts.map((product) => <GiftCard key={product.uuid} product={product} />)}
+        </section>
+      )}
 
-            <div className="field-grid">
-              <div className="field">
-                <label htmlFor="business_name">Business or organisation *</label>
-                <input id="business_name" required minLength={2} value={form.business_name} onChange={set('business_name')} />
-              </div>
-              <div className="field">
-                <label htmlFor="contact_name">Your name *</label>
-                <input id="contact_name" required minLength={2} value={form.contact_name} onChange={set('contact_name')} />
-              </div>
-              <div className="field">
-                <label htmlFor="contact_mobile">Mobile *</label>
-                <input id="contact_mobile" required inputMode="numeric" maxLength={10} placeholder="9876543210" value={form.contact_mobile} onChange={set('contact_mobile')} />
-              </div>
-              <div className="field">
-                <label htmlFor="contact_email">Email</label>
-                <input id="contact_email" type="email" value={form.contact_email} onChange={set('contact_email')} />
-              </div>
-              <div className="field field--full">
-                <label htmlFor="requirements">What do you need? *</label>
-                <textarea
-                  id="requirements"
-                  rows={4}
-                  required
-                  minLength={10}
-                  placeholder="200 gift boxes with almonds, cashews and anjeer. Company logo on the sleeve. Needed by 15 October."
-                  value={form.requirements}
-                  onChange={set('requirements')}
-                />
-                <div className="field-hint">The more specific you are, the more accurate the quote.</div>
-              </div>
-              <div className="field">
-                <label htmlFor="estimated_quantity">Roughly how many</label>
-                <input id="estimated_quantity" type="number" min="1" value={form.estimated_quantity} onChange={set('estimated_quantity')} />
-              </div>
-              <div className="field">
-                <label htmlFor="estimated_budget">Budget (₹)</label>
-                <input id="estimated_budget" type="number" min="0" step="0.01" value={form.estimated_budget} onChange={set('estimated_budget')} />
-              </div>
-              <div className="field">
-                <label htmlFor="expected_delivery_date">Needed by</label>
-                <input id="expected_delivery_date" type="date" value={form.expected_delivery_date} onChange={set('expected_delivery_date')} />
-              </div>
-              <div className="field">
-                <label htmlFor="delivery_pincode">Delivery pincode</label>
-                <input id="delivery_pincode" inputMode="numeric" maxLength={6} value={form.delivery_pincode} onChange={set('delivery_pincode')} />
-              </div>
-              <div className="field">
-                <label htmlFor="gstin">GSTIN</label>
-                <input id="gstin" maxLength={15} value={form.gstin} onChange={set('gstin')} />
-                <div className="field-hint">For a GST invoice in your company's name.</div>
-              </div>
-            </div>
-
-            <button type="submit" className="btn-marigold" disabled={busy}>{busy ? 'Sending…' : 'Send enquiry'}</button>
-            <span className="text-muted small gifting-note">No account needed.</span>
-          </form>
-        </div>
-
-        <div className="gifting-side">
-          <div className="checkout-panel">
-            <h2>How it works</h2>
-            <ol className="gifting-steps">
+      <section className="sf-wrap">
+        <div className="sf-enquiry">
+          <div className="sf-enquiry__aside">
+            <h2 className="sf-h2">Ordering 25 or more?</h2>
+            <ol>
               <li>You tell us what you need.</li>
               <li>We send a written quotation, valid for a set period.</li>
               <li>You accept it, and it becomes a normal order.</li>
               <li>Same OTP confirmation, same prepaid UPI, same tracking.</li>
             </ol>
-            <p className="text-muted small">
-              A wholesale order follows exactly the same rules as any other. Nothing ships before payment is
-              confirmed — which matters most here, because these are the largest amounts.
-            </p>
+          </div>
+          <div className="sf-enquiry__form">
+            {reference ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 0' }}>
+                <span className="sf-h3" style={{ fontSize: 24 }}>Thank you — we have your enquiry</span>
+                <span style={{ font: '400 15px/1.55 var(--sf-text)', color: 'var(--sf-ink-2)' }}>
+                  Reference <b>{reference}</b>. We will send a quotation to the mobile number you gave us, usually the same working day.
+                </span>
+              </div>
+            ) : (
+              <form className="sf-form-grid" onSubmit={handleSubmit}>
+                {error && (
+                  <div className="sf-error sf-field--full">
+                    {error.message}
+                    {fieldMessages.length > 0 && <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>{fieldMessages.map((m) => <li key={m}>{m}</li>)}</ul>}
+                  </div>
+                )}
+                <label className="sf-field">Business or organisation<input required minLength={2} value={form.business_name} onChange={set('business_name')} /></label>
+                <label className="sf-field">Your name<input required minLength={2} autoComplete="name" value={form.contact_name} onChange={set('contact_name')} /></label>
+                <label className="sf-field">Mobile<input required inputMode="numeric" maxLength={10} placeholder="9876543210" autoComplete="tel-national" value={form.contact_mobile} onChange={set('contact_mobile')} /></label>
+                <label className="sf-field">Roughly how many<input type="number" min="1" value={form.estimated_quantity} onChange={set('estimated_quantity')} /></label>
+                <label className="sf-field sf-field--full">
+                  What do you need?
+                  <textarea
+                    rows={3}
+                    required
+                    minLength={10}
+                    placeholder="200 gift boxes with almonds, cashews and anjeer. Company logo on the sleeve. Needed by 15 October."
+                    value={form.requirements}
+                    onChange={set('requirements')}
+                  />
+                </label>
+                <div className="sf-field--full" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                  <button type="submit" className="sf-btn sf-btn--red sf-btn--xl" disabled={busy}>{busy ? 'Sending…' : 'Send enquiry'}</button>
+                  <span className="sf-muted" style={{ fontSize: 14 }}>No account needed.</span>
+                </div>
+              </form>
+            )}
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
