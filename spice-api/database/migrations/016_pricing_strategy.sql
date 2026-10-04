@@ -79,15 +79,19 @@ CREATE TABLE `pricing_rules` (
             (`scope` = 'product'  AND `category_id` IS NULL     AND `product_id` IS NOT NULL AND `product_variant_id` IS NULL) OR
             (`scope` = 'variant'  AND `category_id` IS NULL     AND `product_id` IS NULL     AND `product_variant_id` IS NOT NULL)
         ),
+    -- ON UPDATE RESTRICT (not CASCADE): all three columns appear in the CHECK
+    -- above, and MySQL 8 refuses any referential action on a CHECK column
+    -- (error 3823). MariaDB accepts either; ids never change, so RESTRICT is
+    -- equivalent in practice and keeps this file portable.
     CONSTRAINT `fk_pricing_rules_category`
         FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
     CONSTRAINT `fk_pricing_rules_product`
         FOREIGN KEY (`product_id`) REFERENCES `products` (`id`)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
     CONSTRAINT `fk_pricing_rules_variant`
         FOREIGN KEY (`product_variant_id`) REFERENCES `product_variants` (`id`)
-        ON UPDATE CASCADE ON DELETE RESTRICT
+        ON UPDATE RESTRICT ON DELETE RESTRICT
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------

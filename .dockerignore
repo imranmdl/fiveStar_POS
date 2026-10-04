@@ -1,0 +1,46 @@
+# Only Dockerfile, docker/, 5star-frontend/ and spice-api/ are needed to build.
+# Everything else stays out of the build context — in particular database
+# dumps, env files and the stale copies at the repository root.
+
+.git
+.claude
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+*.envsss
+*.sql.gz
+**/*.zip
+
+# Database dumps and backups (contain customer data)
+backups-before-wipe
+spice-api/database/backups
+spice-api/backend/storage
+
+# Root-level legacy copies (the real code lives in spice-api/ and 5star-frontend/)
+/*.php
+/*.sql
+/*.html
+/*.js
+/*.mjs
+/*.md
+/*.csv
+/*.json
+!/railway.json
+/admin
+/assets
+/docs
+/samples
+/.htaccess
+/DO_NOT_UPLOAD_HERE
+
+# Frontend build output and native shells (rebuilt in the image)
+5star-frontend/dist
+5star-frontend/dev-dist
+5star-frontend/android
+
+# Old test bundle
+spice-api/test
+spice-api/phpinfo.php.txt
+spice-api/backend/composer.phar
+spice-api/backend/vendor

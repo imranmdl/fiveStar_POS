@@ -174,7 +174,7 @@ warn('Rotate any secret that has ever been pasted into a chat, an email, a '
 // ---------------------------------------------------------------------------
 section('Payments');
 
-$paymentDriver = (string) env('PAYMENT_DRIVER', 'sandbox');
+$paymentDriver = (string) env('PAYMENT_DRIVER', 'manual');
 
 if ($paymentDriver === 'sandbox') {
     block(
@@ -209,7 +209,7 @@ if ($paymentDriver === 'sandbox') {
 // ---------------------------------------------------------------------------
 section('Delivery');
 
-$courierDriver = (string) env('COURIER_DRIVER', 'sandbox');
+$courierDriver = (string) env('COURIER_DRIVER', 'manual');
 
 if ($courierDriver === 'sandbox') {
     block(
