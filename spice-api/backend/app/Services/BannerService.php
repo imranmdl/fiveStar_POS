@@ -50,6 +50,10 @@ final class BannerService
                 'value' => $row['link_value'],
             ],
             'cta_label' => $row['cta_label'],
+            'eyebrow' => $row['eyebrow'],
+            'promo_code' => $row['promo_code'],
+            'bg_color' => $row['bg_color'],
+            'text_color' => $row['text_color'],
         ], $banners);
     }
 
@@ -71,13 +75,11 @@ final class BannerService
         $this->assertPlacement((string) $data['placement']);
         $this->assertLinkTargetExists((string) $data['link_type'], $data['link_value'] ?? null);
 
-        if (!isset($files['image'])) {
-            throw new HttpException('A banner needs artwork.', 422, [
-                'image' => ['Upload the desktop or wide banner image.'],
-            ]);
-        }
-
-        $wide = $this->uploads->storeImage($files['image'], 'banners');
+        // Artwork is optional: a text banner (eyebrow, headline, body, button
+        // and promo code on a coloured panel) needs no image at all.
+        $this->assertColors($data);
+        $hasImage = isset($files['image']) && (int) ($files['image']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+        $wide = $hasImage ? $this->uploads->storeImage($files['image'], 'banners') : null;
         $mobile = isset($files['mobile_image'])
             ? $this->uploads->storeImage($files['mobile_image'], 'banners')
             : null;
@@ -86,7 +88,11 @@ final class BannerService
             $bannerId = $this->banners->create([
                 'title' => $data['title'],
                 'subtitle' => $data['subtitle'] ?? null,
-                'image_path' => $wide['file_path'],
+                'image_path' => $wide['file_path'] ?? null,
+                'eyebrow' => $data['eyebrow'] ?? null,
+                'promo_code' => $data['promo_code'] ?? null,
+                'bg_color' => strtolower((string) ($data['bg_color'] ?? '#2a2829')),
+                'text_color' => strtolower((string) ($data['text_color'] ?? '#ffffff')),
                 'mobile_image_path' => $mobile['file_path'] ?? null,
                 'alt_text' => $data['alt_text'] ?? $data['title'],
                 'placement' => $data['placement'],
@@ -98,7 +104,7 @@ final class BannerService
                 'end_date' => $data['end_date'] ?? null,
             ], $request->authUserId());
         } catch (\Throwable $exception) {
-            $this->uploads->delete($wide['file_path']);
+            $this->uploads->delete($wide['file_path'] ?? null);
             $this->uploads->delete($mobile['file_path'] ?? null);
 
             throw $exception;
@@ -135,10 +141,19 @@ final class BannerService
             );
         }
 
+        $this->assertColors($data);
+
         $changes = array_intersect_key($data, array_flip([
             'title', 'subtitle', 'alt_text', 'placement', 'link_type', 'link_value',
             'cta_label', 'display_order', 'start_date', 'end_date', 'is_active',
+            'eyebrow', 'promo_code', 'bg_color', 'text_color',
         ]));
+
+        foreach (['bg_color', 'text_color'] as $colorField) {
+            if (isset($changes[$colorField])) {
+                $changes[$colorField] = strtolower((string) $changes[$colorField]);
+            }
+        }
 
         if ($changes === []) {
             throw new HttpException('No changes were supplied.', 422);
@@ -175,6 +190,72 @@ final class BannerService
             request: $request,
             entityUuid: $uuid
         );
+    }
+
+    /**
+     * Uploads (or replaces) a banner's wide artwork.
+     *
+     * @param array<string, mixed> $file
+     *
+     * @return array<string, mixed>
+     */
+    public function replaceImage(string $uuid, array $file, Request $request): array
+    {
+        $banner = $this->requireBanner($uuid);
+        $stored = $this->uploads->storeImage($file, 'banners');
+
+        $this->banners->update((int) $banner['id'], ['image_path' => $stored['file_path']], $request->authUserId());
+        $this->uploads->delete($banner['image_path']);
+
+        $this->audit->log(
+            entityName: 'banners',
+            entityId: (int) $banner['id'],
+            action: 'replace_image',
+            request: $request,
+            entityUuid: $uuid
+        );
+
+        return $this->present((array) $this->banners->findById((int) $banner['id']));
+    }
+
+    /**
+     * Turns a photo banner back into a text banner.
+     *
+     * @return array<string, mixed>
+     */
+    public function removeImage(string $uuid, Request $request): array
+    {
+        $banner = $this->requireBanner($uuid);
+
+        $this->banners->update((int) $banner['id'], ['image_path' => null, 'mobile_image_path' => null], $request->authUserId());
+        $this->uploads->delete($banner['image_path']);
+        $this->uploads->delete($banner['mobile_image_path']);
+
+        $this->audit->log(
+            entityName: 'banners',
+            entityId: (int) $banner['id'],
+            action: 'remove_image',
+            request: $request,
+            entityUuid: $uuid
+        );
+
+        return $this->present((array) $this->banners->findById((int) $banner['id']));
+    }
+
+    /** @param array<string, mixed> $data */
+    private function assertColors(array $data): void
+    {
+        $errors = [];
+
+        foreach (['bg_color', 'text_color'] as $field) {
+            if (isset($data[$field]) && preg_match('/^#[0-9a-fA-F]{6}$/', (string) $data[$field]) !== 1) {
+                $errors[$field] = ['Use a colour like #c62d1f.'];
+            }
+        }
+
+        if ($errors !== []) {
+            throw new HttpException('Banner colours must be hex colours.', 422, $errors);
+        }
     }
 
     /**
@@ -277,6 +358,10 @@ final class BannerService
             'placement' => $row['placement'],
             'link' => ['type' => $row['link_type'], 'value' => $row['link_value']],
             'cta_label' => $row['cta_label'],
+            'eyebrow' => $row['eyebrow'] ?? null,
+            'promo_code' => $row['promo_code'] ?? null,
+            'bg_color' => $row['bg_color'] ?? '#2a2829',
+            'text_color' => $row['text_color'] ?? '#ffffff',
             'display_order' => (int) $row['display_order'],
             'schedule' => ['start_date' => $row['start_date'], 'end_date' => $row['end_date']],
             'stats' => [

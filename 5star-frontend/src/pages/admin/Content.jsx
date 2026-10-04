@@ -9,18 +9,20 @@ import ContentCategories from './ContentCategories';
 import ContentCollections from './ContentCollections';
 import ContentBanners from './ContentBanners';
 import ContentPages from './ContentPages';
+import ContentAppearance from './ContentAppearance';
 import './Content.css';
 
 const TABS = [
+  ['appearance', 'Appearance'],
+  ['banners', 'Banners'],
   ['categories', 'Categories'],
   ['collections', 'Campaign pages'],
-  ['banners', 'Adverts'],
   ['pages', 'Pages'],
 ];
 
 export default function Content() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get('tab') || 'categories';
+  const tab = searchParams.get('tab') || 'appearance';
 
   // A festival on the Festival Calendar screen can open straight into its
   // own campaign page here (?tab=collections&open=<slug>), instead of
@@ -53,6 +55,7 @@ export default function Content() {
         </div>
       </div>
 
+      {tab === 'appearance' && <ContentAppearance />}
       {tab === 'categories' && <ContentCategories />}
       {tab === 'collections' && <ContentCollections initialOpenSlug={openSlug} />}
       {tab === 'banners' && <ContentBanners />}

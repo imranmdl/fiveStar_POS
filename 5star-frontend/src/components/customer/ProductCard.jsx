@@ -16,14 +16,18 @@ export function ProductMedia({ image, tint, label, className = '', children, sty
   );
 }
 
-/** The stepper or Add button for a product, kept in sync with the cart. */
-export function AddControl({ product, size = 'sm', tone = 'add', label }) {
+/**
+ * ADD TO CART, or the red − qty + stepper once the product is in the cart.
+ * `variant` picks the button style (outline-red on cards, yellow on the
+ * product-of-the-month panel).
+ */
+export function AddControl({ product, variant = 'outline-red', size = 'sm', label = 'ADD TO CART', block = false }) {
   const { lineForProduct, addProduct, setQuantity, busy } = useCart();
   const line = lineForProduct(product.uuid);
 
   if (line) {
     return (
-      <div className="sf-stepper" aria-label={`${product.name} in cart`}>
+      <div className="sf-qty" aria-label={`${product.name} in cart`} style={block ? undefined : { minWidth: 140 }}>
         <button type="button" aria-label="One fewer" disabled={busy} onClick={() => setQuantity(line.uuid, line.quantity - 1)}>−</button>
         <span>{line.quantity}</span>
         <button type="button" aria-label="One more" disabled={busy} onClick={() => setQuantity(line.uuid, line.quantity + 1)}>+</button>
@@ -34,47 +38,59 @@ export function AddControl({ product, size = 'sm', tone = 'add', label }) {
   return (
     <button
       type="button"
-      className={`sf-btn sf-btn--${tone} sf-btn--${size}`}
+      className={`sf-btn sf-btn--${variant} sf-btn--${size}${block ? ' sf-btn--block' : ''}`}
       disabled={busy}
       onClick={() => addProduct(product.slug, product.name)}
     >
-      {label || (size === 'xs' ? '+ Add' : 'Add')}
+      {label}
     </button>
   );
 }
 
-/** Product card used on Home, Shop and Gifts — card view-model from lib/store. */
-export default function ProductCard({ product }) {
+export function Rating({ rating, reviews }) {
+  if (!reviews) return null;
+  return (
+    <div className="sf-rating">
+      <b>{Number(rating).toFixed(1)} ★</b>
+      <span>({reviews.toLocaleString('en-IN')})</span>
+    </div>
+  );
+}
+
+export function Price({ price, mrp, off }) {
+  return (
+    <div className="sf-price">
+      <span className="sf-price__now">{rupees(price)}</span>
+      {off > 0 && mrp > price && (
+        <>
+          <span className="sf-price__mrp">{rupees(mrp)}</span>
+          <span className="sf-price__off">{off}% off</span>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Product card used in every grid and shelf — card view-model from lib/store. */
+export default function ProductCard({ product, showAdd = true }) {
   const href = `/product/${product.slug}`;
-  const meta = [product.size, product.sub].filter(Boolean).join(' · ');
 
   return (
-    <div className="sf-card">
-      <Link to={href} className="sf-card__media" aria-label={product.name}>
-        <ProductMedia
-          image={product.image}
-          tint={product.tint}
-          label={product.sub}
-          alt={product.name}
-          className="sf-media--square"
-        >
-          <div className="sf-card__badges">
-            {product.off > 0 && <span className="sf-pill sf-pill--off">{product.off}% off</span>}
-            {product.organic && <span className="sf-pill sf-pill--organic">Organic</span>}
-          </div>
+    <div className="sf-pcard">
+      <Link to={href} aria-label={product.name}>
+        <ProductMedia image={product.image} tint={product.tint} alt={product.name} className="sf-media--square">
+          {product.organic && <span className="sf-badge sf-badge--organic">ORGANIC</span>}
         </ProductMedia>
       </Link>
-      <Link to={href} className="sf-card__text">
-        <span className="sf-card__name">{product.name}</span>
-        {meta && <span className="sf-card__meta">{meta}</span>}
-      </Link>
-      <div className="sf-card__foot">
-        <div className="sf-price">
-          <span className="sf-price__now">{rupees(product.price)}</span>
-          {product.off > 0 && product.mrp > product.price && <span className="sf-price__mrp">{rupees(product.mrp)}</span>}
+      <Link to={href} className="sf-pcard__name">{product.name}</Link>
+      <Rating rating={product.rating} reviews={product.reviews} />
+      <Price price={product.price} mrp={product.mrp} off={product.off} />
+      <span className="sf-pcard__size">{product.size || (product.multiple ? 'Multiple sizes' : ' ')}</span>
+      {showAdd && (
+        <div className="sf-pcard__cta">
+          <AddControl product={product} block />
         </div>
-        <AddControl product={product} />
-      </div>
+      )}
     </div>
   );
 }

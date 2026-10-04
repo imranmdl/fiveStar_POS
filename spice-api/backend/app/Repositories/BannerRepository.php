@@ -16,7 +16,7 @@ final class BannerRepository extends BaseRepository
         return [
             'title', 'subtitle', 'image_path', 'mobile_image_path', 'alt_text',
             'placement', 'link_type', 'link_value', 'cta_label', 'display_order',
-            'start_date', 'end_date',
+            'start_date', 'end_date', 'eyebrow', 'promo_code', 'bg_color', 'text_color',
         ];
     }
 
@@ -34,8 +34,9 @@ final class BannerRepository extends BaseRepository
     public function liveForPlacement(string $placement): array
     {
         return $this->db->select(
-            'SELECT `uuid`, `title`, `subtitle`, `image_path`, `mobile_image_path`,
+            'SELECT `uuid`, `title`, `subtitle`, `eyebrow`, `image_path`, `mobile_image_path`,
                     `alt_text`, `placement`, `link_type`, `link_value`, `cta_label`,
+                    `promo_code`, `bg_color`, `text_color`,
                     `display_order`, `start_date`, `end_date`
                FROM `banners`
               WHERE `placement` = :placement

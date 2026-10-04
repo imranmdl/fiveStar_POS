@@ -31,9 +31,19 @@ const BLANK = {
   min_quantity: '',
   usage_limit: '',
   audience: 'all',
+  offer_type: 'festival',
   starts_date: '',
+  starts_time: '00:00',
   ends_date: '',
+  ends_time: '23:59',
 };
+
+/** How an offer is presented on the storefront (BOGO is set by its benefit). */
+const OFFER_KINDS = [
+  ['festival', 'Regular offer'],
+  ['deal_of_day', 'Deal of the Day — on the home page with a countdown'],
+  ['flash_sale', 'Flash sale'],
+];
 
 /**
  * offer comes straight from OfferService::present() — discount_type/value,
@@ -59,8 +69,11 @@ function fieldsFromOffer(offer) {
     min_quantity: discount.min_quantity ?? '',
     usage_limit: usage.limit ?? '',
     audience: offer.audience || 'all',
+    offer_type: offer.offer_type === 'bogo' ? 'festival' : (offer.offer_type || 'festival'),
     starts_date: String(schedule.starts_date || '').slice(0, 10),
+    starts_time: String(schedule.starts_date || '').slice(11, 16) || '00:00',
     ends_date: String(schedule.ends_date || '').slice(0, 10),
+    ends_time: String(schedule.ends_date || '').slice(11, 16) || '23:59',
   };
 }
 
@@ -94,17 +107,23 @@ export default function OfferForm({ offer, prefill, onCancel, onSaved }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    const payload = { offer_type: fields.discount_type === 'free_items' ? 'bogo' : 'festival' };
+    const payload = {};
 
     Object.entries(fields).forEach(([key, value]) => {
       if (value !== '' && value !== null && value !== undefined) payload[key] = value;
     });
+    // Buy-X-get-Y is its own type; otherwise keep the kind chosen above, so
+    // editing a Deal of the Day no longer turns it into a regular offer.
+    payload.offer_type = fields.discount_type === 'free_items' ? 'bogo' : (fields.offer_type || 'festival');
+    delete payload.starts_time;
+    delete payload.ends_time;
 
     payload.code = String(payload.code || fields.code || '').toUpperCase();
 
-    // Dates come from a date input; the API expects a datetime.
-    if (payload.starts_date) payload.starts_date = `${payload.starts_date} 00:00:00`;
-    if (payload.ends_date) payload.ends_date = `${payload.ends_date} 23:59:59`;
+    // Date + time inputs; the API expects a datetime. Deals of the Day count
+    // down to the exact end time shown here.
+    if (payload.starts_date) payload.starts_date = `${payload.starts_date} ${fields.starts_time || '00:00'}:00`;
+    if (payload.ends_date) payload.ends_date = `${payload.ends_date} ${fields.ends_time || '23:59'}:${fields.ends_time && fields.ends_time !== '23:59' ? '00' : '59'}`;
 
     if (payload.discount_type !== 'free_items') {
       delete payload.buy_quantity;
@@ -164,6 +183,19 @@ export default function OfferForm({ offer, prefill, onCancel, onSaved }) {
             <input id="offer_title" required minLength={3} placeholder="Buy one get one free on spices"
                    value={fields.title} onChange={set('title')} />
           </div>
+
+          {!isBogo && (
+            <div className="promo-field">
+              <label htmlFor="offer_kind">Show as</label>
+              <select id="offer_kind" value={fields.offer_type} onChange={set('offer_type')}>
+                {OFFER_KINDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+              <div className="promo-hint">
+                A Deal of the Day appears in the home page's "Deals of the Day" row with a live countdown to its end
+                time. Choose its products under "Which products" after saving.
+              </div>
+            </div>
+          )}
 
           <div className="promo-field">
             <label htmlFor="offer_discount_type">Benefit *</label>
@@ -262,12 +294,18 @@ export default function OfferForm({ offer, prefill, onCancel, onSaved }) {
 
           <div className="promo-field">
             <label htmlFor="offer_starts">Starts</label>
-            <input id="offer_starts" type="date" value={fields.starts_date} onChange={set('starts_date')} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input id="offer_starts" type="date" value={fields.starts_date} onChange={set('starts_date')} />
+              <input aria-label="Start time" type="time" value={fields.starts_time} onChange={set('starts_time')} />
+            </div>
           </div>
 
           <div className="promo-field">
             <label htmlFor="offer_ends">Ends *</label>
-            <input id="offer_ends" type="date" required value={fields.ends_date} onChange={set('ends_date')} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input id="offer_ends" type="date" required value={fields.ends_date} onChange={set('ends_date')} />
+              <input aria-label="End time" type="time" value={fields.ends_time} onChange={set('ends_time')} />
+            </div>
             <div className="promo-hint">Required to activate — an automatic discount with no end date runs forever.</div>
           </div>
 

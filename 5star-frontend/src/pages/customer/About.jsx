@@ -17,33 +17,33 @@ export default function About() {
   }, []);
 
   return (
-    <div className="sf-stack-72">
-      <section className="sf-wrap sf-about-hero">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+    <>
+      <section className="sf-panel sf-panel--pad sf-about">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <span className="sf-eyebrow">Our story</span>
-          <h1 className="sf-hero__title" style={{ fontSize: 'clamp(36px, 6vw, 64px)' }}>Selling spices and dry fruits since 1984</h1>
-          <p className="sf-lead" style={{ fontSize: 17, lineHeight: 1.6, color: 'var(--sf-ink-2)', maxWidth: '50ch' }}>
+          <h1 className="sf-big" style={{ fontSize: 'clamp(30px, 4.6vw, 48px)' }}>Selling spices and dry fruits since 1984</h1>
+          <p>
             We started as a neighbourhood counter and still buy the way we did then: directly from growers and trusted
             traders, in quantities small enough to keep everything fresh.
           </p>
-          <div><Link to="/shop" className="sf-btn sf-btn--red sf-btn--xl">Shop now</Link></div>
+          <div><Link to="/shop" className="sf-btn sf-btn--red sf-btn--lg">SHOP NOW</Link></div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
-          <img src="/brand/logo-512.png" alt="5 Star, since 1984" width="340" height="340" />
-        </div>
+        <img src="/brand/logo-512.png" alt="5 Star, since 1984" width="280" height="280" />
       </section>
 
-      <section className="sf-wrap sf-sourcing">
+      <section className="sf-sourcing">
         {SOURCING.map((item) => (
-          <div key={item.title}>
+          <div key={item.title} className="sf-panel">
             <div className="sf-media" style={{ background: item.tint }}>
               <span className="sf-media__label">Photo · {item.place}</span>
             </div>
-            <b>{item.title}</b>
-            <span>{item.body}</span>
+            <div className="sf-sourcing__body">
+              <b>{item.title}</b>
+              <span>{item.body}</span>
+            </div>
           </div>
         ))}
       </section>
-    </div>
+    </>
   );
 }

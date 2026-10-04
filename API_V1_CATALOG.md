@@ -83,9 +83,20 @@ Live banners for a placement, filtered by schedule window in SQL so an expired
 banner can never be served. Placements: `home_hero`, `home_strip`,
 `category_top`, `app_home`, `checkout`. Serving a set counts an impression.
 
+Each banner carries `eyebrow`, `title`, `subtitle`, `cta_label`, `promo_code`,
+`bg_color`, `text_color` (`#rrggbb`) and an optional `image_url` — banners without
+artwork render as coloured text slides.
+
 ### POST /banners/{uuid}/click
 
 Click-through telemetry.
+
+### GET /storefront/theme
+
+Public storefront look set by the administrator: `header_bg`, `header_text`,
+`accent`, `primary`, `page_bg`, `announcement`, `announcement_bg`,
+`announcement_text`, `tagline`, `banner_seconds` (3–20) and `show_deals`.
+Cached for 60 seconds. Read by the web shop and the Android/iOS app.
 
 ---
 
@@ -214,9 +225,13 @@ than a JSON blob so it stays queryable ("all products above 20 g protein").
 | Method | Path |
 |---|---|
 | GET | `/admin/banners` — optional `placement` filter, includes impression/click/CTR |
-| POST | `/admin/banners` — multipart: `image` required, `mobile_image` optional |
+| POST | `/admin/banners` — multipart; `image` optional (text slide without it), `mobile_image` optional; `eyebrow`, `promo_code`, `bg_color`, `text_color` |
 | PATCH | `/admin/banners/{uuid}` |
 | DELETE | `/admin/banners/{uuid}` |
+| POST | `/admin/banners/{uuid}/image` — replace the artwork (multipart `image`) |
+| DELETE | `/admin/banners/{uuid}/image` — remove the artwork |
+| GET | `/admin/storefront/theme` |
+| PATCH | `/admin/storefront/theme` — any subset of the theme fields; colours `#rrggbb` |
 
 `link_type` is `none`, `category`, `product`, `url` or `offer`. Category and
 product targets are **verified to exist at save time**, so a banner cannot ship

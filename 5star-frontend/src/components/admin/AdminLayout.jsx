@@ -48,7 +48,7 @@ const NAV_GROUPS = [
     section: 'Marketing',
     items: [
       ['/admin/promotions', 'Promotions', 'Coupons and offers'],
-      ['/admin/content', 'Shopfront', 'Categories and adverts'],
+      ['/admin/content', 'Shopfront', 'Appearance, banners, categories'],
       ['/admin/bulk', 'Wholesale', 'Gifting and bulk enquiries'],
       ['/admin/festivals', 'Festival Calendar', "Set up a festival's gift page in one click"],
     ],

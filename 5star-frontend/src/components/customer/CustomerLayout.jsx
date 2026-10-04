@@ -3,13 +3,13 @@ import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from
 import { api } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
 import { CartProvider, useCart } from '../../hooks/useCart';
+import { StorefrontThemeProvider, themeVars, useStorefrontTheme } from '../../hooks/useStorefrontTheme';
 import { BRAND_LOGO_ALT, BRAND_LOGO_URL } from '../../lib/brand';
-import { FREE_DELIVERY_ABOVE, rupees } from '../../lib/store';
 import '../../styles/customer-legacy.css';
 import '../../styles/storefront.css';
 
 const NAV = [
-  ['/shop', 'Shop'],
+  ['/shop', 'All products'],
   ['/gifting', 'Gift boxes'],
   ['/about', 'About'],
 ];
@@ -19,13 +19,13 @@ function totalProducts(category) {
     + (category.children || []).reduce((sum, child) => sum + totalProducts(child), 0);
 }
 
-function Brand() {
+function Brand({ tagline }) {
   return (
     <Link to="/" className="sf-brand" aria-label="5 Star — home">
-      <img src={BRAND_LOGO_URL} alt={BRAND_LOGO_ALT} width="44" height="44" />
+      <span className="sf-brand__logo"><img src={BRAND_LOGO_URL} alt={BRAND_LOGO_ALT} width="38" height="38" /></span>
       <span className="sf-brand__words">
         <span className="sf-brand__name">5 Star</span>
-        <span className="sf-brand__tag">Spices &amp; Dry Fruits</span>
+        {tagline && <span className="sf-brand__tag">{tagline}</span>}
       </span>
     </Link>
   );
@@ -55,35 +55,12 @@ function SearchBox() {
         name="q"
         value={value}
         onChange={(event) => setValue(event.target.value)}
-        placeholder="Search for haldi, cardamom, almonds…"
+        placeholder="Search for spices, dry fruits, seeds and more"
         aria-label="Search products"
         autoComplete="off"
       />
+      <button type="submit">Search</button>
     </form>
-  );
-}
-
-function CategoryRail({ categories }) {
-  const location = useLocation();
-  const [params] = useSearchParams();
-  const onShop = location.pathname === '/shop';
-  const active = onShop ? params.get('category') || 'all' : null;
-
-  return (
-    <nav className="sf-rail" aria-label="Categories">
-      <Link to="/shop" className={`sf-chip ${active === 'all' && !params.get('q') ? 'sf-chip--active' : ''}`}>
-        Everything
-      </Link>
-      {categories.map((category) => (
-        <Link
-          key={category.slug}
-          to={`/shop?category=${encodeURIComponent(category.slug)}`}
-          className={`sf-chip ${active === category.slug ? 'sf-chip--active' : ''}`}
-        >
-          {category.name}
-        </Link>
-      ))}
-    </nav>
   );
 }
 
@@ -91,16 +68,64 @@ function CartToast() {
   const { toast } = useCart();
   if (!toast) return null;
 
+  if (toast.kind === 'error') {
+    return <div className="sf-toast sf-toast--error" role="alert"><span>{toast.text}</span></div>;
+  }
   return (
-    <div className={`sf-toast ${toast.kind === 'error' ? 'sf-toast--error' : ''}`} role="status" aria-live="polite">
-      <span>{toast.text}</span>
-      {toast.kind !== 'error' && <Link to="/cart">View cart</Link>}
+    <div className="sf-toast" role="status" aria-live="polite">
+      <span><span className="sf-toast__tick">✓</span> {toast.text}</span>
+      <Link to="/cart">VIEW CART</Link>
     </div>
+  );
+}
+
+function Footer({ categories }) {
+  return (
+    <footer className="sf-footer">
+      <div className="sf-footer__cols">
+        <div className="sf-footer__col">
+          <span className="sf-footer__title">Shop</span>
+          <Link to="/shop">All products</Link>
+          {categories.slice(0, 5).map((category) => (
+            <Link key={category.slug} to={`/shop?category=${encodeURIComponent(category.slug)}`}>{category.name}</Link>
+          ))}
+        </div>
+        <div className="sf-footer__col">
+          <span className="sf-footer__title">Company</span>
+          <Link to="/about">Our story</Link>
+          <Link to="/gifting">Gift boxes</Link>
+          <Link to="/gifting#enquiry">Bulk orders</Link>
+        </div>
+        <div className="sf-footer__col">
+          <span className="sf-footer__title">Help</span>
+          <Link to="/orders">My orders</Link>
+          <Link to="/support">Support</Link>
+          <Link to="/page/shipping-policy">Shipping</Link>
+          <Link to="/page/returns-and-refunds">Returns</Link>
+          <Link to="/faq">FAQ</Link>
+          <Link to="/page/privacy-policy">Privacy</Link>
+          <Link to="/page/terms-of-service">Terms</Link>
+        </div>
+        <div className="sf-footer__col">
+          <div className="sf-footer__brand">
+            <span className="sf-brand__logo"><img src={BRAND_LOGO_URL} alt="" width="36" height="36" /></span>
+            <span>5 Star Spices &amp; Dry Fruits<br />Since 1984</span>
+          </div>
+        </div>
+      </div>
+      <div className="sf-footer__bar">
+        <div>
+          <span>© {new Date().getFullYear()} 5 Star Spices &amp; Dry Fruits</span>
+          <span>Secure UPI payments · All prices include GST</span>
+        </div>
+      </div>
+    </footer>
   );
 }
 
 function Shell({ signedIn }) {
   const { count } = useCart();
+  const theme = useStorefrontTheme();
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
@@ -113,19 +138,11 @@ function Shell({ signedIn }) {
       .catch(() => setCategories([]));
   }, []);
 
-  const announcement = [
-    FREE_DELIVERY_ABOVE ? `Free delivery above ${rupees(FREE_DELIVERY_ABOVE)}` : null,
-    'Dispatched within 24 hours',
-    'All prices include GST',
-  ].filter(Boolean).join(' · ');
-
   return (
-    <div className="sf">
-      <div className="sf-announce">{announcement}</div>
-
+    <div className="sf" style={themeVars(theme)}>
       <header className="sf-header">
         <div className="sf-header__row">
-          <Brand />
+          <Brand tagline={theme.tagline} />
           <SearchBox />
           <div className="sf-header__actions">
             <nav className="sf-nav" aria-label="Main">
@@ -141,35 +158,14 @@ function Shell({ signedIn }) {
             </Link>
           </div>
         </div>
-        <CategoryRail categories={categories} />
       </header>
+      {theme.announcement && <div className="sf-announce">{theme.announcement}</div>}
 
       <main className="sf-main">
-        <Outlet />
+        <Outlet context={{ categories }} />
       </main>
 
-      <footer className="sf-footer">
-        <div className="sf-footer__row">
-          <div className="sf-footer__brand">
-            <img src={BRAND_LOGO_URL} alt="" width="40" height="40" />
-            <span>5 Star Spices &amp; Dry Fruits<br />Since 1984</span>
-          </div>
-          <div className="sf-footer__links">
-            <Link to="/shop">Shop</Link>
-            <Link to="/gifting">Gift boxes</Link>
-            <Link to="/about">About</Link>
-            <Link to="/orders">My orders</Link>
-            <Link to="/support">Support</Link>
-            <Link className="sf-footer__quiet" to="/page/shipping-policy">Shipping</Link>
-            <Link className="sf-footer__quiet" to="/page/returns-and-refunds">Returns</Link>
-            <Link className="sf-footer__quiet" to="/page/privacy-policy">Privacy</Link>
-            <Link className="sf-footer__quiet" to="/page/terms-of-service">Terms</Link>
-            <Link className="sf-footer__quiet" to="/faq">FAQ</Link>
-          </div>
-          <span className="sf-footer__note">Secure UPI payments · All prices include GST</span>
-        </div>
-      </footer>
-
+      <Footer categories={categories} />
       <CartToast />
     </div>
   );
@@ -185,10 +181,12 @@ export default function CustomerLayout() {
   }, [pathname]);
 
   return (
-    // Reload the cart once the session is restored and any guest cart merged
-    // (useAuth's `ready`), and again whenever the person signs in or out.
-    <CartProvider refreshKey={ready ? (signedIn ? 'signed-in' : 'guest') : 'starting'}>
-      <Shell signedIn={signedIn} />
-    </CartProvider>
+    <StorefrontThemeProvider>
+      {/* Reload the cart once the session is restored and any guest cart merged
+          (useAuth's `ready`), and again whenever the person signs in or out. */}
+      <CartProvider refreshKey={ready ? (signedIn ? 'signed-in' : 'guest') : 'starting'}>
+        <Shell signedIn={signedIn} />
+      </CartProvider>
+    </StorefrontThemeProvider>
   );
 }
