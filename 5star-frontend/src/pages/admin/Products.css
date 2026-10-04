@@ -1,0 +1,105 @@
+.admin-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.admin-field {
+  margin-bottom: 12px;
+  flex: 1;
+}
+
+.admin-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.admin-field-row {
+  display: flex;
+  gap: 12px;
+}
+
+.admin-hint {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
+
+.admin-btn--danger-outline {
+  color: #c0392b;
+  border-color: #c0392b;
+  background: #fff;
+}
+
+.admin-btn--success {
+  background: #2e7d32;
+  color: #fff;
+  border-color: #2e7d32;
+}
+
+/* Simple custom overlay panel, used in place of a modal library. */
+.admin-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 16px;
+}
+
+.admin-overlay__panel {
+  background: #fff;
+  border-radius: 10px;
+  width: 100%;
+  max-width: 32rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.admin-overlay__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-overlay__close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: #888;
+}
+
+.admin-overlay__body {
+  padding: 16px 20px;
+}
+
+.admin-overlay__footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.review-chip {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #fff;
+}
+
+.review-chip--success { background: #2e7d32; }

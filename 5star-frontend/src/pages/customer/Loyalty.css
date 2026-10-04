@@ -1,0 +1,141 @@
+.loyalty-page {
+  max-width: 640px;
+}
+
+.loyalty-empty {
+  text-align: center;
+  padding-top: 40px;
+}
+
+.loyalty-empty .btn-marigold {
+  display: inline-block;
+  margin-top: 12px;
+}
+
+.loyalty-balance-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+  margin-bottom: 16px;
+  background: #fff;
+}
+
+.loyalty-balance-card__value {
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.loyalty-balance-card__lifetime {
+  margin-top: 8px;
+}
+
+.checkout-panel {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  background: #fff;
+  margin-bottom: 16px;
+}
+
+.checkout-panel h2 {
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+
+.redeem-form {
+  display: flex;
+  gap: 8px;
+}
+
+.redeem-form input {
+  flex: 1 1 auto;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.redeem-form button {
+  padding: 9px 18px;
+  border: none;
+  border-radius: 999px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ledger-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ledger-row:last-child {
+  border-bottom: none;
+}
+
+.ledger-row__source {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.ledger-row__narration,
+.ledger-row__date {
+  font-size: 12px;
+  color: #888;
+}
+
+.ledger-row__points {
+  font-weight: 600;
+}
+
+.ledger-row__points--credit {
+  color: #2f6b1f;
+}
+
+.ledger-row__points--debit {
+  color: #c0392b;
+}
+
+.alert {
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.alert-warning {
+  background: #fff8e6;
+  color: #8a6416;
+}
+
+.text-muted {
+  color: #888;
+}
+
+.small {
+  font-size: 13px;
+}
+
+.toast-pop {
+  position: fixed;
+  bottom: 20px;
+  right: 16px;
+  left: 16px;
+  max-width: 360px;
+  margin-left: auto;
+  padding: 12px 16px;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  z-index: 300;
+}
+
+.toast-pop--success {
+  background: #2f6b1f;
+}
+
+.toast-pop--danger {
+  background: #c0392b;
+}

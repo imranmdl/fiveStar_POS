@@ -1,0 +1,326 @@
+/*
+ * Mobile-first on purpose: this is the one admin screen meant to be used on
+ * a phone, on a warehouse floor, by someone who may be holding a scanner
+ * gun in the other hand. Big tap targets, no horizontal scrolling, inputs
+ * sized so iOS doesn't auto-zoom on focus (>=16px).
+ */
+
+.mscan {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.mscan-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mscan-tab {
+  flex: 1;
+  padding: 12px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mscan-tab--active {
+  background: var(--brand-forest);
+  color: #fff;
+  border-color: var(--brand-forest);
+}
+
+.mscan-scan-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.mscan-input {
+  font-size: 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mscan-input--big {
+  flex: 1;
+  min-height: 48px;
+}
+
+.mscan-add-btn {
+  min-height: 48px;
+  min-width: 72px;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mscan-feedback {
+  font-size: 14px;
+  margin-bottom: 10px;
+  padding: 8px 0;
+}
+
+.mscan-feedback--muted { color: #888; }
+.mscan-feedback--success { color: #2e7d32; }
+.mscan-feedback--warning { color: #b7791f; }
+.mscan-feedback--danger { color: #c0392b; }
+
+.mscan-quick-create {
+  border: 1px solid #b7791f;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mscan-quick-create__title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.mscan-quick-create__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.mscan-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #555;
+}
+
+.mscan-field input,
+.mscan-field select {
+  font-size: 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  min-height: 44px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.mscan-full-btn {
+  width: 100%;
+  min-height: 48px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.mscan-cart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 18px 0 8px;
+}
+
+.mscan-cart-header h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.mscan-cart-total {
+  font-weight: 700;
+}
+
+.mscan-empty-hint {
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+  padding: 24px 0;
+}
+
+.mscan-cart-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.mscan-cart-row {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.mscan-cart-row__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.mscan-cart-row__name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.mscan-cart-row__meta {
+  color: #888;
+  font-size: 12px;
+}
+
+.mscan-remove {
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 8px;
+  border: 1px solid #c0392b;
+  background: #fff;
+  color: #c0392b;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mscan-cart-row__fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mscan-cart-row__total {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #555;
+}
+
+.mscan-confirm-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.mscan-confirm-btn {
+  margin-top: 4px;
+}
+
+.mscan-lookup-result {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.mscan-stock-list {
+  margin: 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mscan-stock-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mscan-lookup-total {
+  font-weight: 700;
+}
+
+/* Price-decision overlay (brief §7), shown one flagged line at a time. */
+.mscan-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1090;
+  padding: 0;
+}
+
+@media (min-width: 560px) {
+  .mscan-overlay {
+    align-items: center;
+    padding: 16px;
+  }
+}
+
+.mscan-sheet {
+  background: #fff;
+  width: 100%;
+  max-width: 440px;
+  border-radius: 16px 16px 0 0;
+  padding: 18px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@media (min-width: 560px) {
+  .mscan-sheet {
+    border-radius: 16px;
+  }
+}
+
+.mscan-sheet__title {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+
+.mscan-sheet__facts {
+  margin: 0 0 14px;
+  font-size: 13px;
+}
+
+.mscan-sheet__facts > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mscan-sheet__facts dt { color: #888; font-weight: 400; }
+.mscan-sheet__facts dd { margin: 0; font-weight: 600; }
+
+.mscan-sheet__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mscan-choice {
+  text-align: left;
+  min-height: 46px;
+}
+
+.mscan-manual-row {
+  display: flex;
+  gap: 8px;
+}
+
+.mscan-manual-row .mscan-input {
+  flex: 1;
+}
+
+.mscan-sheet__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.mscan-sheet__progress {
+  font-size: 12px;
+  color: #888;
+}

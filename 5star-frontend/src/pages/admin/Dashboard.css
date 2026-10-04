@@ -1,0 +1,155 @@
+.dash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.dash-eyebrow {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #888;
+}
+
+.dash-date {
+  font-size: 13px;
+  color: #888;
+}
+
+.dash-section-label {
+  font-weight: 600;
+  margin: 18px 0 8px;
+  font-size: 13.5px;
+}
+
+.dash-muted {
+  color: #888;
+  font-size: 13px;
+}
+
+.dash-muted--spaced {
+  margin-bottom: 8px;
+}
+
+.dash-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+  background: #fff;
+}
+
+.dash-card__header {
+  font-weight: 600;
+  margin-bottom: 10px;
+  font-size: 13.5px;
+}
+
+.dash-card__header--split {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dash-card__link {
+  font-size: 13px;
+}
+
+.dash-card--attention {
+  border-color: #c0392b;
+}
+
+.attention-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.attention-list__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.attention-list__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c0392b;
+  flex-shrink: 0;
+}
+
+.attention-list__label {
+  flex: 1;
+}
+
+.attention-list__count {
+  display: inline-block;
+  min-width: 24px;
+  text-align: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #c0392b;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dash-attention-empty {
+  text-align: center;
+  padding: 24px;
+}
+
+.dash-attention-empty__title {
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+.dash-attention-empty__hint {
+  color: #888;
+  font-size: 13px;
+}
+
+.dash-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 900px) {
+  .dash-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.dash-row--today td {
+  font-weight: 600;
+}
+
+.dash-offer-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.dash-urgent {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #c0392b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dash-footnote {
+  color: #888;
+  font-size: 12px;
+  margin-top: 24px;
+}

@@ -1,0 +1,179 @@
+.inv-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.inv-tab {
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: #666;
+  border-bottom: 2px solid transparent;
+}
+
+.inv-tab--active {
+  color: var(--brand-forest);
+  font-weight: 600;
+  border-bottom-color: var(--brand-forest);
+}
+
+.inv-filter-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.inv-btn-group {
+  display: flex;
+  gap: 4px;
+}
+
+.inv-input,
+.inv-select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  background: #fff;
+}
+
+.inv-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #1a5fb4;
+  cursor: pointer;
+  font-size: 13px;
+  text-decoration: underline;
+}
+
+.inv-link:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.inv-qty--danger {
+  color: #c0392b;
+  font-weight: 600;
+}
+
+.inv-qty--warning {
+  color: #b7791f;
+  font-weight: 600;
+}
+
+.inv-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.inv-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.small-muted {
+  color: #888;
+  font-size: 12px;
+}
+
+/* Overlay "modals" — plain fixed-position panels since this app ships no Bootstrap. */
+.inv-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1090;
+  padding: 16px;
+}
+
+.inv-modal {
+  background: #fff;
+  border-radius: 10px;
+  max-width: 32rem;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.inv-modal--wide {
+  max-width: 48rem;
+}
+
+.inv-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.inv-modal__title {
+  font-size: 16px;
+  margin: 0;
+}
+
+.inv-modal__body {
+  padding: 18px;
+}
+
+.inv-modal__h3 {
+  font-size: 14px;
+  margin: 16px 0 6px;
+}
+
+.inv-modal__table {
+  margin-bottom: 12px;
+}
+
+.inv-modal__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.inv-field {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.inv-field > span:first-child {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.inv-field input,
+.inv-field select {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.inv-field .small-muted {
+  display: block;
+  margin-top: 4px;
+}
+
+.inv-batch-select {
+  margin-bottom: 6px;
+}

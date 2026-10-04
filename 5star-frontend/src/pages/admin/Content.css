@@ -1,0 +1,164 @@
+/* Shared styling for the Shopfront tabs (categories, campaign pages, adverts, pages). */
+
+.content-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 7fr 5fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.content-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  margin-bottom: 16px;
+}
+
+.content-card--wide {
+  grid-column: 1;
+}
+
+.content-card__header {
+  font-weight: 600;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.content-card__body {
+  padding: 16px;
+}
+
+.content-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.content-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #444;
+}
+
+.content-field input,
+.content-field select,
+.content-field textarea {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.content-hint {
+  font-size: 11px;
+  color: #888;
+}
+
+.content-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.content-muted {
+  color: #888;
+}
+
+.content-subtext {
+  color: #888;
+  font-size: 12px;
+}
+
+.content-note {
+  color: #888;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.content-row-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.content-thumb {
+  width: 10rem;
+  height: 6rem;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.content-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.content-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.content-list li:last-child {
+  border-bottom: none;
+}
+
+.content-headline {
+  color: #8a6a1f;
+  font-size: 12px;
+}
+
+.content-warning {
+  color: #c0392b;
+  font-size: 12px;
+}
+
+.content-back {
+  background: none;
+  border: none;
+  color: var(--brand-forest);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 0 12px;
+  font-size: 13px;
+}
+
+.content-editor-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.content-editor-top h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.content-editor-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

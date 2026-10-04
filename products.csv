@@ -1,0 +1,4 @@
+name,sku,description,price,stock,status
+Almonds Premium,TEST-ALM-001,Premium California Almonds,650,50,active
+Cashews W320,TEST-CAS-001,Premium Cashew Nuts,800,30,active
+Pistachios,TEST-PIS-001,Roasted Pistachios,900,25,active

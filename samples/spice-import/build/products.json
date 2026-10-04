@@ -1,0 +1,222 @@
+[
+    {
+        "file": "black-pepper.jpg",
+        "name": "Black Pepper",
+        "kind": "whole",
+        "colors": [
+            "#1c1c1c",
+            "#3a2f2a",
+            "#0f0f0f"
+        ],
+        "sub": "Whole Spices"
+    },
+    {
+        "file": "green-cardamom-8mm.jpg",
+        "name": "Green Cardamom 8mm",
+        "kind": "whole",
+        "colors": [
+            "#5c8a3a",
+            "#7aa84a",
+            "#486b2d"
+        ],
+        "sub": "Whole Spices"
+    },
+    {
+        "file": "cloves.jpg",
+        "name": "Cloves",
+        "kind": "whole",
+        "colors": [
+            "#5a2d12",
+            "#7a3f1a",
+            "#43200c"
+        ],
+        "sub": "Whole Spices"
+    },
+    {
+        "file": "cinnamon-sticks.jpg",
+        "name": "Cinnamon Sticks",
+        "kind": "stick",
+        "colors": [
+            "#a0622d",
+            "#b87a3f",
+            "#85501f"
+        ],
+        "sub": "Whole Spices"
+    },
+    {
+        "file": "cumin-seeds.jpg",
+        "name": "Cumin Seeds",
+        "kind": "whole",
+        "colors": [
+            "#8a7350",
+            "#a08a63",
+            "#6f5c3d"
+        ],
+        "sub": "Whole Spices"
+    },
+    {
+        "file": "coriander-seeds.jpg",
+        "name": "Coriander Seeds",
+        "kind": "whole",
+        "colors": [
+            "#b39a52",
+            "#c8b068",
+            "#96803f"
+        ],
+        "sub": "Whole Spices"
+    },
+    {
+        "file": "star-anise.jpg",
+        "name": "Star Anise",
+        "kind": "star",
+        "colors": [
+            "#6b3a1e",
+            "#8a4d2a",
+            "#54290f"
+        ],
+        "sub": "Whole Spices"
+    },
+    {
+        "file": "bay-leaf.jpg",
+        "name": "Bay Leaf",
+        "kind": "leaf",
+        "colors": [
+            "#7d8a3c",
+            "#95a34c",
+            "#65712d"
+        ],
+        "sub": "Whole Spices"
+    },
+    {
+        "file": "fennel-seeds.jpg",
+        "name": "Fennel Seeds",
+        "kind": "whole",
+        "colors": [
+            "#9aa060",
+            "#b1b874",
+            "#7f8549"
+        ],
+        "sub": "Whole Spices"
+    },
+    {
+        "file": "mustard-seeds.jpg",
+        "name": "Mustard Seeds",
+        "kind": "whole",
+        "colors": [
+            "#3d2b1f",
+            "#54392a",
+            "#2a1b12"
+        ],
+        "sub": "Whole Spices"
+    },
+    {
+        "file": "turmeric-powder.jpg",
+        "name": "Turmeric Powder",
+        "kind": "powder",
+        "colors": [
+            "#e0a71a",
+            "#f0b92e",
+            "#c48f0e"
+        ],
+        "sub": "Ground Spices"
+    },
+    {
+        "file": "red-chilli-powder.jpg",
+        "name": "Red Chilli Powder",
+        "kind": "powder",
+        "colors": [
+            "#b3251b",
+            "#cc3324",
+            "#8f1a12"
+        ],
+        "sub": "Ground Spices"
+    },
+    {
+        "file": "kashmiri-chilli-powder.jpg",
+        "name": "Kashmiri Chilli Powder",
+        "kind": "powder",
+        "colors": [
+            "#c4180f",
+            "#dc2a1c",
+            "#a11009"
+        ],
+        "sub": "Ground Spices"
+    },
+    {
+        "file": "coriander-powder.jpg",
+        "name": "Coriander Powder",
+        "kind": "powder",
+        "colors": [
+            "#a89a4a",
+            "#bcae5c",
+            "#8d8038"
+        ],
+        "sub": "Ground Spices"
+    },
+    {
+        "file": "cumin-powder.jpg",
+        "name": "Cumin Powder",
+        "kind": "powder",
+        "colors": [
+            "#9c7d4c",
+            "#b2925d",
+            "#816439"
+        ],
+        "sub": "Ground Spices"
+    },
+    {
+        "file": "black-pepper-powder.jpg",
+        "name": "Black Pepper Powder",
+        "kind": "powder",
+        "colors": [
+            "#2b2b2b",
+            "#454545",
+            "#1a1a1a"
+        ],
+        "sub": "Ground Spices"
+    },
+    {
+        "file": "dry-ginger-powder.jpg",
+        "name": "Dry Ginger Powder",
+        "kind": "powder",
+        "colors": [
+            "#d2b16a",
+            "#e0c07c",
+            "#b8974f"
+        ],
+        "sub": "Ground Spices"
+    },
+    {
+        "file": "garam-masala.jpg",
+        "name": "Garam Masala",
+        "kind": "blend",
+        "colors": [
+            "#7a4a22",
+            "#96602f",
+            "#5e3717"
+        ],
+        "sub": "Spice Blends"
+    },
+    {
+        "file": "biryani-masala.jpg",
+        "name": "Biryani Masala",
+        "kind": "blend",
+        "colors": [
+            "#a8552a",
+            "#c26a3a",
+            "#8a4120"
+        ],
+        "sub": "Spice Blends"
+    },
+    {
+        "file": "chaat-masala.jpg",
+        "name": "Chaat Masala",
+        "kind": "blend",
+        "colors": [
+            "#b58a4a",
+            "#cc9f5c",
+            "#986f38"
+        ],
+        "sub": "Spice Blends"
+    }
+]

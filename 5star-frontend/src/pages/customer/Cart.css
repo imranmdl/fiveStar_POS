@@ -1,0 +1,294 @@
+.cart-empty {
+  text-align: center;
+  padding-top: 48px;
+}
+
+.cart-empty .btn-marigold {
+  display: inline-block;
+  margin-top: 12px;
+}
+
+.cart-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (min-width: 900px) {
+  .cart-layout {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .cart-items {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .cart-summary {
+    flex: 0 0 320px;
+  }
+}
+
+.cart-line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+  background: #fff;
+}
+
+.cart-line__info {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.cart-line__name {
+  font-weight: 600;
+}
+
+.cart-line__variant {
+  font-size: 13px;
+  color: #888;
+}
+
+.cart-line__offer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.cart-line__warning {
+  display: inline-block;
+  margin-top: 6px;
+  background: #fff3cd;
+  color: #8a6416;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.cart-line__price-changed {
+  color: #c0392b;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.cart-line__controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cart-line__controls input[type='number'] {
+  width: 64px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.cart-line__price {
+  text-align: right;
+  min-width: 90px;
+}
+
+.cart-line__price-now {
+  font-weight: 600;
+}
+
+.cart-line__price-each {
+  font-size: 12px;
+  color: #888;
+}
+
+.btn-outline {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.coupon-form {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  background: #fff;
+}
+
+.coupon-form label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.coupon-form__row {
+  display: flex;
+  gap: 8px;
+}
+
+.coupon-form__row input {
+  flex: 1 1 auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.order-summary {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  background: #fff;
+}
+
+.order-summary h2 {
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.order-summary__rows {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 0;
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.order-summary__rows dt {
+  font-weight: 400;
+}
+
+.order-summary__rows dd {
+  margin: 0;
+  text-align: right;
+}
+
+.order-summary__discount-label,
+.order-summary__discount-value {
+  color: #2f6b1f;
+}
+
+.order-summary__offer-note {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.order-summary__total {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.order-summary__tax {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.order-summary__savings {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2f6b1f;
+  margin-bottom: 10px;
+}
+
+.order-summary__wallet {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #2f6b1f;
+}
+
+.text-success {
+  color: #2f6b1f;
+}
+
+.pincode-form {
+  margin-top: 14px;
+}
+
+.pincode-form label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.pincode-form__row {
+  display: flex;
+  gap: 8px;
+}
+
+.pincode-form__row input {
+  flex: 1 1 auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.form-text {
+  font-size: 12px;
+  color: #888;
+  margin-top: 6px;
+}
+
+.form-text--success {
+  color: #2f6b1f;
+}
+
+.form-text--error {
+  color: #c0392b;
+}
+
+.alert {
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-top: 14px;
+}
+
+.alert-warning {
+  background: #fff8e6;
+  color: #8a6416;
+}
+
+.alert__title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.alert ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.checkout-cta {
+  display: block;
+  text-align: center;
+  margin-top: 14px;
+  padding: 10px;
+  border-radius: 999px;
+  text-decoration: none;
+}
+
+.checkout-cta--disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.small {
+  font-size: 13px;
+}

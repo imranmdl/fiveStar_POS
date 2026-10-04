@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PLACEHOLDER LOGO for light backgrounds — the console sign-in card and any
+  printed page. Same mark, ink instead of cream.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="320" height="80"
+     role="img" aria-label="Spice and Dry Fruits">
+  <circle cx="40" cy="40" r="27" fill="none" stroke="#C9A253" stroke-width="2.5"/>
+  <text x="40" y="53" font-family="Marcellus, Georgia, serif" font-size="34"
+        fill="#8A6A1F" text-anchor="middle">S</text>
+  <text x="82" y="36" font-family="Marcellus, Georgia, serif" font-size="23" fill="#0B3B2E">Spice</text>
+  <text x="152" y="36" font-family="Marcellus, Georgia, serif" font-size="23" fill="#C9A253">&amp;</text>
+  <text x="82" y="62" font-family="Marcellus, Georgia, serif" font-size="23" fill="#0B3B2E">Dry Fruits</text>
+</svg>

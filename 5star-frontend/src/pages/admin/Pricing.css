@@ -1,0 +1,109 @@
+.pricing-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.pricing-card__header {
+  padding: 10px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.pricing-card__body {
+  padding: 16px;
+}
+
+.pricing-hint {
+  color: #888;
+  font-size: 12px;
+}
+
+.pricing-ok {
+  color: #2e7d32;
+}
+
+.pricing-error {
+  color: #c0392b;
+}
+
+.pricing-mode-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.pricing-mode-form select {
+  min-width: 22rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.pricing-row--warning {
+  background: #fff8e6;
+}
+
+.pricing-suggested {
+  color: #b7791f;
+  font-weight: 600;
+}
+
+.pricing-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.pricing-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pricing-field--wide {
+  grid-column: 1 / -1;
+}
+
+.pricing-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+}
+
+.pricing-field input,
+.pricing-field select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.pricing-sku-lookup {
+  display: flex;
+  gap: 8px;
+  max-width: 24rem;
+}
+
+.pricing-sku-lookup input {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.pricing-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+@media (max-width: 720px) {
+  .pricing-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Spice &amp; Dry Fruits Commerce API</title>
+  <!--
+    Swagger UI is loaded from a CDN with subresource integrity omitted
+    deliberately: pinning a hash here would break silently on the next CDN
+    release and leave the documentation blank with no explanation. If this page
+    is exposed publicly, vendor the assets locally instead and pin them.
+
+    THIS PAGE SHOULD NOT BE PUBLIC ON A PRODUCTION HOST. It enumerates every
+    endpoint, including staff ones. Serve it behind the same access control as
+    the admin console, or not at all.
+  -->
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    body { margin: 0; background: #fafafa; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .banner {
+      background: #7a2e1d; color: #fff; padding: 0.85rem 1.25rem;
+      font-size: 0.9rem; line-height: 1.45;
+    }
+    .banner strong { display: block; font-size: 1.05rem; margin-bottom: 0.15rem; }
+    .banner code { background: rgba(255,255,255,0.16); padding: 0.1rem 0.35rem; border-radius: 3px; }
+    #swagger-ui { max-width: 1180px; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <div class="banner">
+    <strong>Generated from the code, not written by hand.</strong>
+    Regenerate with <code>php bin/generate_openapi.php</code> after changing any route.
+    The consistency audit fails if this document is stale.
+    Response <em>payload</em> shapes are not described — see <code>docs/API_*.md</code> for those.
+  </div>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js" crossorigin></script>
+  <script>
+    window.addEventListener('load', function () {
+      window.ui = SwaggerUIBundle({
+        url: '../../docs/openapi.json',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        docExpansion: 'none',
+        filter: true,
+        tryItOutEnabled: true,
+        persistAuthorization: true,
+        defaultModelsExpandDepth: 1,
+        presets: [SwaggerUIBundle.presets.apis]
+      });
+    });
+  </script>
+</body>
+</html>

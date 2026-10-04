@@ -1,0 +1,120 @@
+.gifting-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (min-width: 900px) {
+  .gifting-layout {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .gifting-main {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .gifting-side {
+    flex: 0 0 300px;
+  }
+}
+
+.checkout-panel {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  background: #fff;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.field--full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 560px) {
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: #888;
+  margin-top: 4px;
+}
+
+.form-error {
+  background: #fdecea;
+  color: #c0392b;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.form-error ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.gifting-note {
+  margin-left: 12px;
+}
+
+.gifting-side h2 {
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+
+.gifting-steps {
+  padding-left: 20px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.gifting-steps li {
+  margin-bottom: 8px;
+}
+
+.gifting-thanks {
+  text-align: center;
+  padding: 48px 16px;
+}
+
+.gifting-thanks .btn-marigold {
+  display: inline-block;
+  margin-top: 12px;
+}
+
+.text-muted {
+  color: #888;
+}
+
+.small {
+  font-size: 13px;
+}

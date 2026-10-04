@@ -1,0 +1,9 @@
+﻿SKU,Barcode,Category,"Sub Category","Product Name",Brand,"Pack Size",Size,Colour,"Weight (g)",Unit,Loose,Quantity,"Unit Cost","Discount %","GST %",HSN,MRP,"Selling Price","Markup %","Batch No","Expiry Date","Publish Online"
+,,Spices,"Whole Spices","Black Pepper","Sample Farms","250 g",,,,,,20,180,5,5,,320,,30,BP-01,2027-09-19,yes
+,,"Grocery & Staples","Rice & Grains","Sona Masoori Rice",,,,,,kg,yes,50,52,,5,,,,20,RC-01,2027-09-19,
+,,Oils,"Cooking Oils","Groundnut Oil","Sample Oils","1 L",,,,,,12,170,2,5,,210,199,,OIL-01,2027-09-19,
+,,Clothing,Men,"Cotton T-Shirt","Sample Wear",,M,Blue,,,,10,180,,12,,499,,60,,,
+,,Clothing,Men,"Cotton T-Shirt","Sample Wear",,L,Blue,,,,10,180,,12,,499,,60,,,
+,,Footwear,Men,"Canvas Sneakers",,,8,Black,,,,6,450,5,12,,999,849,,,,
+,,Toys,"Soft Toys","Teddy Bear 30cm",,Medium,,Brown,,,,8,220,,12,,499,,50,,,
+,,Stationery,"Pens & Pencils","Gel Pen Blue",Sample,"Pack of 10",,,,,,30,55,,12,,100,,40,,,

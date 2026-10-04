@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PLACEHOLDER LOGO — replace this file with your own.
+
+  Drawn in the shop's own colours (forest #0B3B2E, gold #C9A253) so the header
+  looks deliberate until your real mark arrives, rather than showing a broken
+  image or an empty gap.
+
+  Replace with a PNG, SVG or WebP of roughly 4:1 — about 320x80. Keep the file
+  name, or point SPICE_BRAND.logoUrl at the new one in assets/js/config.js.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="320" height="80"
+     role="img" aria-label="Spice and Dry Fruits">
+  <circle cx="40" cy="40" r="27" fill="none" stroke="#C9A253" stroke-width="2.5"/>
+  <text x="40" y="53" font-family="Marcellus, Georgia, serif" font-size="34"
+        fill="#E4C77E" text-anchor="middle">S</text>
+  <text x="82" y="36" font-family="Marcellus, Georgia, serif" font-size="23" fill="#FBF7EE">Spice</text>
+  <text x="152" y="36" font-family="Marcellus, Georgia, serif" font-size="23" fill="#C9A253">&amp;</text>
+  <text x="82" y="62" font-family="Marcellus, Georgia, serif" font-size="23" fill="#FBF7EE">Dry Fruits</text>
+</svg>

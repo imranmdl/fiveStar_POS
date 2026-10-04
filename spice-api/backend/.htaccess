@@ -1,0 +1,10 @@
+# Nothing in backend/ is web-servable EXCEPT public/.
+#
+# This protects app/, config/, bootstrap/, bin/, storage/ and above all .env if
+# the document root is ever pointed at backend/ instead of backend/public, or if
+# the application is installed in a subdirectory so that the URL path traverses
+# this folder.
+#
+# public/.htaccess grants access back to itself. If you move or delete that
+# grant, the API will return 403 for every request.
+Require all denied

@@ -1,0 +1,6 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="96" fill="#2b2a5c"/>
+  <circle cx="256" cy="226" r="132" fill="none" stroke="#e8972e" stroke-width="16"/>
+  <path d="M256 128 L286 206 L368 206 L302 254 L326 332 L256 284 L186 332 L210 254 L144 206 L226 206 Z" fill="#e8972e"/>
+  <text x="256" y="430" font-family="Poppins, Arial, sans-serif" font-weight="700" font-size="56" fill="#ffffff" text-anchor="middle">5Star</text>
+</svg>

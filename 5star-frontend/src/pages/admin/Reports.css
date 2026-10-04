@@ -1,0 +1,101 @@
+.reports-muted {
+  color: #888;
+  font-size: 12px;
+}
+
+.reports-danger {
+  color: #c0392b;
+}
+
+.reports-range-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.reports-clickable {
+  cursor: pointer;
+}
+
+.reports-grid {
+  display: grid;
+  grid-template-columns: 7fr 5fr;
+  gap: 16px;
+  margin-bottom: 20px;
+  align-items: start;
+}
+
+.reports-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.reports-dl {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.reports-dl dt {
+  font-weight: 400;
+  color: #555;
+}
+
+.reports-dl dd {
+  margin: 0;
+  text-align: right;
+}
+
+.reports-daily-card {
+  transition: box-shadow 0.2s ease;
+}
+
+.reports-flash {
+  box-shadow: 0 0 0 3px #b7791f;
+}
+
+.reports-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1090;
+  padding: 16px;
+}
+
+.reports-modal {
+  background: #fff;
+  border-radius: 10px;
+  max-width: 900px;
+  width: 100%;
+  max-height: 85vh;
+  overflow: auto;
+}
+
+.reports-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.reports-modal__header h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.reports-modal__body {
+  padding: 0 0 12px;
+}
+
+@media (max-width: 900px) {
+  .reports-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,151 @@
+.barcode-gen-intro {
+  color: var(--ink-500);
+  font-size: 13px;
+  max-width: 60ch;
+  margin: 0 0 var(--space-4);
+}
+
+.barcode-gen-search {
+  max-width: 32rem;
+  margin-bottom: var(--space-2);
+}
+
+.barcode-gen-search__input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.barcode-gen-results {
+  max-width: 32rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-4);
+  overflow: hidden;
+}
+
+.barcode-gen-results__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 13.5px;
+}
+
+.barcode-gen-results__item:last-child {
+  border-bottom: none;
+}
+
+.barcode-gen-results__item:hover {
+  background: var(--surface-muted);
+}
+
+.barcode-gen-results__item:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.barcode-gen-results__name {
+  display: block;
+  font-weight: 600;
+  color: var(--ink-900);
+}
+
+.barcode-gen-results__sku {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-500);
+}
+
+.barcode-gen-results__cta {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--ink-500);
+  margin-left: var(--space-2);
+}
+
+.barcode-gen-results__empty {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--ink-500);
+}
+
+.barcode-gen-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.barcode-gen-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.barcode-gen-card__title {
+  font-weight: 600;
+}
+
+.barcode-gen-card__count {
+  font-size: 12.5px;
+  color: var(--ink-500);
+}
+
+.barcode-gen-card__body {
+  padding: var(--space-3) var(--space-4);
+}
+
+.barcode-gen-table-wrap {
+  overflow-x: auto;
+}
+
+.barcode-gen-table__name {
+  font-weight: 600;
+  color: var(--ink-900);
+}
+
+.barcode-gen-table__sku {
+  font-size: 12px;
+  color: var(--ink-500);
+}
+
+.barcode-gen-table__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+}
+
+.barcode-gen-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 480px) {
+  .barcode-gen-card__footer {
+    justify-content: stretch;
+  }
+
+  .barcode-gen-card__footer .admin-btn {
+    flex: 1;
+    text-align: center;
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "appId": "com.fivestarspices.app",
+  "appName": "5Star Spices",
+  "webDir": "dist",
+  "backgroundColor": "#16302a",
+  "android": {
+    "allowMixedContent": false
+  }
+}

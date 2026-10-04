@@ -1,0 +1,26 @@
+# =====================================================================
+# Alimstech CMS — PRODUCTION environment
+# Copy this file to ".env" on your server and fill in real values.
+# NEVER commit the real .env to version control.
+# =====================================================================
+
+# App
+APP_NAME="Alimstech"
+APP_ENV=production
+# IMPORTANT: false in production so visitors never see errors/stack traces
+APP_DEBUG=false
+
+# Public base URL of the site.
+#  - Domain root (docroot points at /public):   leave EMPTY
+#  - Installed in a subfolder e.g. /alimstech:   APP_URL=/alimstech/public
+APP_URL=
+
+# Timezone (https://www.php.net/manual/en/timezones.php)
+APP_TIMEZONE="Asia/Kolkata"
+
+# Database (from your hosting control panel)
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=u907741364_alimstech
+DB_USER=u907741364_alims
+DB_PASS=Virat@554

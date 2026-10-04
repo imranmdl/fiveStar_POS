@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PWA app icon — the same monogram as logo.svg, squared off for a home-screen
+  icon. PLACEHOLDER: replace with your own artwork: see logo.svg's own note.
+
+  No raster (PNG) icon exists alongside this one because no image tool
+  (ImageMagick, GD, PIL, rsvg-convert) was available to generate one — SVG is
+  fully supported in Chrome/Android's install manifest, so this is not a
+  degraded fallback, just the format actually produced. Swap in PNGs later if
+  you want broader legacy-browser coverage; see manifest.json.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Spice and Dry Fruits">
+  <rect width="512" height="512" fill="#0B3B2E"/>
+  <circle cx="256" cy="256" r="173" fill="none" stroke="#C9A253" stroke-width="16"/>
+  <text x="256" y="296" font-family="Marcellus, Georgia, serif" font-size="200"
+        fill="#E4C77E" text-anchor="middle">S</text>
+</svg>

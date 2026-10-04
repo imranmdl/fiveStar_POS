@@ -1,0 +1,15 @@
+{
+  "name": "Spice & Dry Fruits",
+  "short_name": "Spice & Dry Fruits",
+  "description": "Whole spices, dry fruits, herbs and seeds — order online.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FBF7EE",
+  "theme_color": "#0B3B2E",
+  "icons": [
+    { "src": "assets/img/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "assets/img/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

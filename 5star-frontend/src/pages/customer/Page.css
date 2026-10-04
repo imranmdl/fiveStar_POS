@@ -1,0 +1,21 @@
+.cms-page {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.cms-page h1 {
+  font-size: 22px;
+  color: #c0601c;
+  margin-bottom: 8px;
+}
+
+.cms-page__updated {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 16px;
+}
+
+.cms-page__body p {
+  margin-bottom: 14px;
+  line-height: 1.6;
+}

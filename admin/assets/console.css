@@ -1,0 +1,578 @@
+/*
+ * Admin console — visual system imported from "Anjeera Dry Fruits v2".
+ *
+ * The design's second turn is the admin panel itself, so this follows it
+ * directly: a deep forest sidebar, warm parchment working area, white cards with
+ * sand borders, and the same Marcellus/Karla pairing as the shop.
+ *
+ * THIS FILE IS THE ONLY THING THAT CHANGED.
+ *
+ * Every screen's markup already carried semantic class names, so the whole
+ * import is a stylesheet swap: no API call, field name, event handler or page
+ * flow is touched. That matters because the console is where orders get packed
+ * and money gets refunded, and a restyle has no business risking any of it.
+ *
+ * The console stays deliberately denser than the shop. This is a tool someone
+ * uses for hours, not a shop window — so the type is smaller, the rows tighter,
+ * and the gold is used only where it carries meaning.
+ */
+
+:root {
+  /* Sidebar is darker than the shop's header: it sits beside content all day
+     and needs to recede rather than compete. */
+  --rail:          #072A21;
+  --forest:        #0B3B2E;
+  --forest-soft:   #3A4238;
+
+  --gold:          #C9A253;
+  --gold-light:    #E4C77E;
+  --gold-dark:     #8A6A1F;
+
+  --work:          #F6F2E7;
+  --surface:       #FFFFFF;
+  --tint:          #EFE9DA;
+  --sand:          #E3DAC5;
+  --sand-2:        #DCD3BF;
+
+  --ink:           #23231F;
+  --muted:         #7E857A;
+  --muted-2:       #5C6459;
+
+  --r-card:        12px;
+  --r-control:     9px;
+  --r-pill:        20px;
+}
+
+body {
+  background: var(--work);
+  color: var(--forest-soft);
+  font-family: Karla, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, .display-face {
+  font-family: Marcellus, Georgia, serif;
+  font-weight: 400;
+  color: var(--forest);
+  letter-spacing: .01em;
+}
+
+h1 { font-size: 30px; line-height: 1.1; }
+
+/* Half this interface is quantities and money that must line up in a column. */
+.num, .price, td, th, input[type="number"],
+.summary-row, .table-tight td, .table-tight th {
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+}
+
+a { color: var(--forest); }
+a:hover { color: var(--gold-dark); }
+.text-muted { color: var(--muted) !important; }
+
+/* ---------------------------------------------------------------------------
+   Sidebar
+   --------------------------------------------------------------------------- */
+
+.console-sidebar {
+  background: var(--rail);
+  width: 250px;
+  padding: 20px 10px 18px;
+  color: #FBF7EE;
+}
+
+.console-sidebar > .fw-semibold:first-child {
+  font-family: Marcellus, Georgia, serif;
+  font-size: 17px;
+  font-weight: 400 !important;
+  letter-spacing: .03em;
+  color: var(--gold-light);
+  padding: 0 10px 12px;
+}
+
+/* A left accent bar rather than a filled pill: it marks the active screen
+   without turning the rail into a block of colour. */
+.console-sidebar .nav-link {
+  color: rgba(251, 247, 238, .78);
+  border-radius: var(--r-control);
+  border-left: 3px solid transparent;
+  padding: 10px 12px;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.console-sidebar .nav-link span {
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(251, 247, 238, .5);
+}
+
+/* A real icon per section (see NAV_SECTION/NAV_ICON in console.js),
+   replacing what used to be a plain coloured dot — next to icons
+   everywhere else in the product, a bare dot read as an unfinished list.
+   Deliberately a plain div, not a span, so it does not pick up the dim
+   11px hint styling above, which only the actual hint text should have. */
+.console-sidebar .nav-icon-chip {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  background: color-mix(in srgb, var(--tone, var(--gold)) 22%, transparent);
+  color: var(--tone, var(--gold-light));
+}
+
+.console-sidebar .nav-icon-chip svg { width: 16px; height: 16px; }
+
+.console-sidebar .nav-link.active .nav-icon-chip {
+  background: color-mix(in srgb, var(--tone, var(--gold)) 32%, transparent);
+}
+
+.console-sidebar .nav-link:hover {
+  background: rgba(201, 162, 83, .12);
+  color: #fff;
+}
+
+.console-sidebar .nav-link.active {
+  background: rgba(201, 162, 83, .16);
+  border-left-color: var(--gold);
+  color: var(--gold-light);
+}
+
+.console-sidebar .nav-link.active span { color: rgba(228, 199, 126, .7); }
+
+/* Reports gets a standing highlight — not just on hover/active — so it can
+   be spotted at a glance instead of blending in with the rest of the rail. */
+.console-sidebar .nav-link.nav-link-highlight {
+  border-left-color: var(--gold);
+  background: rgba(201, 162, 83, .1);
+}
+
+.console-sidebar .nav-link.nav-link-highlight:not(.active) {
+  color: var(--gold-light);
+}
+
+.console-sidebar hr {
+  border-color: rgba(201, 162, 83, .28);
+  opacity: 1;
+  margin: 14px 0 0;
+}
+
+.console-sidebar .small { font-size: 12px; }
+.console-sidebar .text-white { color: var(--gold-light) !important; }
+
+.console-sidebar .btn-outline-light {
+  border-color: rgba(201, 162, 83, .45);
+  color: var(--gold-light);
+  border-radius: var(--r-pill);
+  min-height: 40px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.console-sidebar .btn-outline-light:hover {
+  background: rgba(201, 162, 83, .16);
+  color: var(--gold-light);
+}
+
+/* Desktop: the rail stays put and scrolls on its own, so a long menu never
+   pushes the lower items (and Sign out) off-screen or scrolls away with the page. */
+@media (min-width: 992px) {
+  /* Only the side rail of the full console (a row layout) — the till reuses
+     .console-sidebar as a thin top bar and must keep its natural height. */
+  .flex-lg-row > .console-sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(201, 162, 83, .45) transparent;
+  }
+
+  .flex-lg-row > .console-sidebar .nav-link { min-height: 40px; padding: 7px 12px; }
+  .flex-lg-row > .console-sidebar .nav-link span { font-size: 10.5px; }
+}
+
+@media (max-width: 991.98px) {
+  .console-sidebar { width: auto; }
+  .console-sidebar #console-menu { max-height: 70vh; overflow-y: auto; }
+}
+
+/* ---------------------------------------------------------------------------
+   Cards and tables
+   --------------------------------------------------------------------------- */
+
+.card, .panel {
+  background: var(--surface);
+  border: 1px solid var(--sand);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+.card-header, .panel-head {
+  background: var(--surface);
+  border-bottom: 1px solid var(--tint);
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.card-footer { background: var(--surface); border-top-color: var(--tint); }
+
+.table-tight td, .table-tight th { padding: 10px 14px; vertical-align: middle; }
+.table-tight tbody tr { border-color: var(--tint); }
+
+.table-tight th {
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--gold-dark);
+  border-bottom-color: var(--sand);
+}
+
+.table-hover tbody tr:hover > * { background: var(--tint); }
+
+.needs-attention { border-left: 3px solid var(--gold); }
+
+/* ---------------------------------------------------------------------------
+   Controls
+   --------------------------------------------------------------------------- */
+
+.btn { border-radius: var(--r-pill); font-weight: 700; font-size: 13px; min-height: 40px; }
+.btn-sm { min-height: 36px; font-size: 12.5px; padding-inline: 12px; }
+
+.btn-dark, .btn-primary {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: var(--gold-light);
+}
+
+.btn-dark:hover, .btn-dark:focus,
+.btn-primary:hover, .btn-primary:focus {
+  background: #061F18;
+  border-color: #061F18;
+  color: var(--gold-light);
+}
+
+.btn-outline-secondary {
+  border-color: var(--sand-2);
+  color: var(--forest-soft);
+  background: var(--surface);
+}
+
+.btn-outline-secondary:hover {
+  background: var(--tint);
+  border-color: var(--gold);
+  color: var(--forest);
+}
+
+.btn-success { background: var(--forest); border-color: var(--forest); color: var(--gold-light); }
+.btn-success:hover { background: #061F18; border-color: #061F18; color: var(--gold-light); }
+
+/* Destructive actions keep a real red. Cancelling an order and refunding money
+   should never look like every other button on the page. */
+.btn-outline-danger { border-color: #A6291F; color: #A6291F; }
+.btn-outline-danger:hover { background: #A6291F; border-color: #A6291F; color: #fff; }
+
+.btn-link { color: var(--gold-dark); }
+
+.form-control, .form-select {
+  border-color: var(--sand-2);
+  border-radius: var(--r-control);
+  min-height: 40px;
+  font-size: 14px;
+  background: var(--surface);
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201, 162, 83, .18);
+}
+
+.form-control-sm, .form-select-sm { min-height: 36px; font-size: 13px; }
+.form-label { font-size: 13px; font-weight: 600; color: var(--forest-soft); }
+.form-text { color: var(--muted); font-size: 12px; }
+
+.nav-tabs { border-bottom-color: var(--sand); }
+
+.nav-tabs .nav-link {
+  color: var(--muted-2);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.nav-tabs .nav-link:hover { color: var(--forest); border-bottom-color: var(--sand-2); }
+
+.nav-tabs .nav-link.active {
+  color: var(--forest);
+  background: transparent;
+  border-bottom-color: var(--gold);
+}
+
+/* ---------------------------------------------------------------------------
+   Status
+   --------------------------------------------------------------------------- */
+
+.badge {
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+  letter-spacing: .02em;
+}
+
+.text-bg-success   { background: var(--forest) !important; color: var(--gold-light) !important; }
+.text-bg-primary   { background: var(--gold-dark) !important; color: #fff !important; }
+.text-bg-info      { background: var(--tint) !important; color: var(--gold-dark) !important; }
+.text-bg-warning   { background: var(--gold) !important; color: var(--forest) !important; }
+.text-bg-secondary { background: var(--tint) !important; color: var(--muted-2) !important; }
+.text-bg-danger    { background: #A6291F !important; color: #fff !important; }
+
+.alert { border-radius: var(--r-card); border-color: var(--sand); font-size: 13px; }
+.alert-light, .alert-secondary { background: var(--tint); color: var(--forest-soft); }
+.alert-warning { background: #FBF3DF; border-color: var(--gold); color: var(--forest-soft); }
+.alert-info { background: var(--tint); border-color: var(--sand); color: var(--forest-soft); }
+
+.spinner-border { color: var(--gold-dark); }
+
+.list-group-item { border-color: var(--tint); background: var(--surface); font-size: 13.5px; }
+
+.toast.text-bg-success { background: var(--forest) !important; color: var(--gold-light) !important; }
+.toast.text-bg-danger  { background: #A6291F !important; }
+
+/* ---------------------------------------------------------------------------
+   Stat cards — the Dashboard's figure treatment, generalised so any screen
+   (POS history, Shipments) can lead with a headline number the same way.
+   --------------------------------------------------------------------------- */
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.page-header .eyebrow { margin-bottom: 4px; }
+.page-header h1 { margin-bottom: 2px; }
+.page-header .date { color: var(--muted); font-size: 13px; }
+
+/*
+ * Stat cards, v2. The old version — a thick coloured bar across the top of
+ * every card, and the headline number set in the display serif — read as a
+ * template dashboard from years ago rather than a live product screen.
+ * This version borrows the language modern dashboards (Stripe, Linear)
+ * actually use: no chrome beyond a small icon chip and a hairline border,
+ * the number set bold in the UI sans so it reads as data rather than as a
+ * printed heading, and a colour that shows up once (the icon) rather than
+ * three times (bar, icon, number) per card.
+ */
+.stat-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid rgba(35, 35, 31, .07);
+  border-radius: 12px;
+  padding: 16px 16px 14px;
+  transition: box-shadow .16s ease, transform .16s ease, border-color .16s ease;
+}
+
+.stat-card:hover {
+  box-shadow: 0 12px 28px -16px rgba(11, 59, 46, .28);
+  transform: translateY(-1px);
+  border-color: rgba(35, 35, 31, .12);
+}
+
+.stat-card .stat-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.stat-card .stat-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--tone, var(--gold)) 12%, var(--surface));
+  color: var(--tone, var(--gold-dark));
+  flex-shrink: 0;
+  order: 2;
+}
+
+.stat-card .stat-icon svg { width: 16px; height: 16px; }
+
+.stat-card .eyebrow {
+  color: var(--muted-2);
+  font-weight: 700;
+  font-size: 10.5px;
+  order: 1;
+}
+
+.stat-card .stat-value {
+  font-family: Karla, system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  letter-spacing: -.01em;
+  line-height: 1.05;
+  color: var(--ink);
+}
+
+.stat-card .stat-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+.stat-card-clickable { cursor: pointer; }
+.stat-card-clickable:hover { border-color: var(--tone, var(--gold)); }
+
+/* A small icon accent beside a card-header label — used sparingly, one per
+   section, so a screen with several cards reads faster at a glance without
+   turning into an icon soup. Sized down and lightened from v1 so it sits as
+   a quiet accent next to the text instead of a separate boxed element. */
+.card-header-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--tone, var(--gold)) 12%, var(--surface));
+  color: var(--tone, var(--gold-dark));
+  margin-right: 8px;
+  vertical-align: -5px;
+}
+
+.card-header-icon svg { width: 12px; height: 12px; }
+
+/* ---------------------------------------------------------------------------
+   Dashboard
+   --------------------------------------------------------------------------- */
+
+.dash-attention-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.dash-attention-item .dash-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #A6291F;
+  flex-shrink: 0;
+}
+
+/* Thin progress-bar primitive — used by the "Top products" revenue bars and
+   (previously) the pipeline panel. Deliberately NOT scoped under a parent
+   class: it was `.dash-pipeline-row .dash-track` before, which meant the
+   top-products bars (no such ancestor) had no height/background at all. */
+.dash-track {
+  height: 6px;
+  border-radius: 4px;
+  background: var(--tint);
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.dash-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--gold);
+}
+
+/* "In progress" donut (plain conic-gradient, no charting library) + legend. */
+.dash-donut {
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.dash-donut-hole {
+  position: absolute;
+  inset: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.dash-donut-total { font-family: Marcellus, Georgia, serif; font-size: 1.4rem; color: var(--forest); line-height: 1; }
+.dash-donut-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+
+.dash-legend-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+
+.dash-legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+/* "Last seven days" trend line (plain inline SVG, no charting library). */
+.dash-line-chart { width: 100%; height: 6rem; display: block; }
+
+.dash-line-grid { stroke: var(--sand); stroke-width: 1; stroke-dasharray: 3 3; }
+
+.dash-line-stroke { stroke: var(--gold-dark); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+
+.dash-line-dot { fill: var(--gold-dark); stroke: var(--surface); stroke-width: 1.5; }
+.dash-line-dot.is-today { fill: var(--forest); }
+
+.dash-line-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 0 12px;
+}
+
+.dash-line-labels .is-today { color: var(--forest); font-weight: 700; }
+
+/* A labelled header above a loose row of stat cards (see sectionLabel() in
+   page-index.js) — same visual language as a card-header-icon, just sitting
+   above an open row of cards instead of inside a <div class="card">. */
+.dash-section-label {
+  display: flex;
+  align-items: center;
+  margin: 4px 0 10px;
+  font-size: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* A brief highlight for a card scrolled-to on purpose (see Reports'
+   "Cash flow" tiles → scrollToAndFlash(), which points at the "Day by day"
+   table those tiles summarise instead of opening a redundant modal). */
+@keyframes dash-flash {
+  0%, 100% { box-shadow: none; border-color: var(--sand); }
+  30% { box-shadow: 0 0 0 3px rgba(201, 162, 83, .35); border-color: var(--gold); }
+}
+
+.flash-highlight { animation: dash-flash 1.1s ease; }
+
+/* A flex child defaults to min-width:auto, so one wide table would stretch the
+   whole page instead of scrolling inside its .table-responsive wrapper. */
+[data-page-root] { min-width: 0; }

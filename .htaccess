@@ -1,0 +1,55 @@
+# THIS DIRECTORY IS THE ONLY ONE MEANT TO BE PUBLIC.
+#
+# The parent (backend/.htaccess) carries `Require all denied` so that a
+# mis-pointed document root cannot expose app/, config/ or .env. Apache applies
+# parent .htaccess rules to every directory beneath, so without granting access
+# back here the API returns 403 for everything — which is what happens when the
+# backend is installed in a subdirectory and the URL path traverses backend/.
+#
+# Granting here re-opens public/ ONLY. Everything above it stays denied.
+<IfModule mod_authz_core.c>
+    Require all granted
+</IfModule>
+<IfModule !mod_authz_core.c>
+    # Apache 2.2
+    Order allow,deny
+    Allow from all
+</IfModule>
+
+# Route every request that is not a real file to the front controller.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # NO RewriteBase.
+    #
+    # A hardcoded `RewriteBase /` works only when the API is the document root.
+    # Deployed in a subdirectory — htdocs/spice-api/public, which is what XAMPP
+    # and most shared hosting encourage — it rewrites to /index.php at the site
+    # root instead of the one next to this file, and every route 404s.
+    #
+    # Omitting it entirely makes mod_rewrite resolve relative to the directory
+    # containing this .htaccess, which is correct in both layouts.
+
+    # Pass the Authorization header through to PHP (some CGI/FastCGI setups strip it).
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "no-referrer"
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
+    Header always unset X-Powered-By
+</IfModule>
+
+# Never serve dotfiles.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+Options -Indexes

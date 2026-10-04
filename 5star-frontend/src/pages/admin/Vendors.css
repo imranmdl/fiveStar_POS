@@ -1,0 +1,151 @@
+.small-muted {
+  color: #888;
+  font-size: 12px;
+}
+
+.admin-link-back {
+  background: none;
+  border: none;
+  color: var(--brand-forest);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.admin-link-back:hover {
+  text-decoration: underline;
+}
+
+.admin-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--brand-forest);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.admin-link:hover {
+  text-decoration: underline;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  grid-column: span 12;
+}
+
+.field input,
+.field select,
+.field textarea {
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.form-section {
+  grid-column: span 12;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #888;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+@media (min-width: 640px) {
+  .field--sm { grid-column: span 4; }
+  .field--half { grid-column: span 6; }
+  .field--lg { grid-column: span 8; }
+}
+
+.vendor-dashboard {
+  margin-bottom: 8px;
+}
+
+.vendor-dashboard__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.vendor-panel {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.vendor-panel h2 {
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+
+.admin-table--plain th,
+.admin-table--plain td {
+  border-bottom: none;
+  padding: 4px 0;
+  white-space: normal;
+}
+
+.vendor-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.vendor-tabs button {
+  background: none;
+  border: none;
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: #555;
+}
+
+.vendor-tabs button.active {
+  border-bottom-color: var(--brand-forest);
+  color: var(--brand-forest);
+  font-weight: 600;
+}
+
+.ie-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+}
+
+.ie-panel__field {
+  min-width: 11rem;
+}
+
+.ie-import-label {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}

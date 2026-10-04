@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/c/xampp/php/php.exe bin/migrate.php --status)",
+      "Bash(/c/xampp/php/php.exe \"C:\\\\Users\\\\cw\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--xampp-htdocs-5star\\\\61e86691-bb1f-4515-b618-23a8170f41ea\\\\scratchpad\\\\dedupe_faq.php\")",
+      "Bash(\"/c/xampp/mysql/bin/mysql.exe\" -h 127.0.0.1 -u root -e \"SELECT VERSION\\(\\);\")",
+      "Bash(\"/c/xampp/mysql/bin/mysql.exe\" -h 127.0.0.1 -u root 5star -e \"SHOW CREATE TABLE carts\\\\G\")",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless=new --disable-gpu --virtual-time-budget=90000 --dump-dom http://localhost/5star/admin/_h.html)",
+      "Bash(/c/xampp/mysql/bin/mysql -uroot 5star -e \"select status,count\\(*\\) n from products group by status; select count\\(*\\) variants from product_variants; select count\\(*\\) media from product_media; select p.name, p.short_description, p.gst_rate, p.hsn_code, p.brand, c.name cat from products p join categories c on c.id=p.category_id limit 3; select v.sku,v.variant_name,v.weight_grams,v.mrp,v.selling_price from product_variants v limit 4\")"
+    ]
+  }
+}

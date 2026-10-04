@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/c/xampp/php/php.exe -r ' *)",
+      "Bash(/c/xampp/php/php.exe \"C:\\\\Users\\\\cw\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--xampp-htdocs-5star\\\\61e86691-bb1f-4515-b618-23a8170f41ea\\\\scratchpad\\\\make_fixtures.php\")",
+      "Bash(/c/xampp/php/php.exe \"C:\\\\Users\\\\cw\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--xampp-htdocs-5star\\\\61e86691-bb1f-4515-b618-23a8170f41ea\\\\scratchpad\\\\verify_phase4_live.php\")"
+    ]
+  }
+}

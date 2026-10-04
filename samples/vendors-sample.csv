@@ -1,0 +1,3 @@
+name,company_name,contact_person,phone,email,address_line1,address_line2,city,state,pincode,country,gstin,pan,bank_account_name,bank_account_number,bank_ifsc,bank_name,payment_terms,notes
+Sample Spice Traders,Sample Spice Traders Pvt Ltd,Ramesh Kumar,9876500001,sample1@example.com,12 Market Road,,Mumbai,Maharashtra,400001,India,27BBBBB1111B1Z6,BBBBB1111B,Sample Spice Traders,123456789012,HDFC0001234,HDFC Bank,Net 30,Test vendor
+Test Oil Suppliers,,Anita Shah,9876500002,sample2@example.com,45 Industrial Area,,Pune,Maharashtra,411001,India,,,,,,,Net 15,

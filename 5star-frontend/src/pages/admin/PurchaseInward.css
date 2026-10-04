@@ -1,0 +1,529 @@
+/*
+ * Purchase Inward — ported from admin/assets/page-purchase-inward.js (+
+ * inward-new-item.js, inward-csv.js, pricing-decisions.js). No Bootstrap
+ * here, so this replaces its card/grid/badge/modal classes with plain CSS
+ * scoped under a "pi-" prefix.
+ */
+
+.pi {
+  max-width: 1100px;
+}
+
+.pi-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+/* Cards --------------------------------------------------------------- */
+
+.pi-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 16px;
+  background: #fff;
+}
+
+.pi-card--accent {
+  border-color: #276f86;
+}
+
+.pi-card__header {
+  font-weight: 600;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pi-card__body {
+  padding: 16px;
+}
+
+.pi-h5 {
+  font-size: 17px;
+  margin: 0 0 4px;
+}
+
+.pi-h6 {
+  font-size: 15px;
+  margin: 0 0 10px;
+}
+
+.pi-hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 14px 0;
+}
+
+/* Grids / fields -------------------------------------------------------- */
+
+.pi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.pi-grid-2 {
+  grid-template-columns: repeat(2, minmax(170px, 1fr));
+}
+
+.pi-grid-3 {
+  grid-template-columns: repeat(3, minmax(170px, 1fr));
+}
+
+.pi-grid-edit {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.pi-field,
+.pi-field-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.pi-field > span,
+.pi-field-sm > span {
+  font-weight: 600;
+  font-size: 12px;
+  color: #444;
+}
+
+.pi-field input,
+.pi-field select,
+.pi-field textarea,
+.pi-field-sm input,
+.pi-field-sm select {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.pi-field-lg {
+  grid-column: span 2;
+}
+
+.pi-field-full {
+  grid-column: 1 / -1;
+}
+
+.pi-field-grow {
+  flex: 1;
+}
+
+.pi-inline-group {
+  display: flex;
+  gap: 6px;
+}
+
+.pi-inline-group input,
+.pi-inline-group select {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.pi-checkbox-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.pi-link-btn {
+  background: none;
+  border: none;
+  color: #1a5fb4;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+}
+
+.pi-link-btn:hover {
+  text-decoration: underline;
+}
+
+.pi-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+
+.pi-items-toolbar {
+  align-items: flex-end;
+}
+
+.pi-row-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.pi-type-badge {
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  color: #555;
+  background: #fafafa;
+}
+
+.pi-full-btn {
+  width: 100%;
+}
+
+/* Feedback / text helpers ----------------------------------------------- */
+
+.pi-feedback {
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.pi-feedback--success { color: #2e7d32; }
+.pi-feedback--danger { color: #c0392b; }
+.pi-feedback--warning { color: #b7791f; }
+.pi-feedback--muted { color: #888; }
+
+.pi-muted { color: #888; }
+.pi-small { font-size: 12px; }
+.pi-fw-semibold { font-weight: 600; }
+.pi-right { text-align: right; }
+.pi-nowrap { white-space: nowrap; }
+.pi-uppercase { text-transform: uppercase; }
+.pi-text-danger { color: #c0392b; }
+.pi-text-warning { color: #b7791f; }
+.pi-text-success { color: #2e7d32; }
+
+.pi-ml4 { margin-left: 4px; }
+.pi-mt2 { margin-top: 8px; }
+.pi-mt3 { margin-top: 12px; }
+.pi-mt4 { margin-top: 4px; }
+.pi-mb2 { margin-bottom: 8px; }
+.pi-mb3 { margin-bottom: 12px; }
+.pi-mb4 { margin-bottom: 4px; width: 100%; }
+
+/* Category/vendor inline-add row ---------------------------------------- */
+
+.pi-cat-add {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fafafa;
+  margin-top: 8px;
+}
+
+/* Chips (size / colour pickers) ------------------------------------------ */
+
+.pi-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.pi-chip {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pi-chip--on {
+  background: var(--brand-forest);
+  color: #fff;
+  border-color: var(--brand-forest);
+}
+
+.pi-radio-group {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+/* Items search dropdown --------------------------------------------------- */
+
+.pi-search-results {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-width: 40rem;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.pi-search-result {
+  border-bottom: 1px solid var(--border);
+}
+
+.pi-search-result:last-child {
+  border-bottom: none;
+}
+
+.pi-search-result__btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.pi-search-result__btn:hover {
+  background: #f5f5f5;
+}
+
+.pi-duplicate-warning {
+  padding: 0 12px 8px;
+}
+
+/* Lines table (record form + detail view) -------------------------------- */
+
+.pi-lines-table-wrap {
+  overflow-x: auto;
+}
+
+.pi-lines-table th,
+.pi-lines-table td {
+  white-space: normal;
+}
+
+.pi-empty-row {
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+  padding: 20px 0 !important;
+}
+
+.pi-input-sm {
+  width: 7rem;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.pi-btn-xs {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.pi-pricing-row td {
+  border-top: none;
+  padding-top: 0 !important;
+  padding-bottom: 10px !important;
+}
+
+.pi-pricing-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  padding-left: 8px;
+}
+
+.pi-pricing-fields input {
+  width: 7rem;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.pi-transport-hint {
+  display: flex;
+  align-items: flex-end;
+}
+
+.pi-totals-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 24px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.pi-grand-total {
+  font-size: 16px;
+}
+
+/* CSV review table --------------------------------------------------------- */
+
+.pi-csv-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.pi-csv-table-wrap {
+  max-height: 32rem;
+  overflow: auto;
+  margin-bottom: 10px;
+}
+
+.pi-csv-table-wrap .admin-table th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+
+.pi-csv-table-wrap input,
+.pi-csv-table-wrap select {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.pi-row-bad {
+  background: #fdecea;
+}
+
+.pi-row-warn {
+  background: #fff8e8;
+}
+
+.pi-row-msg {
+  font-size: 12px;
+  padding-top: 0 !important;
+}
+
+/* Price-decision overlay (brief §7), one flagged line at a time ----------- */
+
+.pi-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 16px;
+}
+
+.pi-sheet {
+  background: #fff;
+  width: 100%;
+  max-width: 440px;
+  border-radius: 12px;
+  padding: 18px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.pi-sheet__title {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+
+.pi-sheet__facts {
+  margin: 0 0 14px;
+  font-size: 13px;
+}
+
+.pi-sheet__facts > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.pi-sheet__facts dt { color: #888; font-weight: 400; margin: 0; }
+.pi-sheet__facts dd { margin: 0; font-weight: 600; }
+
+.pi-sheet__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pi-choice {
+  text-align: left;
+  min-height: 42px;
+}
+
+.pi-manual-row {
+  display: flex;
+  gap: 8px;
+}
+
+.pi-manual-row input {
+  flex: 1;
+}
+
+.pi-sheet__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.pi-sheet__progress {
+  font-size: 12px;
+  color: #888;
+}
+
+/* History detail ------------------------------------------------------------ */
+
+.pi-detail-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 860px) {
+  .pi-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pi-dl > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-size: 13px;
+}
+
+.pi-dl dt { font-weight: 400; color: #555; margin: 0; }
+.pi-dl dd { margin: 0; }
+
+.pi-dl-strong {
+  font-weight: 700;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 6px !important;
+}
+
+.pi-edit-actions {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.pi-pagination {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}

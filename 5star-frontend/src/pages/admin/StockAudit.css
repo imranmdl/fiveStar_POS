@@ -1,0 +1,208 @@
+.sa-sub {
+  font-size: 12px;
+  color: var(--ink-500);
+}
+
+.sa-muted {
+  color: var(--ink-500);
+}
+
+.sa-hint {
+  margin-top: var(--space-2);
+}
+
+.sa-ok {
+  color: var(--success);
+  font-size: 12.5px;
+}
+
+.sa-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-4);
+  overflow: hidden;
+}
+
+.sa-filters {
+  padding: var(--space-4);
+}
+
+.sa-tabs {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  overflow-x: auto;
+  margin-bottom: var(--space-4);
+}
+
+.sa-filter-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+@media (min-width: 640px) {
+  .sa-filter-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 960px) {
+  .sa-filter-grid {
+    grid-template-columns: repeat(2, minmax(120px, 160px)) 1fr repeat(2, minmax(140px, 1fr)) 1.4fr auto;
+  }
+}
+
+.sa-field {
+  min-width: 0;
+}
+
+.sa-search-field {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 960px) {
+  .sa-search-field {
+    grid-column: auto;
+  }
+}
+
+.sa-field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-700);
+  margin-bottom: 4px;
+}
+
+.sa-filter-grid input,
+.sa-filter-grid select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  background: var(--surface);
+  color: var(--ink-900);
+}
+
+.sa-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 960px) {
+  .sa-presets {
+    grid-column: auto;
+  }
+}
+
+.sa-flagged-check {
+  display: flex;
+  align-items: center;
+  grid-column: 1 / -1;
+}
+
+.sa-flagged-check label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-700);
+  cursor: pointer;
+}
+
+.sa-table-wrap {
+  overflow-x: auto;
+}
+
+.sa-item-cell {
+  min-width: 14rem;
+  white-space: normal !important;
+}
+
+.sa-flag-row {
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sa-flag-badge {
+  margin-right: 4px;
+  margin-bottom: 2px;
+  display: inline-block;
+}
+
+tr.sa-row--flagged {
+  background: var(--warning-bg);
+  cursor: pointer;
+}
+
+tr.sa-row--flagged:hover {
+  background: var(--warning-bg);
+  filter: brightness(0.97);
+}
+
+.admin-table tbody tr[onclick],
+.sa-table-wrap tbody tr {
+  cursor: pointer;
+}
+
+/* Modal, same shape as the shared pl-modal pattern used elsewhere but
+   self-contained since page-specific CSS files aren't shared across pages. */
+.sa-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 16px;
+}
+
+.sa-modal {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  max-width: 960px;
+  width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+}
+
+.sa-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.sa-modal__header h2 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.sa-modal__header button {
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  color: var(--ink-500);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.sa-modal__body {
+  padding: var(--space-4);
+  overflow-y: auto;
+}

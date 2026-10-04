@@ -1,0 +1,5 @@
+sku,barcode,category,product_name,variant_name,weight_grams,mrp,selling_price,warehouse_code,quantity,purchase_cost
+TEST-CAS-001,8901234500011,cashews,Cashews W320,500g Pouch,500,650,599,WH-MAIN,50,420
+TEST-WSP-001,,whole-spices,Whole Black Pepper,100g Pouch,100,180,159,,,
+DEMO-TURMERIC-100,,,,,,,135,,,
+TEST-BAD-001,,,Missing Category Item,250g Pouch,250,200,180,,,

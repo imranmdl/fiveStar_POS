@@ -1,0 +1,31 @@
+﻿SKU,Barcode,Category,"Sub Category","Product Name",Brand,"Pack Size",Size,Colour,"Weight (g)",Unit,Loose,Quantity,"Unit Cost","Discount %","GST %",HSN,MRP,"Selling Price","Markup %","Batch No","Expiry Date","Publish Online"
+TST-21C7-P001,,"Dry Fruits",Almonds,"California Almonds","Spice Route","100 g",,,,,,36,138.7,,5,,,,35,B21C787,2027-03-19,
+TST-21C7-P002,,"Dry Fruits",Almonds,"California Almonds","Spice Route","250 g",,,,,,59,346.75,2,5,,,,35,B21C721,2027-04-19,yes
+TST-21C7-P003,,"Dry Fruits",Almonds,"California Almonds","Golden Harvest","500 g",,,,,,52,693.5,2,5,,,,35,B21C799,2028-03-19,
+TST-21C7-P004,,"Dry Fruits",Almonds,"California Almonds","Sample Farms","1 kg",,,,,,50,1387,5,5,,2219,1942,,B21C760,2027-09-19,yes
+,,"Grocery & Staples","Pulses & Dals","Toor Dal",,,,,,kg,yes,39.5,105,,5,,,,20,L21C714,2027-06-19,
+TST-21C7-P005,,Oils,"Cooking Oils","Groundnut Oil","Sample Farms","500 ml",,,,,,34,57,5,5,,,,35,B21C782,2027-09-19,yes
+TST-21C7-P006,,Oils,"Cooking Oils","Groundnut Oil","Golden Harvest","1 L",,,,,,27,114,,5,,182,160,,B21C795,2027-07-19,
+TST-21C7-P007,,Oils,"Cooking Oils","Groundnut Oil","Golden Harvest","5 L",,,,,,47,570,5,5,,912,798,,B21C713,2027-03-19,
+,,Clothing,Kids,"Kids Shorts","Sample Wear",,S,Black,,,,7,271,,12,,650,,55,,,
+,,Clothing,Kids,"Kids Shorts","Sample Wear",,S,White,,,,8,271,,12,,650,,55,,,
+,,Clothing,Kids,"Kids Shorts","Sample Wear",,M,Navy,,,,10,271,,12,,650,,55,,,
+,,Clothing,Kids,"Kids Shorts","Sample Wear",,M,White,,,,11,271,,12,,650,,55,,,
+,,Clothing,Kids,"Kids Shorts","Sample Wear",,L,Navy,,,,14,271,,12,,650,,55,,,
+,,Clothing,Kids,"Kids Shorts","Sample Wear",,L,White,,,,10,271,,12,,650,,55,,,
+,,Footwear,Men,"Canvas Sneakers","Sample Wear",,7,Navy,,,,9,797,,12,,1913,,55,,,
+,,Footwear,Men,"Canvas Sneakers","Sample Wear",,7,White,,,,9,797,,12,,1913,,55,,,
+,,Footwear,Men,"Canvas Sneakers","Sample Wear",,8,Navy,,,,8,797,,12,,1913,,55,,,
+,,Footwear,Men,"Canvas Sneakers","Sample Wear",,8,White,,,,5,797,,12,,1913,,55,,,
+TST-21C7-T008,,Toys,"Soft Toys","Teddy Bear",FunTime,Standard,,,,,,14,356,,12,,783,,45,,,
+TST-21C7-S009,,Stationery,"Notebooks & Paper","Ruled Notebook A5",WriteWell,"Pack of 10",,,,,,49,140,5,12,,266,,40,,,
+TST-21C7-P010,,Spices,"Whole Spices","Cumin Seeds","Golden Harvest","100 g",,,,,,18,61.4,,5,,,,35,B21C765,2027-03-19,yes
+TST-21C7-P011,,Spices,"Whole Spices","Cumin Seeds","Sample Farms","250 g",,,,,,34,153.5,,5,,246,215,,B21C777,2027-06-19,yes
+TST-21C7-P012,,Spices,"Whole Spices","Cumin Seeds","Spice Route","500 g",,,,,,32,307,5,5,,491,430,,B21C747,2027-06-19,
+TST-21C7-P013,,Spices,"Whole Spices","Cumin Seeds","Sample Farms","1 kg",,,,,,11,614,2,5,,,,35,B21C748,2027-05-19,yes
+,,"Grocery & Staples","Rice & Grains","Basmati Rice",,,,,,kg,yes,26.5,71,,5,,,,20,L21C746,2026-12-19,
+TST-21C7-P014,,Oils,"Cooking Oils","Sunflower Oil","Golden Harvest","500 ml",,,,,,24,81,,5,,130,113,,B21C721,2027-06-19,
+TST-21C7-P015,,Oils,"Cooking Oils","Sunflower Oil","Spice Route","1 L",,,,,,43,162,,5,,259,227,,B21C766,2027-09-19,
+TST-21C7-P016,,Oils,"Cooking Oils","Sunflower Oil","Spice Route","5 L",,,,,,60,810,5,5,,,,35,B21C799,2027-09-19,yes
+,,Clothing,Women,"Cotton Kurti","Sample Wear",,S,Navy,,,,15,362,,12,,869,,55,,,
+,,Clothing,Women,"Cotton Kurti","Sample Wear",,S,White,,,,12,362,,12,,869,,55,,,

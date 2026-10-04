@@ -1,0 +1,725 @@
+/*
+ * Spice & Dry Fruits — storefront
+ *
+ * Visual system imported from the "Anjeera Dry Fruits" design.
+ *
+ *   Display  Marcellus — headings, prices, brand
+ *   Body     Karla — everything else
+ *   Forest   #0B3B2E, the primary surface and heading colour
+ *   Gold     #C9A253 with #E4C77E for text on forest
+ *   Cream    #FBF7EE page, #FFFFFF cards
+ *
+ * THIS FILE IS THE ONLY THING THE IMPORT CHANGED IN ANY MEANINGFUL WAY. Every
+ * API call, field name, event handler and page transition is untouched — the
+ * markup already carried semantic class names, so the design lands as a
+ * stylesheet swap rather than a rewrite. That matters because the flow was hard
+ * won: the pincode field, the session gate, the cart merge and the per-kilo
+ * pricing all stay exactly as they are.
+ */
+
+:root {
+  --forest:       #0B3B2E;
+  --forest-soft:  #3A4238;
+  --gold:         #C9A253;
+  --gold-light:   #E4C77E;
+  --gold-dark:    #8A6A1F;
+
+  --cream:        #FBF7EE;
+  --tint:         #F3EEE0;
+  --tint-2:       #EFE9DA;
+  --sand:         #E7E0CE;
+  --sand-2:       #E3DAC5;
+
+  --muted:        #7E857A;
+  --muted-2:      #5C6459;
+
+  --surface:      #FFFFFF;
+
+  --r-card:       16px;
+  --r-panel:      20px;
+  --r-pill:       22px;
+  --r-small:      11px;
+
+  --shadow:       0 1px 2px rgba(11, 59, 46, .05), 0 10px 30px rgba(11, 59, 46, .06);
+}
+
+/* ---------------------------------------------------------------------------
+   Type
+   --------------------------------------------------------------------------- */
+
+body {
+  background: var(--cream);
+  color: var(--forest-soft);
+  font-family: Karla, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+}
+
+main { flex: 1 0 auto; }
+
+h1, h2, h3, h4, .display-face, .brand {
+  font-family: Marcellus, Georgia, serif;
+  font-weight: 400;
+  color: var(--forest);
+  letter-spacing: .01em;
+}
+
+h1 { font-size: 2rem; }
+h2 { font-size: 1.4rem; }
+
+/* Numbers are compared down a column, so they are set to line up. */
+.num, .price, .price-was, .price-per-kg, td, th,
+input[type="number"], .pack-pill, .summary-row {
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+a { color: var(--forest); }
+a:hover { color: var(--gold-dark); }
+
+.text-muted { color: var(--muted) !important; }
+
+/* ---------------------------------------------------------------------------
+   Header
+   --------------------------------------------------------------------------- */
+
+.site-header {
+  background: var(--forest);
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+}
+
+.site-header .navbar-brand {
+  font-family: Marcellus, Georgia, serif;
+  font-size: 1.35rem;
+  color: var(--cream);
+  letter-spacing: .02em;
+}
+
+.site-header .navbar-brand span { color: var(--gold-light); }
+
+.site-header .nav-link {
+  color: rgba(251, 247, 238, .74);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.site-header .nav-link:hover,
+.site-header .nav-link.active { color: var(--gold-light); }
+
+.header-search .form-control {
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(201, 162, 83, .4);
+  color: var(--cream);
+  border-radius: var(--r-pill);
+  padding: .5rem 1.1rem;
+  font-size: 14px;
+  min-height: 44px;
+}
+
+.header-search .form-control::placeholder { color: rgba(251, 247, 238, .5); }
+
+.header-search .form-control:focus {
+  background: rgba(255, 255, 255, .12);
+  border-color: var(--gold);
+  box-shadow: none;
+  color: var(--cream);
+}
+
+.cart-pill {
+  border-radius: var(--r-pill);
+  border: 1px solid var(--gold);
+  color: var(--gold-light);
+  font-size: 13px;
+  font-weight: 700;
+  padding: .5rem 1.1rem;
+  min-height: 44px;
+}
+
+.cart-pill:hover { background: rgba(201, 162, 83, .14); color: var(--gold-light); }
+.cart-pill .badge { background: var(--gold); color: var(--forest); font-weight: 700; }
+
+/* ---------------------------------------------------------------------------
+   Category rail
+   --------------------------------------------------------------------------- */
+
+.category-rail {
+  background: var(--tint);
+  border-bottom: 1px solid var(--sand);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.category-rail::-webkit-scrollbar { display: none; }
+
+.category-chip {
+  flex: 0 0 auto;
+  border: 1px solid var(--sand-2);
+  border-radius: var(--r-pill);
+  padding: .45rem 1rem;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--forest-soft);
+  text-decoration: none;
+  white-space: nowrap;
+  background: var(--surface);
+}
+
+.category-chip:hover { border-color: var(--gold); color: var(--forest); }
+
+.category-chip.active {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: var(--gold-light);
+}
+
+/* ---------------------------------------------------------------------------
+   Product card
+   --------------------------------------------------------------------------- */
+
+.product-card {
+  background: var(--surface);
+  border: 1px solid var(--sand);
+  border-radius: var(--r-card);
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.product-card:hover { box-shadow: var(--shadow); border-color: var(--gold); }
+
+.product-media {
+  aspect-ratio: 1 / 1;
+  background: var(--tint-2);
+  position: relative;
+  overflow: hidden;
+}
+
+.product-media img { width: 100%; height: 100%; object-fit: cover; }
+
+/* No photograph yet: the brand's own monogram treatment rather than a broken
+   image icon — forest ground, gold ring, serif initial. */
+.product-media--empty {
+  display: grid;
+  place-items: center;
+  background: var(--forest);
+  color: var(--gold-light);
+  font-family: Marcellus, Georgia, serif;
+  font-size: 2.6rem;
+  position: relative;
+}
+
+.product-media--empty::before {
+  content: "";
+  position: absolute;
+  inset: 22%;
+  border: 2px solid var(--gold);
+  border-radius: 50%;
+  opacity: .55;
+}
+
+.badge-stack {
+  position: absolute;
+  top: .6rem;
+  left: .6rem;
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  align-items: flex-start;
+  z-index: 2;
+}
+
+.tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: .25rem .6rem;
+  border-radius: var(--r-small);
+  text-transform: none;
+}
+
+.tag--save    { background: var(--forest);    color: var(--gold-light); }
+.tag--offer   { background: var(--gold);      color: var(--forest); }
+.tag--organic { background: var(--tint);      color: var(--gold-dark); border: 1px solid var(--sand-2); }
+
+.product-body { padding: .9rem 1rem 1rem; display: flex; flex-direction: column; flex: 1; }
+
+.product-name {
+  font-family: Marcellus, Georgia, serif;
+  font-size: 1.02rem;
+  line-height: 1.3;
+  color: var(--forest);
+  text-decoration: none;
+}
+
+.product-name:hover { color: var(--gold-dark); }
+
+/* Pack sizes on the card. The design shows 250g / 500g / 1kg on every product,
+   and for dry fruits the pack size is the decision. */
+.pack-pills { display: flex; flex-wrap: wrap; gap: .3rem; margin: .55rem 0 .6rem; }
+
+.pack-pill {
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--sand-2);
+  border-radius: var(--r-small);
+  padding: .18rem .5rem;
+  color: var(--muted-2);
+  background: var(--tint);
+}
+
+/* Product page's "Choose a pack" selector — small boxes so the product
+   itself stays the focus; the weight/price is all a buyer needs to pick,
+   pack type and per-kg rate are left off this compact view. */
+.pack-option-grid { display: flex; flex-wrap: wrap; gap: .6rem; }
+
+.pack-option {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 5.5rem;
+  border: 1px solid var(--sand-2);
+  border-radius: var(--r-small);
+  padding: .6rem .8rem;
+  text-align: center;
+  cursor: pointer;
+  background: var(--surface);
+  transition: border-color .15s ease, background .15s ease;
+}
+
+.pack-option:hover { border-color: var(--gold); }
+
+.pack-option:has(input:checked) { border-color: var(--gold); background: var(--tint); }
+
+.pack-option input { position: absolute; opacity: 0; width: 0; height: 0; }
+
+.pack-option-size { display: block; font-weight: 700; font-size: .85rem; color: var(--forest); }
+
+.pack-option-price {
+  display: block;
+  font-family: Marcellus, Georgia, serif;
+  font-size: 1rem;
+  color: var(--forest);
+  margin-top: .2rem;
+}
+
+.pack-option-was { display: block; font-size: .72rem; color: var(--muted); text-decoration: line-through; }
+
+.pack-option-badge {
+  position: absolute;
+  top: -.5rem;
+  right: -.5rem;
+  font-size: 10px;
+  font-weight: 700;
+  padding: .12rem .4rem;
+  border-radius: var(--r-small);
+  background: var(--forest);
+  color: var(--gold-light);
+}
+
+.price {
+  font-family: Marcellus, Georgia, serif;
+  font-size: 1.2rem;
+  color: var(--forest);
+}
+
+.price-was {
+  font-size: .85rem;
+  color: var(--muted);
+  text-decoration: line-through;
+  margin-left: .4rem;
+}
+
+.price-discount {
+  font-size: .85rem;
+  font-weight: 700;
+  color: var(--forest);
+  margin-left: .4rem;
+}
+
+.price-per-kg { font-size: 11.5px; color: var(--muted); margin-top: .1rem; }
+
+.rating-line { font-size: 12.5px; color: var(--muted-2); }
+.rating-star { color: var(--gold-dark); }
+
+/* ---------------------------------------------------------------------------
+   Buttons — pills, 44px minimum, as the design specifies
+   --------------------------------------------------------------------------- */
+
+.btn-spice, .btn-marigold, .btn-quiet {
+  border-radius: var(--r-pill);
+  font-weight: 700;
+  font-size: 13.5px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 1.25rem;
+}
+
+/* Primary: forest with gold text. */
+.btn-spice, .btn-marigold {
+  background: var(--forest);
+  border: 1px solid var(--forest);
+  color: var(--gold-light);
+}
+
+.btn-spice:hover, .btn-spice:focus,
+.btn-marigold:hover, .btn-marigold:focus {
+  background: #072B21;
+  border-color: #072B21;
+  color: var(--gold-light);
+}
+
+/* Secondary: gold outline, forest text. */
+.btn-quiet {
+  background: transparent;
+  border: 1px solid var(--gold);
+  color: var(--forest);
+}
+
+.btn-quiet:hover { background: rgba(201, 162, 83, .12); color: var(--forest); }
+
+.btn-sm { min-height: 38px; font-size: 12.5px; padding-inline: .9rem; }
+.btn-lg { min-height: 52px; font-size: 15px; }
+
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--gold-dark);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Panels, forms, cart
+   --------------------------------------------------------------------------- */
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--sand);
+  border-radius: var(--r-panel);
+}
+
+.panel-head {
+  padding: .85rem 1.1rem;
+  border-bottom: 1px solid var(--sand);
+  font-family: Marcellus, Georgia, serif;
+  color: var(--forest);
+}
+
+.card { border-color: var(--sand); border-radius: var(--r-panel); }
+.card-header { background: var(--surface); border-bottom-color: var(--sand); }
+
+.form-control, .form-select {
+  border-color: var(--sand-2);
+  border-radius: 12px;
+  min-height: 44px;
+  font-size: 14px;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201, 162, 83, .18);
+}
+
+.form-label { font-size: 13px; font-weight: 600; color: var(--forest-soft); }
+
+.summary-row { display: flex; justify-content: space-between; font-size: 14px; padding: .25rem 0; }
+
+.summary-row--total {
+  font-family: Marcellus, Georgia, serif;
+  font-size: 1.15rem;
+  color: var(--forest);
+  padding-top: .7rem;
+}
+
+.summary-saving { color: var(--gold-dark); font-weight: 700; }
+
+.qty-stepper {
+  display: inline-flex;
+  border: 1px solid var(--sand-2);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.qty-stepper button {
+  border: 0;
+  background: transparent;
+  width: 2.4rem;
+  min-height: 44px;
+  font-size: 1.05rem;
+  color: var(--forest);
+}
+
+.qty-stepper button:hover { background: var(--tint); }
+
+.qty-stepper input {
+  border: 0;
+  width: 2.8rem;
+  text-align: center;
+  font-weight: 700;
+  background: transparent;
+  color: var(--forest);
+}
+
+.qty-stepper input:focus { outline: none; }
+
+/* Trust strip. The design leads with dispatch time, packing and free-delivery
+   threshold — the three things a dry-fruit buyer wants to know. */
+.trust-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  font-size: 12.5px;
+  color: var(--muted-2);
+  background: var(--tint);
+  border: 1px solid var(--sand);
+  border-radius: var(--r-card);
+  padding: .85rem 1.1rem;
+  margin: 1.25rem 0;
+}
+
+.trust-strip b { color: var(--forest); font-weight: 700; }
+
+.badge.text-bg-success { background: var(--forest) !important; color: var(--gold-light) !important; }
+.badge.text-bg-warning { background: var(--gold) !important; color: var(--forest) !important; }
+
+.alert { border-radius: var(--r-card); border-color: var(--sand-2); }
+.alert-warning { background: var(--tint); color: var(--forest-soft); }
+
+.breadcrumb { font-size: 12.5px; }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--tint-2) 25%, var(--tint) 50%, var(--tint-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s infinite linear;
+  border-radius: var(--r-card);
+}
+
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+footer { background: var(--forest); border-top: 0; color: rgba(251, 247, 238, .7); }
+footer a { color: rgba(251, 247, 238, .7) !important; }
+footer a:hover { color: var(--gold-light) !important; }
+
+@media print {
+  body { background: #fff; }
+  .site-header, footer, .category-rail, .d-print-none { display: none !important; }
+  .panel, .card { border: 0 !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+
+/* ---------------------------------------------------------------------------
+   Adverts
+   An advert slot with nothing in it takes NO space. No reserved gap, no
+   placeholder, no "advertisement" label sitting above emptiness.
+   --------------------------------------------------------------------------- */
+
+.banner {
+  position: relative;
+  border: 1px solid var(--sand);
+  border-radius: var(--r-card);
+  overflow: hidden;
+  background: var(--forest);
+  color: var(--cream);
+  margin-bottom: 1rem;
+}
+
+.banner-image { width: 100%; display: block; object-fit: cover; max-height: 220px; }
+.banner-link { display: block; text-decoration: none; color: inherit; }
+
+.banner-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 2.5rem 1rem 1.25rem;
+}
+
+.banner-title { font-family: Marcellus, Georgia, serif; font-size: 1.1rem; color: var(--gold-light); }
+.banner-sub { font-size: 13px; color: rgba(251, 247, 238, .75); }
+.banner .btn-quiet { border-color: var(--gold); color: var(--gold-light); }
+.banner .btn-quiet:hover { background: rgba(201, 162, 83, .18); color: var(--gold-light); }
+
+/* The dismiss control is always reachable, and large enough to hit on a phone. */
+.banner-close {
+  position: absolute;
+  top: .35rem;
+  right: .35rem;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(11, 59, 46, .55);
+  color: var(--cream);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.banner-close:hover { background: rgba(11, 59, 46, .85); }
+
+/* Homepage headline: live offers, one at a time. Slides are stacked with
+   position:absolute over a fixed-height shell so rotating between them never
+   shifts anything else on the page. */
+.offer-hero {
+  position: relative;
+  min-height: 220px;
+  border: 1px solid var(--sand);
+  border-radius: var(--r-card);
+  overflow: hidden;
+  background: var(--forest);
+  color: var(--cream);
+  margin-bottom: 1rem;
+}
+
+.offer-hero-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.75rem 2rem;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .6s ease;
+  text-decoration: none;
+  color: inherit;
+  background-size: cover;
+  background-position: center;
+}
+
+.offer-hero-slide.is-active { opacity: 1; visibility: visible; }
+
+.offer-hero-eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); font-weight: 700; }
+.offer-hero-title { font-family: Marcellus, Georgia, serif; font-size: 1.6rem; line-height: 1.25; color: var(--gold-light); margin: .3rem 0; }
+.offer-hero-sub { font-size: 14px; color: rgba(251, 247, 238, .85); max-width: 34rem; }
+.offer-hero-cta { border-color: var(--gold); color: var(--gold-light); }
+.offer-hero-cta:hover { background: rgba(201, 162, 83, .18); color: var(--gold-light); }
+
+.offer-hero-dots {
+  position: absolute;
+  left: 1.25rem;
+  bottom: .9rem;
+  display: flex;
+  gap: .4rem;
+  z-index: 1;
+}
+
+.offer-hero-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(251, 247, 238, .35);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.offer-hero-dot.is-active { background: var(--gold-light); }
+
+@media (max-width: 576px) {
+  .offer-hero-slide { flex-direction: column; align-items: flex-start; justify-content: center; padding: 1.5rem 1.25rem 2.25rem; }
+  .offer-hero-title { font-size: 1.3rem; }
+}
+
+/* ---------------------------------------------------------------------------
+   Festive gift collections (home page) — assets/js/gift-collections.js
+   --------------------------------------------------------------------------- */
+
+.gift-tile-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.gift-tile {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 160px;
+  border-radius: var(--r-card, .75rem);
+  background-color: var(--forest, #0B3B2E);
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+  text-decoration: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .12);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.gift-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .18);
+}
+
+.gift-tile-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  text-align: center;
+  color: #fff;
+  font-family: Marcellus, Georgia, serif;
+  font-size: 1.1rem;
+}
+
+.gift-tile-caption {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  padding: .9rem 1rem;
+  width: 100%;
+}
+
+.gift-tile-title {
+  color: #fff;
+  font-family: Marcellus, Georgia, serif;
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.gift-tile-sub {
+  color: rgba(255, 255, 255, .85);
+  font-size: .78rem;
+  line-height: 1.3;
+}
+
+/* Small header link into the full gifting page — assets/js/ui.js */
+.gifting-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .3rem .7rem;
+  border-radius: var(--r-pill, 999px);
+  border: 1px solid var(--gold, #C9A253);
+  color: var(--forest, #0B3B2E);
+  font-size: .8rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.gifting-nav-btn:hover {
+  background: var(--gold, #C9A253);
+  color: #fff;
+}

@@ -1,0 +1,124 @@
+.account-page {
+  display: flex;
+  justify-content: center;
+  padding-top: 32px;
+}
+
+.account-card {
+  width: 100%;
+  max-width: 400px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  background: #fff;
+}
+
+.account-card__title {
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+.account-tabs {
+  display: flex;
+  gap: 4px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.account-tabs button {
+  background: none;
+  border: none;
+  padding: 8px 4px;
+  margin-right: 16px;
+  font-size: 14px;
+  color: #888;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.account-tabs button.active {
+  color: var(--brand-forest);
+  font-weight: 600;
+  border-bottom-color: var(--brand-marigold);
+}
+
+.field {
+  margin-bottom: 14px;
+}
+
+.field label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.field input {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: #888;
+  margin-top: 4px;
+}
+
+.btn-block {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 999px;
+}
+
+.account-error {
+  background: #fdecea;
+  color: #c0392b;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.account-error ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.account-info {
+  background: #eaf3fb;
+  color: #205080;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.otp-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  font-size: 20px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 8px 0 16px;
+  letter-spacing: 0.3em;
+}
+
+.fw-semibold {
+  font-weight: 600;
+}
+
+.text-muted {
+  color: #888;
+  font-size: 13px;
+}

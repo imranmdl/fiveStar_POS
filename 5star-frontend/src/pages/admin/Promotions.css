@@ -1,0 +1,129 @@
+.promo-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 20px;
+  background: #fff;
+}
+
+.promo-card__header {
+  font-weight: 600;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.promo-card__body {
+  padding: 16px;
+}
+
+.promo-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 16px;
+  align-items: start;
+}
+
+.promo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.promo-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #444;
+}
+
+.promo-field input,
+.promo-field select,
+.promo-field textarea {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.promo-field input:disabled,
+.promo-field select:disabled {
+  background: #f4f4f4;
+  color: #888;
+}
+
+.promo-hint {
+  font-size: 11px;
+  color: #888;
+}
+
+.promo-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  grid-column: 1 / -1;
+}
+
+.promo-table-note {
+  color: #888;
+  font-size: 12px;
+}
+
+.promo-toolbar-right {
+  display: flex;
+  gap: 8px;
+}
+
+.promo-error-row td {
+  padding-top: 0;
+}
+
+.promo-scope {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.promo-scope__modes {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.promo-scope__mode-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.promo-scope__mode-btn--active {
+  background: var(--brand-forest);
+  color: #fff;
+  border-color: var(--brand-forest);
+}
+
+.promo-scope__filter {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.promo-checklist {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 10px;
+}
+
+.promo-checklist label {
+  display: block;
+  font-size: 13px;
+  padding: 2px 0;
+}
