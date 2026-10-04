@@ -1,133 +1,194 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { api, signOut } from '../../lib/api';
+import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { api } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
-import { useCartCount } from '../../hooks/useCartCount';
-import { BRAND_LOGO_ALT, BRAND_LOGO_HEIGHT, BRAND_LOGO_URL, BRAND_NAME } from '../../lib/brand';
-import './CustomerLayout.css';
+import { CartProvider, useCart } from '../../hooks/useCart';
+import { BRAND_LOGO_ALT, BRAND_LOGO_URL } from '../../lib/brand';
+import { FREE_DELIVERY_ABOVE, rupees } from '../../lib/store';
+import '../../styles/customer-legacy.css';
+import '../../styles/storefront.css';
 
-const CATEGORY_COLORS = ['var(--brand-marigold)', 'var(--brand-teal)', 'var(--brand-terracotta)', 'var(--brand-saffron)'];
+const NAV = [
+  ['/shop', 'Shop'],
+  ['/gifting', 'Gift boxes'],
+  ['/about', 'About'],
+];
 
-/** Falls back to the text wordmark if the logo image 404s, same as the live site's brandMarkup(). */
-function BrandMark() {
-  const [imageFailed, setImageFailed] = useState(false);
+function totalProducts(category) {
+  return Number(category.product_count || 0)
+    + (category.children || []).reduce((sum, child) => sum + totalProducts(child), 0);
+}
 
-  if (imageFailed) return <span>{BRAND_NAME}</span>;
-
+function Brand() {
   return (
-    <img
-      src={BRAND_LOGO_URL}
-      alt={BRAND_LOGO_ALT}
-      height={BRAND_LOGO_HEIGHT}
-      style={{ height: BRAND_LOGO_HEIGHT, width: 'auto' }}
-      onError={() => setImageFailed(true)}
-    />
+    <Link to="/" className="sf-brand" aria-label="5 Star — home">
+      <img src={BRAND_LOGO_URL} alt={BRAND_LOGO_ALT} width="44" height="44" />
+      <span className="sf-brand__words">
+        <span className="sf-brand__name">5 Star</span>
+        <span className="sf-brand__tag">Spices &amp; Dry Fruits</span>
+      </span>
+    </Link>
   );
 }
 
-const NAV = [
-  ['/', 'Shop'],
-  ['/gifting', 'Gifting'],
-  ['/orders', 'My orders'],
-  ['/loyalty', 'Loyalty'],
-  ['/support', 'Support'],
-];
-
-export default function CustomerLayout() {
-  const { signedIn } = useAuth();
-  const { count } = useCartCount(signedIn);
-  const [categories, setCategories] = useState([]);
+function SearchBox() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [params] = useSearchParams();
+  const current = location.pathname === '/shop' ? params.get('q') || '' : '';
+  const [value, setValue] = useState(current);
+
+  useEffect(() => {
+    setValue(current);
+  }, [current]);
+
+  function submit(event) {
+    event.preventDefault();
+    const term = value.trim();
+    navigate(term ? `/shop?q=${encodeURIComponent(term)}` : '/shop');
+  }
+
+  return (
+    <form className="sf-search" role="search" onSubmit={submit}>
+      <input
+        type="search"
+        name="q"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        placeholder="Search for haldi, cardamom, almonds…"
+        aria-label="Search products"
+        autoComplete="off"
+      />
+    </form>
+  );
+}
+
+function CategoryRail({ categories }) {
+  const location = useLocation();
+  const [params] = useSearchParams();
+  const onShop = location.pathname === '/shop';
+  const active = onShop ? params.get('category') || 'all' : null;
+
+  return (
+    <nav className="sf-rail" aria-label="Categories">
+      <Link to="/shop" className={`sf-chip ${active === 'all' && !params.get('q') ? 'sf-chip--active' : ''}`}>
+        Everything
+      </Link>
+      {categories.map((category) => (
+        <Link
+          key={category.slug}
+          to={`/shop?category=${encodeURIComponent(category.slug)}`}
+          className={`sf-chip ${active === category.slug ? 'sf-chip--active' : ''}`}
+        >
+          {category.name}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+function CartToast() {
+  const { toast } = useCart();
+  if (!toast) return null;
+
+  return (
+    <div className={`sf-toast ${toast.kind === 'error' ? 'sf-toast--error' : ''}`} role="status" aria-live="polite">
+      <span>{toast.text}</span>
+      {toast.kind !== 'error' && <Link to="/cart">View cart</Link>}
+    </div>
+  );
+}
+
+function Shell({ signedIn }) {
+  const { count } = useCart();
+  const [categories, setCategories] = useState([]);
 
   useEffect(() => {
     api
       .get('/categories')
-      .then((response) => setCategories(response.data.categories || response.data || []))
-      .catch(() => setCategories(null));
+      .then((response) => {
+        const list = response.data.categories || response.data || [];
+        setCategories(list.filter((category) => totalProducts(category) > 0));
+      })
+      .catch(() => setCategories([]));
   }, []);
 
-  function handleSearch(event) {
-    event.preventDefault();
-    const term = new FormData(event.currentTarget).get('q');
-    navigate(`/?q=${encodeURIComponent(String(term || ''))}`);
-  }
-
-  async function handleSignOut() {
-    await signOut();
-    navigate('/');
-  }
+  const announcement = [
+    FREE_DELIVERY_ABOVE ? `Free delivery above ${rupees(FREE_DELIVERY_ABOVE)}` : null,
+    'Dispatched within 24 hours',
+    'All prices include GST',
+  ].filter(Boolean).join(' · ');
 
   return (
-    <div className="customer-shell">
-      <header className="site-header">
-        <div className="site-header__row">
-          <Link className="site-header__brand" to="/">
-            <BrandMark />
-          </Link>
+    <div className="sf">
+      <div className="sf-announce">{announcement}</div>
 
-          <form className="header-search" onSubmit={handleSearch}>
-            <input
-              type="search"
-              name="q"
-              placeholder="Search for haldi, cardamom, almonds…"
-              autoComplete="off"
-            />
-          </form>
-
-          <nav className="site-header__nav">
-            {NAV.map(([to, label]) => (
-              <NavLink key={to} to={to} className="site-header__link" end={to === '/'}>
-                {label}
-              </NavLink>
-            ))}
-          </nav>
-
-          <div className="site-header__actions">
-            <Link className="cart-pill" to="/cart">
-              Cart
-              {count > 0 && <span className="cart-pill__badge">{count}</span>}
+      <header className="sf-header">
+        <div className="sf-header__row">
+          <Brand />
+          <SearchBox />
+          <div className="sf-header__actions">
+            <nav className="sf-nav" aria-label="Main">
+              {NAV.map(([to, label]) => (
+                <NavLink key={to} to={to}>{label}</NavLink>
+              ))}
+            </nav>
+            <Link className="sf-account-link" to={signedIn ? '/account' : '/account?next=/'}>
+              {signedIn ? 'Account' : 'Sign in'}
             </Link>
-            {signedIn ? (
-              <button type="button" className="btn-quiet" onClick={handleSignOut}>
-                Sign out
-              </button>
-            ) : (
-              <Link className="btn-marigold" to="/account">
-                Sign in
-              </Link>
-            )}
+            <Link className="sf-cart-btn" to="/cart" aria-label={`Cart, ${count} items`}>
+              Cart<span className="sf-cart-btn__count">{count}</span>
+            </Link>
           </div>
         </div>
-
-        {categories !== null && (
-          <div className="category-rail">
-            <Link to="/" className="category-chip">
-              Everything
-            </Link>
-            {categories.map((category, index) => (
-              <Link key={category.uuid || category.slug} to={`/?category=${encodeURIComponent(category.slug)}`} className="category-chip">
-                <span className="category-chip__dot" style={{ background: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }} />
-                {category.name}
-              </Link>
-            ))}
-          </div>
-        )}
+        <CategoryRail categories={categories} />
       </header>
 
-      <main className="customer-main">
+      <main className="sf-main">
         <Outlet />
       </main>
 
-      <footer className="site-footer">
-        <div className="site-footer__links">
-          <Link to="/page/shipping-policy">Shipping</Link>
-          <Link to="/page/returns-and-refunds">Returns</Link>
-          <Link to="/page/privacy-policy">Privacy</Link>
-          <Link to="/page/terms-of-service">Terms</Link>
-          <Link to="/faq">FAQ</Link>
+      <footer className="sf-footer">
+        <div className="sf-footer__row">
+          <div className="sf-footer__brand">
+            <img src={BRAND_LOGO_URL} alt="" width="40" height="40" />
+            <span>5 Star Spices &amp; Dry Fruits<br />Since 1984</span>
+          </div>
+          <div className="sf-footer__links">
+            <Link to="/shop">Shop</Link>
+            <Link to="/gifting">Gift boxes</Link>
+            <Link to="/about">About</Link>
+            <Link to="/orders">My orders</Link>
+            <Link to="/support">Support</Link>
+            <Link className="sf-footer__quiet" to="/page/shipping-policy">Shipping</Link>
+            <Link className="sf-footer__quiet" to="/page/returns-and-refunds">Returns</Link>
+            <Link className="sf-footer__quiet" to="/page/privacy-policy">Privacy</Link>
+            <Link className="sf-footer__quiet" to="/page/terms-of-service">Terms</Link>
+            <Link className="sf-footer__quiet" to="/faq">FAQ</Link>
+          </div>
+          <span className="sf-footer__note">Secure UPI payments · All prices include GST</span>
         </div>
-        <div className="site-footer__note">Prepaid UPI only · All prices include GST</div>
       </footer>
+
+      <CartToast />
     </div>
+  );
+}
+
+export default function CustomerLayout() {
+  const { signedIn, ready } = useAuth();
+  const { pathname } = useLocation();
+
+  // New page, start at the top (the design's go() does the same).
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return (
+    // Reload the cart once the session is restored and any guest cart merged
+    // (useAuth's `ready`), and again whenever the person signs in or out.
+    <CartProvider refreshKey={ready ? (signedIn ? 'signed-in' : 'guest') : 'starting'}>
+      <Shell signedIn={signedIn} />
+    </CartProvider>
   );
 }

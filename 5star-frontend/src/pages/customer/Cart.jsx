@@ -1,362 +1,291 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, formatMoney } from '../../lib/api';
-import { useCartCount } from '../../hooks/useCartCount';
-import './Cart.css';
+import { api } from '../../lib/api';
+import { useCart } from '../../hooks/useCart';
+import { cardFromListItem, packLabel, rupees, tintFor } from '../../lib/store';
+import { AddControl, ProductMedia } from '../../components/customer/ProductCard';
 
-function offerCategoryLabel(offer) {
-  return offer.discount_type === 'free_items' ? 'Combo offer' : 'Special price';
+/** A missing pincode is resolved at checkout, so it never blocks the button. */
+function hardBlockers(cart) {
+  return ((cart.checkout && cart.checkout.blockers) || [])
+    .filter((b) => !String(b).toLowerCase().includes('enter a delivery pincode'));
 }
 
-/**
- * Which blockers actually block checkout vs. are resolved by picking an
- * address later — same rule as the vanilla cart page: a missing pincode is
- * a convenience, not a hard stop.
- */
-function classifyBlockers(blockers) {
-  const soft = [];
-  const hard = [];
-
-  blockers.forEach((blocker) => {
-    if (String(blocker).toLowerCase().includes('enter a delivery pincode')) {
-      soft.push(blocker);
-    } else {
-      hard.push(blocker);
-    }
-  });
-
-  return { soft, hard };
-}
-
-function CartLine({ item, offer, busy, onQuantityChange, onRemove }) {
-  return (
-    <div className="cart-line">
-      <div className="cart-line__info">
-        <div className="cart-line__name">{item.product.name}</div>
-        <div className="cart-line__variant">{item.variant.name} · {item.variant.sku}</div>
-        {offer && (
-          <div className="cart-line__offer">
-            <span className="tag tag--offer">{offerCategoryLabel(offer)}</span>
-            <span title={offer.title}>{offer.summary}</span>
-          </div>
-        )}
-        {!item.is_purchasable && (
-          <div className="cart-line__warning">{item.unavailable_reason || 'Unavailable'}</div>
-        )}
-        {item.price_changed && <div className="cart-line__price-changed">Price changed since you added this.</div>}
-      </div>
-
-      <div className="cart-line__controls">
-        <input
-          type="number"
-          min="0"
-          max={item.variant.max_order_quantity || 500}
-          defaultValue={item.quantity}
-          disabled={busy}
-          onBlur={(event) => onQuantityChange(item.uuid, Number(event.currentTarget.value))}
-          aria-label="Quantity"
-        />
-        <div className="cart-line__price">
-          <div className="cart-line__price-now">{formatMoney(item.line_total)}</div>
-          <div className="cart-line__price-each">{formatMoney(item.unit_price)} each</div>
-        </div>
-        <button type="button" className="btn-outline" disabled={busy} onClick={() => onRemove(item.uuid)}>
-          Remove
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function OrderSummary({ cart, pincodeInput, onPincodeChange, onPincodeSubmit, pincodeBusy }) {
-  const pricing = cart.pricing.summary;
-  const payment = cart.payment || {};
-  const allBlockers = (cart.checkout && cart.checkout.blockers) || [];
-  const { soft, hard } = classifyBlockers(allBlockers);
+function FreeDelivery({ cart, onPincode, pincodeBusy }) {
   const delivery = cart.pricing.delivery || {};
+  const summary = cart.pricing.summary;
+  const [pincode, setPincode] = useState(delivery.pincode || '');
+  const known = delivery.is_serviceable;
+  const spendMore = Number(delivery.spend_more_for_free_delivery || 0);
 
-  return (
-    <div className="order-summary">
-      <h2>Order summary</h2>
-
-      <dl className="order-summary__rows">
-        <dt>Items</dt>
-        <dd>{formatMoney(pricing.items_subtotal)}</dd>
-
-        {Number(pricing.order_discount) > 0 && (
-          <>
-            <dt className="order-summary__discount-label">
-              {cart.promotions.applied_offer ? cart.promotions.applied_offer.title : 'Discount'}
-            </dt>
-            <dd className="order-summary__discount-value">−{formatMoney(pricing.order_discount)}</dd>
-          </>
-        )}
-
-        <dt>Delivery</dt>
-        <dd>{Number(pricing.delivery_charge) === 0 ? <span className="text-success">Free</span> : formatMoney(pricing.delivery_charge)}</dd>
-      </dl>
-
-      {cart.promotions.applied_offer && (
-        <div className="order-summary__offer-note">{cart.promotions.applied_offer.summary}</div>
-      )}
-
-      <hr />
-      <div className="order-summary__total">
-        <span>Total</span><span>{formatMoney(pricing.grand_total)}</span>
-      </div>
-      <div className="order-summary__tax">Includes {formatMoney(pricing.tax_total)} GST</div>
-
-      {Number(pricing.total_savings) > 0 && (
-        <div className="order-summary__savings">You saved {formatMoney(pricing.total_savings)} on this order</div>
-      )}
-
-      {Number(payment.wallet_applied || 0) > 0 && (
-        <>
-          <div className="order-summary__wallet">
-            <span>Wallet credit</span><span>−{formatMoney(payment.wallet_applied)}</span>
-          </div>
-          <div className="order-summary__total">
-            <span>To pay</span><span>{formatMoney(payment.amount_payable)}</span>
-          </div>
-        </>
-      )}
-
-      <form className="pincode-form" onSubmit={onPincodeSubmit}>
-        <label htmlFor="pincode">Delivery pincode</label>
-        <div className="pincode-form__row">
+  if (!known) {
+    return (
+      <form
+        className="sf-progress"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onPincode(pincode);
+        }}
+      >
+        <span>
+          {delivery.pincode
+            ? 'We do not deliver to that pincode yet. Try another one.'
+            : 'Enter your pincode to see delivery charges and timing.'}
+        </span>
+        <div className="sf-inline-form">
           <input
-            id="pincode"
+            className="sf-input"
             inputMode="numeric"
             maxLength={6}
             pattern="\d{6}"
             placeholder="560001"
-            value={pincodeInput}
-            onChange={(event) => onPincodeChange(event.target.value)}
+            aria-label="Delivery pincode"
+            value={pincode}
+            onChange={(event) => setPincode(event.target.value.replace(/\D/g, ''))}
+            style={{ maxWidth: 180 }}
           />
-          <button type="submit" className="btn-outline" disabled={pincodeBusy}>
-            {pincodeBusy ? '…' : 'Check'}
-          </button>
+          <button type="submit" className="sf-btn sf-btn--ink" disabled={pincodeBusy}>{pincodeBusy ? '…' : 'Check'}</button>
         </div>
-        {delivery.pincode && delivery.is_serviceable === false ? (
-          <div className="form-text form-text--error">We do not deliver to that pincode yet.</div>
-        ) : delivery.estimated_days ? (
-          <div className="form-text form-text--success">
-            Delivers in {delivery.estimated_days.min}–{delivery.estimated_days.max} days
-          </div>
-        ) : (
-          <div className="form-text">
-            Optional — enter it to see the delivery charge now. You can also just continue and pick your address at
-            checkout.
-          </div>
-        )}
       </form>
+    );
+  }
 
-      {hard.length > 0 && (
-        <div className="alert alert-warning">
-          <div className="alert__title">Before you can check out</div>
-          <ul>
-            {hard.map((b) => <li key={b}>{b}</li>)}
-          </ul>
+  const free = Number(summary.delivery_charge) === 0;
+  const subtotal = Number(summary.items_subtotal || 0);
+  const pct = free ? 100 : spendMore > 0 ? Math.min(100, (subtotal / (subtotal + spendMore)) * 100) : 0;
+  const days = delivery.estimated_days && delivery.estimated_days.max
+    ? ` · arrives in ${delivery.estimated_days.min}–${delivery.estimated_days.max} days`
+    : '';
+
+  return (
+    <div className="sf-progress">
+      <span>
+        {free ? 'You get free delivery' : spendMore > 0 ? `Add ${rupees(spendMore)} more for free delivery` : `Delivery to ${delivery.pincode}: ${rupees(summary.delivery_charge)}`}
+        <span className="sf-muted">{days}</span>
+      </span>
+      {(free || spendMore > 0) && (
+        <div className="sf-progress__track"><div className="sf-progress__bar" style={{ width: `${pct}%` }} /></div>
+      )}
+    </div>
+  );
+}
+
+function CartLine({ item, offer, busy, onQuantity }) {
+  const max = Number(item.variant.max_order_quantity || 500);
+  const href = `/product/${item.product.slug}`;
+  const size = packLabel(item.variant.weight_grams) || item.variant.name;
+
+  return (
+    <div className="sf-line">
+      <Link to={href} aria-label={item.product.name}>
+        <ProductMedia tint={tintFor(item.product.slug)} className="sf-line__thumb" />
+      </Link>
+      <div className="sf-line__body">
+        <div className="sf-line__top">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+            <Link to={href} className="sf-line__name">{item.product.name}</Link>
+            <span className="sf-small">{size} · {rupees(item.unit_price)} each</span>
+            {offer && <span className="sf-small sf-good" style={{ fontWeight: 600 }}>{offer.summary}</span>}
+            {!item.is_purchasable && <span className="sf-line__warn">{item.unavailable_reason || 'Unavailable'}</span>}
+            {item.price_changed_date && <span className="sf-line__warn">Price changed since you added this.</span>}
+          </div>
+          <span className="sf-line__total">{rupees(item.line_total)}</span>
         </div>
-      )}
-
-      {soft.length > 0 && hard.length === 0 && (
-        <p className="text-muted small">Delivery is worked out once we know where it is going.</p>
-      )}
-
-      {hard.length === 0 ? (
-        <Link className="btn-marigold checkout-cta" to="/checkout">Checkout</Link>
-      ) : (
-        <span className="btn-marigold checkout-cta checkout-cta--disabled" aria-disabled="true">Checkout</span>
-      )}
-      <div className="text-center text-muted small">Prepaid UPI only</div>
+        <div className="sf-line__ctrls">
+          <div className="sf-stepper sf-stepper--light">
+            <button type="button" aria-label="One fewer" disabled={busy} onClick={() => onQuantity(item.uuid, item.quantity - 1)}>−</button>
+            <span>{item.quantity}</span>
+            <button type="button" aria-label="One more" disabled={busy || item.quantity >= max} onClick={() => onQuantity(item.uuid, item.quantity + 1)}>+</button>
+          </div>
+          <button type="button" className="sf-line__remove" disabled={busy} onClick={() => onQuantity(item.uuid, 0)}>Remove</button>
+        </div>
+      </div>
     </div>
   );
 }
 
 export default function Cart() {
-  const { refresh: refreshCartCount } = useCartCount();
-  const [status, setStatus] = useState('loading');
-  const [error, setError] = useState(null);
-  const [cart, setCart] = useState(null);
-  const [items, setItems] = useState([]);
-  const [offersByProduct, setOffersByProduct] = useState({});
-  const [busyItem, setBusyItem] = useState(null);
-  const [pincodeInput, setPincodeInput] = useState('');
-  const [pincodeBusy, setPincodeBusy] = useState(false);
-  const [couponInput, setCouponInput] = useState('');
+  const { cart, lines, count, busy, refresh, setQuantity, showToast } = useCart();
+  const [offers, setOffers] = useState({});
+  const [suggestions, setSuggestions] = useState([]);
+  const [coupon, setCoupon] = useState('');
   const [couponBusy, setCouponBusy] = useState(false);
-  const [toast, setToastMsg] = useState(null);
-
-  const load = useCallback(async () => {
-    setStatus('loading');
-    try {
-      const response = await api.get('/cart');
-      const c = response.data;
-      const activeItems = (c.items || []).filter((item) => !item.is_saved_for_later);
-
-      setCart(c);
-      setItems(activeItems);
-      setPincodeInput((c.pricing.delivery && c.pricing.delivery.pincode) || '');
-      setCouponInput((c.promotions.applied_coupon || {}).code || '');
-      setStatus('ready');
-      refreshCartCount();
-
-      if (activeItems.length > 0) {
-        try {
-          const uuids = [...new Set(activeItems.map((item) => item.product.uuid))];
-          const lookup = await api.get('/offers/product-lookup', { product_uuids: uuids.join(',') });
-          setOffersByProduct((lookup.data && lookup.data.offers) || {});
-        } catch {
-          setOffersByProduct({});
-        }
-      }
-    } catch (err) {
-      setError(err.message);
-      setStatus('error');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [pincodeBusy, setPincodeBusy] = useState(false);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    document.title = 'Your cart · 5 Star';
+    refresh();
+  }, [refresh]);
+
+  const productKey = useMemo(() => [...new Set(lines.map((l) => l.product.uuid))].sort().join(','), [lines]);
 
   useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToastMsg(null), 4000);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
-  async function handleQuantityChange(uuid, quantity) {
-    setBusyItem(uuid);
-    try {
-      if (quantity <= 0) {
-        await api.delete(`/cart/items/${uuid}`);
-      } else {
-        await api.patch(`/cart/items/${uuid}`, { quantity });
-      }
-      await load();
-    } catch (err) {
-      setToastMsg({ text: err.message, variant: 'danger' });
-      await load();
-    } finally {
-      setBusyItem(null);
-    }
-  }
-
-  async function handleRemove(uuid) {
-    setBusyItem(uuid);
-    try {
-      await api.delete(`/cart/items/${uuid}`);
-      setToastMsg({ text: 'Removed from your cart.', variant: 'success' });
-      await load();
-    } catch (err) {
-      setToastMsg({ text: err.message, variant: 'danger' });
-    } finally {
-      setBusyItem(null);
-    }
-  }
-
-  async function handlePincodeSubmit(event) {
-    event.preventDefault();
-    if (!/^\d{6}$/.test(pincodeInput)) {
-      setToastMsg({ text: 'An Indian pincode is six digits.', variant: 'danger' });
+    if (!productKey) {
+      setOffers({});
       return;
     }
+    api.get('/offers/product-lookup', { product_uuids: productKey })
+      .then((lookup) => setOffers((lookup.data && lookup.data.offers) || {}))
+      .catch(() => setOffers({}));
+  }, [productKey]);
 
-    setPincodeBusy(true);
-    try {
-      await api.post('/cart/pincode', { pincode: pincodeInput });
-      await load();
-    } catch (err) {
-      setToastMsg({ text: err.message, variant: 'danger' });
-    } finally {
-      setPincodeBusy(false);
-    }
-  }
+  useEffect(() => {
+    const inCart = new Set(productKey.split(','));
+    api.get('/products', { per_page: 12, sort: 'relevance' })
+      .then((payload) => setSuggestions((payload.data || [])
+        .filter((p) => !inCart.has(p.uuid))
+        .slice(0, 4)
+        .map(cardFromListItem)))
+      .catch(() => setSuggestions([]));
+  }, [productKey]);
 
-  async function handleCouponSubmit(event) {
+  useEffect(() => {
+    setCoupon((cart && cart.promotions && cart.promotions.applied_coupon && cart.promotions.applied_coupon.code) || '');
+  }, [cart]);
+
+  async function applyCoupon(event) {
     event.preventDefault();
     setCouponBusy(true);
     try {
-      if (!couponInput) {
+      if (!coupon) {
         await api.delete('/cart/coupon');
-        setToastMsg({ text: 'Coupon removed.', variant: 'success' });
+        showToast('Coupon removed');
       } else {
-        const result = await api.post('/cart/coupon', { coupon_code: couponInput });
-        setToastMsg({ text: result.message || 'Coupon applied.', variant: 'success' });
+        const result = await api.post('/cart/coupon', { coupon_code: coupon.trim().toUpperCase() });
+        showToast(result.message || 'Coupon applied');
       }
-      await load();
+      await refresh();
     } catch (err) {
-      setToastMsg({ text: err.message, variant: 'danger' });
+      showToast(err.message, 'error');
     } finally {
       setCouponBusy(false);
     }
   }
 
-  if (status === 'loading') {
-    return <div className="page"><p className="state-message">Loading your cart…</p></div>;
+  async function checkPincode(pincode) {
+    if (!/^\d{6}$/.test(pincode)) {
+      showToast('An Indian pincode is six digits.', 'error');
+      return;
+    }
+    setPincodeBusy(true);
+    try {
+      await api.post('/cart/pincode', { pincode });
+      await refresh();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setPincodeBusy(false);
+    }
   }
 
-  if (status === 'error') {
-    return <div className="page"><p className="state-message state-message--error">Couldn't load your cart: {error}</p></div>;
+  if (!cart) {
+    return <div className="sf-page"><h1 className="sf-h1">Your cart</h1><p className="sf-muted">Loading your cart…</p></div>;
   }
 
-  if (items.length === 0) {
+  if (lines.length === 0) {
     return (
-      <div className="page cart-empty">
-        <h1 className="page-title">Your cart is empty</h1>
-        <p className="text-muted">Nothing added yet.</p>
-        <Link className="btn-marigold" to="/">Browse the shop</Link>
+      <div className="sf-page">
+        <h1 className="sf-h1">Your cart</h1>
+        <div className="sf-empty-box">
+          <b>Your cart is empty</b>
+          <span className="sf-muted" style={{ fontSize: 15 }}>Start with the everyday favourites.</span>
+          <Link to="/shop" className="sf-btn sf-btn--red">Shop now</Link>
+        </div>
       </div>
     );
   }
 
+  const summary = cart.pricing.summary;
+  const payment = cart.payment || {};
+  const appliedOffer = cart.promotions && cart.promotions.applied_offer;
+  const savings = Number(summary.product_discount || 0) + Number(summary.order_discount || 0);
+  const blockers = hardBlockers(cart);
+  const deliveryKnown = cart.pricing.delivery && cart.pricing.delivery.is_serviceable;
+
   return (
-    <div className="page cart-page">
-      <h1 className="page-title">Your cart</h1>
-      <div className="cart-layout">
-        <div className="cart-items">
-          {items.map((item) => (
-            <CartLine
-              key={item.uuid}
-              item={item}
-              offer={offersByProduct[item.product.uuid]}
-              busy={busyItem === item.uuid}
-              onQuantityChange={handleQuantityChange}
-              onRemove={handleRemove}
-            />
-          ))}
+    <div className="sf-page">
+      <h1 className="sf-h1">Your cart</h1>
+      <div className="sf-split">
+        <div className="sf-split__main">
+          <FreeDelivery cart={cart} onPincode={checkPincode} pincodeBusy={pincodeBusy} />
 
-          <form className="coupon-form" onSubmit={handleCouponSubmit}>
-            <label htmlFor="coupon">Coupon code</label>
-            <div className="coupon-form__row">
-              <input
-                id="coupon"
-                value={couponInput}
-                onChange={(event) => setCouponInput(event.target.value)}
-                placeholder="e.g. WELCOME10"
-              />
-              <button type="submit" className="btn-outline" disabled={couponBusy}>
-                {couponBusy ? '…' : 'Apply'}
-              </button>
+          <div className="sf-lines">
+            {lines.map((item) => (
+              <CartLine key={item.uuid} item={item} offer={offers[item.product.uuid]} busy={busy} onQuantity={setQuantity} />
+            ))}
+          </div>
+
+          {suggestions.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 12 }}>
+              <span className="sf-h3">Frequently bought together</span>
+              <div className="sf-fbt">
+                {suggestions.map((p) => (
+                  <div key={p.uuid} className="sf-fbt__item">
+                    <Link to={`/product/${p.slug}`} aria-label={p.name}>
+                      <ProductMedia image={p.image} tint={p.tint} className="sf-media--square" alt={p.name} />
+                    </Link>
+                    <Link to={`/product/${p.slug}`} className="sf-fbt__name">{p.name}</Link>
+                    <div className="sf-fbt__foot">
+                      <span>{rupees(p.price)}</span>
+                      <AddControl product={p} size="xs" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
+          )}
+        </div>
+
+        <aside className="sf-summary" aria-label="Order summary">
+          <span className="sf-h3">Order summary</span>
+          <div className="sf-summary__row"><span>Items ({count})</span><span>{rupees(summary.items_mrp_total)}</span></div>
+          {savings > 0 && (
+            <div className="sf-summary__row"><span>Discount</span><span className="sf-good">− {rupees(savings)}</span></div>
+          )}
+          {appliedOffer && <span className="sf-small sf-good">{appliedOffer.title} — {appliedOffer.summary}</span>}
+          <div className="sf-summary__row">
+            <span>Delivery</span>
+            <span>{!deliveryKnown ? 'At checkout' : Number(summary.delivery_charge) === 0 ? 'Free' : rupees(summary.delivery_charge)}</span>
+          </div>
+
+          <form className="sf-inline-form" onSubmit={applyCoupon}>
+            <input
+              className="sf-input"
+              placeholder="Coupon code"
+              aria-label="Coupon code"
+              value={coupon}
+              onChange={(event) => setCoupon(event.target.value)}
+            />
+            <button type="submit" className="sf-btn sf-btn--outline" disabled={couponBusy} style={{ padding: '0 16px' }}>
+              {couponBusy ? '…' : 'Apply'}
+            </button>
           </form>
-        </div>
 
-        <div className="cart-summary">
-          <OrderSummary
-            cart={cart}
-            pincodeInput={pincodeInput}
-            onPincodeChange={setPincodeInput}
-            onPincodeSubmit={handlePincodeSubmit}
-            pincodeBusy={pincodeBusy}
-          />
-        </div>
+          <div className="sf-summary__row sf-summary__row--total"><span>Total</span><span>{rupees(summary.grand_total)}</span></div>
+          <span className="sf-small">Inclusive of {rupees(summary.tax_total)} GST</span>
+
+          {Number(payment.wallet_applied || 0) > 0 && (
+            <>
+              <div className="sf-summary__row"><span>Wallet credit</span><span className="sf-good">− {rupees(payment.wallet_applied)}</span></div>
+              <div className="sf-summary__row" style={{ fontWeight: 700 }}><span>To pay</span><span>{rupees(payment.amount_payable)}</span></div>
+            </>
+          )}
+
+          {blockers.length > 0 && (
+            <div className="sf-error">
+              <b>Before you can check out</b>
+              <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>{blockers.map((b) => <li key={b}>{b}</li>)}</ul>
+            </div>
+          )}
+
+          {blockers.length === 0 ? (
+            <Link to="/checkout" className="sf-btn sf-btn--red sf-btn--lg">Checkout</Link>
+          ) : (
+            <span className="sf-btn sf-btn--red sf-btn--lg" aria-disabled="true">Checkout</span>
+          )}
+          <Link to="/shop" className="sf-btn sf-btn--ghost" style={{ color: 'var(--sf-ink)' }}>Continue shopping</Link>
+        </aside>
       </div>
-
-      {toast && <div className={`toast-pop toast-pop--${toast.variant}`}>{toast.text}</div>}
     </div>
   );
 }

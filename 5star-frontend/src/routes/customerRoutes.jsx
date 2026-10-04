@@ -13,6 +13,8 @@ import Faq from '../pages/customer/Faq';
 import Gifting from '../pages/customer/Gifting';
 import Invoice from '../pages/customer/Invoice';
 import Page from '../pages/customer/Page';
+import Shop from '../pages/customer/Shop';
+import About from '../pages/customer/About';
 
 /**
  * Customer-facing routes, rendered inside CustomerLayout.
@@ -20,6 +22,8 @@ import Page from '../pages/customer/Page';
  */
 export const customerRoutes = [
   { index: true, element: <Home /> },
+  { path: 'shop', element: <Shop /> },
+  { path: 'about', element: <About /> },
   {
     path: 'product/:slug',
     element: <Product />,
