@@ -5,7 +5,7 @@ name: Android app
 #
 # One-time setup — repo Settings → Secrets and variables → Actions:
 #   Variables:
-#     API_BASE_URL          https://<your-railway-domain>/api/v1   (required)
+#     API_BASE_URL          optional; defaults to https://fivestarpos-production.up.railway.app/api/v1
 #     BRAND_LOGO_URL        optional, same as Railway's VITE_BRAND_LOGO_URL
 #   Secrets (optional — only for a signed Play Store build):
 #     ANDROID_KEYSTORE_BASE64   base64 of your .jks/.keystore file
@@ -43,7 +43,7 @@ jobs:
         working-directory: 5star-frontend
 
     env:
-      API_BASE: ${{ inputs.api_base || vars.API_BASE_URL }}
+      API_BASE: ${{ inputs.api_base || vars.API_BASE_URL || 'https://fivestarpos-production.up.railway.app/api/v1' }}
       VERSION_CODE: ${{ github.run_number }}
       VERSION_NAME: 1.0.${{ github.run_number }}
 
