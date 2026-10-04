@@ -56,6 +56,8 @@ COPY --from=mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /u
 RUN set -eux; \
     install-php-extensions gd pdo_mysql zip opcache; \
     a2enmod rewrite headers expires deflate; \
+    a2dismod -f mpm_event mpm_worker || true; \
+    a2enmod mpm_prefork; \
     a2dissite 000-default; \
     sed -i 's|^\(\s*Alias /icons/\)|# \1|' /etc/apache2/mods-available/alias.conf; \
     mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"

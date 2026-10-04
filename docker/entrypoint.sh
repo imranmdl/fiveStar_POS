@@ -205,6 +205,23 @@ fi
 # ---------------------------------------------------------------------------
 export PORT="${PORT:-8080}"
 echo "Listen ${PORT}" > /etc/apache2/ports.conf
+
+# mod_php needs the prefork MPM, and Apache refuses to start with more than
+# one MPM enabled ("AH00534: More than one MPM loaded"). Enforce exactly one
+# at runtime as well, whatever the base image or platform left enabled.
+rm -f /etc/apache2/mods-enabled/mpm_event.load /etc/apache2/mods-enabled/mpm_event.conf \
+      /etc/apache2/mods-enabled/mpm_worker.load /etc/apache2/mods-enabled/mpm_worker.conf
+if [ ! -e /etc/apache2/mods-enabled/mpm_prefork.load ]; then
+    ln -s ../mods-available/mpm_prefork.load /etc/apache2/mods-enabled/mpm_prefork.load
+    ln -s ../mods-available/mpm_prefork.conf /etc/apache2/mods-enabled/mpm_prefork.conf
+fi
+log "Apache MPM: $(ls /etc/apache2/mods-enabled | grep '^mpm_.*\.load$' | tr '\n' ' ')"
+
+if ! apache2ctl -t 2>/tmp/apache-configtest; then
+    log "FATAL: Apache configuration test failed:"
+    cat /tmp/apache-configtest
+    exit 1
+fi
 log "Starting Apache on port $PORT"
 
 exec "$@"
