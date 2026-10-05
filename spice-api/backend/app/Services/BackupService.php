@@ -21,7 +21,7 @@ use App\Core\Request;
  */
 final class BackupService
 {
-    private const FILENAME_PATTERN = '/^backup_\d{8}_\d{6}\.sql$/';
+    private const FILENAME_PATTERN = '/^backup_\d{8}_\d{6}(_\d{1,3})?\.sql$/';
     private const ROW_BATCH = 200;
     private const MAX_UPLOAD_BYTES = 104_857_600; // 100 MB — generous for a shop this size's dump.
 
@@ -45,7 +45,14 @@ final class BackupService
     /** @return array<string, mixed> */
     public function create(Request $request, string $label = 'manual'): array
     {
-        $filename = 'backup_' . date('Ymd_His') . '.sql';
+        // Two backups in the same second (a manual one, then the safety
+        // backup a reset or restore takes) must never share a file name —
+        // the second would silently overwrite the first.
+        $stamp = 'backup_' . date('Ymd_His');
+        $filename = $stamp . '.sql';
+        for ($n = 2; is_file($this->directory() . '/' . $filename); $n++) {
+            $filename = $stamp . '_' . $n . '.sql';
+        }
         $path = $this->directory() . '/' . $filename;
 
         $handle = fopen($path, 'wb');
@@ -134,10 +141,16 @@ final class BackupService
         $createRow = $pdo->query("SHOW CREATE TABLE {$quotedTable}")->fetch();
         fwrite($handle, (string) $createRow['Create Table'] . ";\n\n");
 
-        $columns = array_map(
-            static fn (array $col): string => (string) $col['Field'],
-            $pdo->query("SHOW COLUMNS FROM {$quotedTable}")->fetchAll()
-        );
+        // Generated columns (computed from others, e.g. carts.active_owner_user)
+        // are left out: MySQL refuses any value for them on INSERT, so a dump
+        // that includes them can never be restored. MySQL marks them
+        // "VIRTUAL GENERATED"/"STORED GENERATED", MariaDB also "PERSISTENT
+        // GENERATED"; "DEFAULT_GENERATED" is just a column default and stays.
+        $stored = array_values(array_filter(
+            $pdo->query("SHOW COLUMNS FROM {$quotedTable}")->fetchAll(),
+            static fn (array $col): bool => preg_match('/\b(VIRTUAL|STORED|PERSISTENT) GENERATED\b/i', (string) ($col['Extra'] ?? '')) !== 1
+        ));
+        $columns = array_map(static fn (array $col): string => (string) $col['Field'], $stored);
         $quotedColumns = implode(', ', array_map(static fn (string $c): string => '`' . $c . '`', $columns));
 
         $countStatement = $pdo->query("SELECT COUNT(*) FROM {$quotedTable}");
@@ -151,7 +164,7 @@ final class BackupService
 
         for ($offset = 0; $offset < $total; $offset += self::ROW_BATCH) {
             $rows = $pdo->query(
-                "SELECT * FROM {$quotedTable} LIMIT " . self::ROW_BATCH . " OFFSET {$offset}"
+                "SELECT {$quotedColumns} FROM {$quotedTable} LIMIT " . self::ROW_BATCH . " OFFSET {$offset}"
             )->fetchAll();
 
             if ($rows === []) {
@@ -273,6 +286,30 @@ final class BackupService
             throw new HttpException('The uploaded file is empty or unreadable.', 422);
         }
 
+        return $this->restoreSql($sql, (string) ($file['name'] ?? ''), $size, $request);
+    }
+
+    /**
+     * Restores one of the backups already saved on the server — the quick
+     * way back after a test run or a data reset.
+     *
+     * @return array{safety_backup:array<string, mixed>}
+     */
+    public function restoreSaved(string $filename, Request $request): array
+    {
+        $path = $this->assertValidFilename($filename);
+        $sql = file_get_contents($path);
+
+        if ($sql === false || trim($sql) === '') {
+            throw new HttpException('That backup file is empty or unreadable.', 422);
+        }
+
+        return $this->restoreSql($sql, $filename, strlen($sql), $request);
+    }
+
+    /** @return array{safety_backup:array<string, mixed>} */
+    private function restoreSql(string $sql, string $sourceName, int $size, Request $request): array
+    {
         $safetyBackup = $this->create($request, 'pre_restore_safety');
 
         try {
@@ -290,7 +327,7 @@ final class BackupService
             entityName: 'database_backups',
             entityId: null,
             action: 'restore',
-            newValues: ['uploaded_filename' => (string) ($file['name'] ?? ''), 'bytes' => $size],
+            newValues: ['source' => $sourceName, 'bytes' => $size],
             request: $request,
             notes: 'Safety backup taken first: ' . $safetyBackup['filename']
         );

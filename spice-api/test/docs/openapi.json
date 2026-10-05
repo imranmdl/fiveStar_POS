@@ -72,6 +72,9 @@
             "name": "Admin: Data Cleanup"
         },
         {
+            "name": "Admin: Data Reset"
+        },
+        {
             "name": "Admin: Export"
         },
         {
@@ -1982,6 +1985,59 @@
                     "Admin: Backups"
                 ],
                 "summary": "Download",
+                "description": "Requires one of these roles: administrator.",
+                "parameters": [
+                    {
+                        "name": "filename",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Filename"
+                    }
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/backups/{filename}/restore": {
+            "post": {
+                "operationId": "backupControllerRestoreSaved",
+                "tags": [
+                    "Admin: Backups"
+                ],
+                "summary": "Restore a backup saved on the server.",
                 "description": "Requires one of these roles: administrator.",
                 "parameters": [
                     {
@@ -5899,6 +5955,84 @@
                         }
                     }
                 },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/data-reset/preview": {
+            "get": {
+                "operationId": "backupControllerResetPreview",
+                "tags": [
+                    "Admin: Data Reset"
+                ],
+                "summary": "Row counts per group, and which extra groups a selection pulls in.",
+                "description": "Requires one of these roles: administrator.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/data-reset/run": {
+            "post": {
+                "operationId": "backupControllerResetRun",
+                "tags": [
+                    "Admin: Data Reset"
+                ],
+                "summary": "{ \"groups\": [\"orders\", ...], \"confirm\": \"RESET\" }",
+                "description": "Requires one of these roles: administrator.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Success",
