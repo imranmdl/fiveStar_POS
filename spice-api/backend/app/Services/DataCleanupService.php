@@ -73,8 +73,10 @@ final class DataCleanupService
      */
     private function columnsByTable(): array
     {
+        // Aliased: MySQL 8 returns information_schema columns in UPPER CASE,
+        // MariaDB as written — the alias makes the array keys the same on both.
         $rows = $this->db->select(
-            "SELECT table_name, column_name
+            "SELECT table_name AS table_name, column_name AS column_name
                FROM information_schema.columns
               WHERE table_schema = DATABASE()"
         );
@@ -103,7 +105,7 @@ final class DataCleanupService
     private function eligibleTables(): array
     {
         $rows = $this->db->select(
-            "SELECT DISTINCT table_name
+            "SELECT DISTINCT table_name AS table_name
                FROM information_schema.columns
               WHERE table_schema = DATABASE()
                 AND column_name IN ('is_deleted', 'deleted_date')

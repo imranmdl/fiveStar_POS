@@ -83,13 +83,16 @@ final class BackupService
         fwrite($handle, "SET NAMES utf8mb4;\n");
         fwrite($handle, "SET FOREIGN_KEY_CHECKS = 0;\n\n");
 
+        // Columns are aliased because MySQL 8 returns information_schema
+        // columns in UPPER CASE (TABLE_NAME) while MariaDB keeps the case
+        // written in the query.
         // information_schema, not SHOW TABLES: this schema has several VIEWs
         // (vw_variant_pricing etc.) alongside base tables, and SHOW CREATE
         // TABLE on a VIEW returns a completely different result shape
         // (`Create View`, not `Create Table`) — they need separate handling,
         // and views have no rows of their own to dump.
         $entities = $this->db->select(
-            "SELECT table_name, table_type FROM information_schema.tables
+            "SELECT table_name AS table_name, table_type AS table_type FROM information_schema.tables
               WHERE table_schema = DATABASE()
               ORDER BY (table_type = 'VIEW') ASC, table_name ASC"
         );
