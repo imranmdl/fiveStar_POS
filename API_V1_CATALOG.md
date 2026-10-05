@@ -230,6 +230,9 @@ than a JSON blob so it stays queryable ("all products above 20 g protein").
 | DELETE | `/admin/banners/{uuid}` |
 | POST | `/admin/banners/{uuid}/image` — replace the artwork (multipart `image`) |
 | DELETE | `/admin/banners/{uuid}/image` — remove the artwork |
+| POST | `/admin/backups/{filename}/restore` — restore a backup saved on the server; `confirm=yes`; a safety backup is taken first |
+| GET | `/admin/data-reset/preview?groups=orders,catalogue` — record counts per group, and which groups a selection pulls in via foreign keys |
+| POST | `/admin/data-reset/run` — `{ "groups": [...], "confirm": "RESET" }`; permanently deletes the groups after a full backup. Groups: `orders`, `pos`, `customers`, `inventory`, `catalogue`, `content`, `logs`. Returns 403 unless the server sets `ALLOW_DATA_RESET=true`. Staff accounts, roles, settings, warehouses, couriers and delivery zones are never touched |
 | GET | `/admin/storefront/theme` |
 | PATCH | `/admin/storefront/theme` — any subset of the theme fields; colours `#rrggbb` |
 

@@ -627,6 +627,17 @@ return static function (Router $router): void {
             [BackupController::class, 'restore'],
             array_merge($administrator, ['throttle:5,3600'])
         );
+        $router->post(
+            '/admin/backups/{filename}/restore',
+            [BackupController::class, 'restoreSaved'],
+            array_merge($administrator, ['throttle:5,3600'])
+        );
+        $router->get('/admin/data-reset/preview', [BackupController::class, 'resetPreview'], $administrator);
+        $router->post(
+            '/admin/data-reset/run',
+            [BackupController::class, 'resetRun'],
+            array_merge($administrator, ['throttle:10,3600'])
+        );
         $router->get('/admin/data-cleanup/preview', [BackupController::class, 'cleanupPreview'], $administrator);
         $router->post(
             '/admin/data-cleanup/run',

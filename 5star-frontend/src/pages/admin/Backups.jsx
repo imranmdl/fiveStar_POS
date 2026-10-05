@@ -23,7 +23,7 @@ async function triggerDownload(filename) {
   URL.revokeObjectURL(url);
 }
 
-function BackupsList() {
+function BackupsList({ refreshKey }) {
   const [backups, setBackups] = useState(null);
   const [error, setError] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -37,7 +37,7 @@ function BackupsList() {
       .catch(setError);
   }
 
-  useEffect(load, []);
+  useEffect(load, [refreshKey]);
 
   async function createBackup() {
     setCreating(true);
@@ -58,6 +58,26 @@ function BackupsList() {
       await triggerDownload(filename);
     } catch (error) {
       toast(error instanceof ApiError ? error.message : 'Could not download this backup.', 'danger');
+    } finally {
+      setBusyFile(null);
+    }
+  }
+
+  async function restore(filename) {
+    if (
+      !window.confirm(
+        `Put the whole database back to how it was in "${filename}"?\n\nEverything added or changed since then is replaced. A safety backup of the current data is taken first. You may need to sign in again afterwards.`
+      )
+    ) {
+      return;
+    }
+    setBusyFile(filename);
+    try {
+      const result = await api.post(`/admin/backups/${encodeURIComponent(filename)}/restore`, { confirm: 'yes' });
+      toast(`Restored. Safety backup of what was there: ${result.data.safety_backup.filename}`);
+      load();
+    } catch (error) {
+      toast(error instanceof ApiError ? error.message : 'Could not restore this backup.', 'danger');
     } finally {
       setBusyFile(null);
     }
@@ -108,6 +128,9 @@ function BackupsList() {
                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <button type="button" className="admin-btn" disabled={busyFile === b.filename} onClick={() => download(b.filename)}>
                       Download
+                    </button>{' '}
+                    <button type="button" className="admin-btn" disabled={busyFile === b.filename} onClick={() => restore(b.filename)}>
+                      Restore
                     </button>{' '}
                     <button
                       type="button"
@@ -167,7 +190,7 @@ function RestoreForm({ onRestored }) {
 
   return (
     <div className="pl-card">
-      <div className="pl-card__header">Restore from backup</div>
+      <div className="pl-card__header">Restore from a file on your computer</div>
       <div style={{ padding: 16 }}>
         <p className="pl-sub" style={{ marginBottom: 12 }}>
           Replaces live data with what's in the file. A safety backup of the current database is always taken first.
@@ -405,14 +428,148 @@ function CleanupForm() {
   );
 }
 
+
+function ResetData({ onDone }) {
+  const [info, setInfo] = useState(null);
+  const [error, setError] = useState(null);
+  const [chosen, setChosen] = useState([]);
+  const [phrase, setPhrase] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+
+  function load(groups) {
+    api
+      .get('/admin/data-reset/preview', groups.length > 0 ? { groups: groups.join(',') } : {})
+      .then((response) => setInfo(response.data))
+      .catch(setError);
+  }
+
+  useEffect(() => load([]), []);
+
+  function toggle(key) {
+    const next = chosen.includes(key) ? chosen.filter((k) => k !== key) : [...chosen, key];
+    setChosen(next);
+    load(next);
+  }
+
+  function chooseAll() {
+    const all = info.groups.map((g) => g.key);
+    setChosen(all);
+    load(all);
+  }
+
+  async function run() {
+    setBusy(true);
+    try {
+      const response = await api.post('/admin/data-reset/run', { groups: chosen, confirm: phrase });
+      setResult(response.data);
+      setChosen([]);
+      setPhrase('');
+      load([]);
+      onDone();
+      toast(`Deleted ${response.data.total_deleted} record(s). Backup taken first: ${response.data.safety_backup.filename}`);
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : 'Could not reset the data.', 'danger');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (error) return <div className="pl-card"><div className="pl-card__header">Reset data</div><ErrorState error={error} /></div>;
+  if (!info) return <div className="pl-card"><div className="pl-card__header">Reset data</div><LoadingState /></div>;
+
+  const effective = new Set(info.selected);
+  const ready = info.enabled && chosen.length > 0 && phrase.trim() === info.confirm_phrase && !busy;
+
+  return (
+    <div className="pl-card backups-reset">
+      <div className="pl-card__header">
+        <span>Reset data (for testing)</span>
+        {info.enabled && (
+          <button type="button" className="admin-btn" onClick={chooseAll} disabled={busy}>
+            Select everything
+          </button>
+        )}
+      </div>
+      <div style={{ padding: 16 }}>
+        {!info.enabled ? (
+          <div className="admin-alert">
+            Switched off on this server, so a live shop can never be wiped by accident. To use it on a <b>test</b> store, add the
+            environment variable <code>ALLOW_DATA_RESET=true</code> to the server (on Railway: the service's Variables tab) and redeploy.
+          </div>
+        ) : (
+          <p className="pl-sub" style={{ marginBottom: 12 }}>
+            Permanently deletes the kinds of data you tick, so you can test the flows again from a clean start. A full backup is taken
+            automatically first — use <b>Restore</b> on it above to undo. Staff and administrator logins, roles, settings, the storefront
+            look, warehouses, couriers and delivery zones are always kept.
+          </p>
+        )}
+
+        <div className="backups-reset__groups">
+          {info.groups.map((g) => {
+            const on = effective.has(g.key);
+            const auto = on && !chosen.includes(g.key);
+            return (
+              <label key={g.key} className={`backups-reset__group${on ? ' is-on' : ''}`}>
+                <input type="checkbox" checked={on} disabled={!info.enabled || busy || auto} onChange={() => toggle(g.key)} />
+                <span>
+                  <b>{g.label}</b>
+                  <span className="pl-sub"> — {g.key === 'customers' ? `${g.customers} customer(s)` : `${g.rows} record(s)`}</span>
+                  {auto && <span className="backups-reset__auto"> included automatically</span>}
+                  <span className="pl-sub backups-reset__hint">{g.hint}</span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+
+        {info.added.length > 0 && (
+          <div className="admin-alert admin-alert--warning" style={{ marginTop: 12 }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>Also deleted, so nothing is left pointing at missing records:</div>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {info.added.map((a) => (
+                <li key={a.group}>
+                  {a.label} — {a.because}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {info.enabled && chosen.length > 0 && (
+          <div className="backups-cleanup-form" style={{ marginTop: 12 }}>
+            <div>
+              <label className="inv-field-label" htmlFor="reset-phrase">
+                Type {info.confirm_phrase} to confirm
+              </label>
+              <input id="reset-phrase" value={phrase} autoComplete="off" onChange={(e) => setPhrase(e.target.value)} style={{ width: '10rem' }} />
+            </div>
+            <button type="button" className="admin-btn backups-reset__go" disabled={!ready} onClick={run}>
+              {busy ? 'Backing up and deleting…' : 'Delete permanently'}
+            </button>
+          </div>
+        )}
+
+        {result && (
+          <div className="admin-alert" style={{ background: 'var(--success-bg)', color: 'var(--success)', marginTop: 12 }}>
+            Deleted {result.total_deleted} record(s){result.customers_deleted ? `, including ${result.customers_deleted} customer account(s)` : ''}.
+            To undo, restore <b>{result.safety_backup.filename}</b> from the list above.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Backups() {
   const [listKey, setListKey] = useState(0);
 
   return (
     <div className="page">
       <h1 className="admin-page-title">Backups</h1>
-      <BackupsList key={listKey} />
+      <BackupsList refreshKey={listKey} />
       <RestoreForm onRestored={() => setListKey((k) => k + 1)} />
+      <ResetData onDone={() => setListKey((k) => k + 1)} />
       <CleanupForm />
     </div>
   );

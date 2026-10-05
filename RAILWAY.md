@@ -90,6 +90,7 @@ Optional switches:
 | `RUN_SCHEDULER` | `true` | Background scheduler every 60 s |
 | `RUN_PREFLIGHT` | `true` | Print the go-live report in the deploy log |
 | `VITE_BRAND_LOGO_URL` | old Hostinger logo URL | Header logo used by the React app (build-time) |
+| `ALLOW_DATA_RESET` | `false` | **Test stores only.** `true` enables Admin → Backups → *Reset data*, which permanently deletes chosen data (orders, customers, products…) after taking a full backup. Leave unset on a live shop. |
 
 `.env` is not used in the container — every setting above is a Railway
 variable. (`Env.php` now falls back to process environment variables when a
@@ -154,7 +155,12 @@ full Hostinger dump — its schema contains MariaDB-only definitions. Instead:
 - **Logs:** Railway → app service → Deploy Logs (Apache + PHP errors). App
   logs and `scheduler.log` are in `/data/storage/logs` (`railway ssh`).
 - **Backups:** turn on Railway's MySQL backups; the in-app backup (Admin →
-  Backups) writes to `/data/storage/backups` on the volume.
+  Backups) writes to `/data/storage/backups` on the volume. Any saved
+  backup can be put back with its **Restore** button.
+- **Testing from a clean start:** with `ALLOW_DATA_RESET=true`, Admin →
+  Backups → *Reset data* wipes the chosen kinds of data (a backup is taken
+  first; restore it to undo). Staff logins, roles, settings, warehouses,
+  couriers and delivery zones are always kept.
 - **Rolling back:** Railway → Deployments → previous deploy → Redeploy.
   Migrations are forward-only on boot; a down-migration is a manual
   `php bin/migrate.php --rollback` over `railway ssh`.

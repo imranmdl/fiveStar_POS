@@ -11,6 +11,7 @@ use App\Core\Response;
 use App\Core\Validator;
 use App\Services\BackupService;
 use App\Services\DataCleanupService;
+use App\Services\DataResetService;
 
 /**
  * Whole-database backup/restore and the hard-delete cleanup of already
@@ -23,6 +24,7 @@ final class BackupController extends BaseController
     public function __construct(
         private readonly BackupService $backups,
         private readonly DataCleanupService $cleanup,
+        private readonly DataResetService $reset,
     ) {
     }
 
@@ -82,6 +84,59 @@ final class BackupController extends BaseController
             $this->backups->restore($request->files['file'], $request),
             'Restore complete. A safety backup was taken beforehand.'
         );
+    }
+
+    /** POST /api/v1/admin/backups/{filename}/restore — restore a backup saved on the server. */
+    public function restoreSaved(Request $request): Response
+    {
+        if ($request->input('confirm') !== 'yes' && $request->input('confirm') !== true) {
+            throw new HttpException(
+                'Confirm the restore before it runs — it replaces live data.',
+                422,
+                ['confirm' => ['Send confirm=yes to proceed.']]
+            );
+        }
+
+        return Response::success(
+            $this->backups->restoreSaved((string) $request->routeParam('filename'), $request),
+            'Restore complete. A safety backup was taken beforehand.'
+        );
+    }
+
+    /**
+     * GET /api/v1/admin/data-reset/preview?groups=orders,catalogue
+     * Row counts per group, and which extra groups a selection pulls in.
+     */
+    public function resetPreview(Request $request): Response
+    {
+        return Response::success(
+            $this->reset->preview($this->groupList($request->input('groups'))),
+            'Preview computed — nothing was deleted'
+        );
+    }
+
+    /**
+     * POST /api/v1/admin/data-reset/run
+     * { "groups": ["orders", ...], "confirm": "RESET" }
+     */
+    public function resetRun(Request $request): Response
+    {
+        return Response::success(
+            $this->reset->run($this->groupList($request->input('groups')), (string) $request->input('confirm', ''), $request),
+            'Data reset complete. A full backup was taken first.'
+        );
+    }
+
+    /** @return array<int, string> */
+    private function groupList(mixed $raw): array
+    {
+        if (is_string($raw)) {
+            $raw = explode(',', $raw);
+        }
+
+        return is_array($raw)
+            ? array_values(array_filter(array_map(static fn ($g): string => trim((string) $g), $raw)))
+            : [];
     }
 
     /** GET /api/v1/admin/data-cleanup/preview?retention_days=90 */
