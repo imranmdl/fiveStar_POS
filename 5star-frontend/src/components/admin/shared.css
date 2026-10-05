@@ -233,3 +233,29 @@
   background: var(--brand-forest-light);
   box-shadow: var(--shadow-md);
 }
+
+/* Small modal dialog (e.g. "add these before publishing"); sits in .admin-overlay (Products.css). */
+.admin-dialog {
+  width: min(30rem, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 20px;
+}
+
+.admin-dialog h2 {
+  font-size: 17px;
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+}
+
+.admin-dialog__list {
+  margin: 0 0 10px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}

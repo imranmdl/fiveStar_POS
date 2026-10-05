@@ -148,3 +148,49 @@
   gap: 6px 16px;
   align-items: baseline;
 }
+
+.publish-checklist__list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.publish-checklist__list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #f6f5f2;
+}
+
+.publish-checklist__list li.is-missing {
+  background: #fff6e8;
+}
+
+.publish-checklist__mark {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  color: #fff;
+  background: #2e7d32;
+}
+
+.is-missing .publish-checklist__mark {
+  background: #c0392b;
+}
+
+.publish-checklist__label {
+  flex: 1 1 200px;
+  font-size: 14px;
+}
