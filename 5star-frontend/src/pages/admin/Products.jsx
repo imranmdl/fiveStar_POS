@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { api, formatMoney } from '../../lib/api';
+import { ApiError, api, formatMoney } from '../../lib/api';
 import { toast } from '../../components/admin/toast';
 import { StatusBadge, EmptyState, LoadingState, ErrorState } from '../../components/admin/shared.jsx';
 import ProductEditor from './ProductEditor.jsx';
@@ -363,6 +363,8 @@ function ProductList() {
     setSearchParams({ new: '' });
   }
 
+  const [notReady, setNotReady] = useState(null); // { product, missing[] } after a refused publish
+
   async function toggleStatus(product) {
     // `status` is not a field /admin/products/{uuid} (PATCH) accepts — published/
     // draft/archived have their own dedicated actions, /publish and /archive.
@@ -374,7 +376,13 @@ function ProductList() {
       toast(publishing ? 'Product is now on sale.' : 'Product hidden from the shop.');
       await load();
     } catch (error) {
-      toast(error.message || 'Could not update the product.', 'danger');
+      const missing = error instanceof ApiError && error.errors && Array.isArray(error.errors.publish) ? error.errors.publish : [];
+      if (publishing && missing.length > 0) {
+        // Say exactly what to add, and offer to go and add it.
+        setNotReady({ product, missing });
+      } else {
+        toast(error.message || 'Could not update the product.', 'danger');
+      }
     } finally {
       setBusyUuid(null);
     }
@@ -554,6 +562,28 @@ function ProductList() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {notReady && (
+        <div className="admin-overlay" role="dialog" aria-modal="true" aria-labelledby="not-ready-title">
+          <div className="admin-dialog">
+            <h2 id="not-ready-title">Add these before “{notReady.product.name}” can go online</h2>
+            <ul className="admin-dialog__list">
+              {notReady.missing.map((m) => <li key={m}>{m}</li>)}
+            </ul>
+            <p className="text-muted small">It can still be sold at the counter (POS) in the meantime.</p>
+            <div className="admin-toolbar">
+              <button
+                type="button"
+                className="admin-btn admin-btn--primary"
+                onClick={() => { const uuid = notReady.product.uuid; setNotReady(null); goToEdit(uuid); }}
+              >
+                Open product to add these
+              </button>
+              <button type="button" className="admin-btn" onClick={() => setNotReady(null)}>Later</button>
+            </div>
+          </div>
         </div>
       )}
 

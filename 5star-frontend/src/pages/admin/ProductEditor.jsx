@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, formatMoney } from '../../lib/api';
+import { api, ApiError, formatMoney } from '../../lib/api';
 import { toast } from '../../components/admin/toast';
 import { StatusBadge, LoadingState, ErrorState } from '../../components/admin/shared.jsx';
 import './ProductEditor.css';
@@ -64,19 +64,6 @@ function sizeSuggestions(sizeType) {
       ))}
     </datalist>
   );
-}
-
-/**
- * Mirrors ProductService::publish()'s own three checks exactly (pack size,
- * image, short description) so staff see what's missing before clicking
- * Publish, not after.
- */
-function publishReadiness(product) {
-  const missing = [];
-  if ((product.variants || []).length === 0) missing.push('at least one pack size');
-  if ((product.images || product.media || []).length === 0) missing.push('at least one photograph');
-  if (!product.short_description || !product.short_description.trim()) missing.push('a short description');
-  return missing;
 }
 
 function GstField({ formRef, initial }) {
@@ -436,7 +423,7 @@ function VariantsPanel({ product, sizeType, onAdded, onUpdated, onRemoved }) {
   }
 
   return (
-    <div className="admin-card mb-4">
+    <div className="admin-card mb-4" id="product-packs">
       <div className="admin-card__header admin-card__header--flex">
         <span className="fw-semibold">Pack sizes</span>
         <span className="small text-muted">{variants.length} defined</span>
@@ -609,7 +596,7 @@ function ImagesPanel({ product, onUploaded, onRemoved }) {
   }
 
   return (
-    <div className="admin-card mb-4">
+    <div className="admin-card mb-4" id="product-images">
       <div className="admin-card__header">Photographs</div>
 
       {images.length === 0 ? (
@@ -659,38 +646,99 @@ function ImagesPanel({ product, onUploaded, onRemoved }) {
   );
 }
 
-function PublishSection({ product, onPublish }) {
-  const missing = publishReadiness(product);
+/** Jumps to a section of this page and focuses its first field. */
+function goTo(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const field = el.matches('input, textarea, select') ? el : el.querySelector('input:not([type=hidden]), textarea, select');
+  if (field) setTimeout(() => field.focus({ preventScroll: true }), 350);
+}
+
+/**
+ * "Ready to go online?" — what the online shop needs, ticked off live, each
+ * missing item with a button that jumps to where it's added. Mirrors
+ * ProductService::publish()'s checks; anything else the server refuses is
+ * listed from its reply, so nothing is ever just "not ready".
+ */
+function PublishChecklist({ product, onPublish }) {
   const [publishing, setPublishing] = useState(false);
+  const [serverProblems, setServerProblems] = useState([]);
   const [error, setError] = useState(null);
 
-  if (missing.length > 0) {
-    return (
-      <div className="admin-alert" style={{ background: '#f1f1ef' }}>
-        Before this can go on sale it needs {missing.join(', ')}.
-      </div>
-    );
-  }
+  const checks = [
+    {
+      key: 'packs',
+      done: (product.variants || []).length > 0,
+      label: 'At least one pack size with a price',
+      target: 'product-packs',
+    },
+    {
+      key: 'photo',
+      done: (product.images || product.media || []).length > 0,
+      label: 'At least one photograph',
+      target: 'product-images',
+    },
+    {
+      key: 'short',
+      done: Boolean(product.short_description && product.short_description.trim()),
+      label: 'A short description (one line, shown on the product card)',
+      target: 'short_description',
+    },
+  ];
+  const ready = checks.every((c) => c.done);
 
   async function handleClick() {
     setPublishing(true);
     setError(null);
+    setServerProblems([]);
 
     try {
       await onPublish();
     } catch (err) {
-      setError(err);
+      const problems = err instanceof ApiError && err.errors && Array.isArray(err.errors.publish) ? err.errors.publish : [];
+      if (problems.length > 0) setServerProblems(problems);
+      else setError(err);
     } finally {
       setPublishing(false);
     }
   }
 
   return (
-    <div>
-      <button className="admin-btn admin-btn--success" type="button" disabled={publishing} onClick={handleClick}>
-        {publishing ? 'Publishing…' : 'Put this product on sale'}
-      </button>
-      {error && <div className="mt-2"><ErrorState error={error} /></div>}
+    <div className="admin-card mb-4 publish-checklist" id="publish-checklist">
+      <div className="admin-card__header">Online shop checklist</div>
+      <div className="admin-card__body">
+        <p className="text-muted small" style={{ marginTop: 0 }}>
+          {ready
+            ? 'Everything the website needs is here — put it on sale when you are ready.'
+            : 'To show this product on the website and app, add the items marked ✗. It can already be sold at the counter (POS).'}
+        </p>
+        <ul className="publish-checklist__list">
+          {checks.map((c) => (
+            <li key={c.key} className={c.done ? 'is-done' : 'is-missing'}>
+              <span className="publish-checklist__mark" aria-hidden="true">{c.done ? '✓' : '✗'}</span>
+              <span className="publish-checklist__label">{c.label}</span>
+              {!c.done && (
+                <button type="button" className="admin-btn" onClick={() => goTo(c.target)}>Add now</button>
+              )}
+            </li>
+          ))}
+        </ul>
+
+        {serverProblems.length > 0 && (
+          <div className="admin-alert admin-alert--warning">
+            <b>Still needed before it can go online:</b>
+            <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+              {serverProblems.map((m) => <li key={m}>{m}</li>)}
+            </ul>
+          </div>
+        )}
+        {error && <ErrorState error={error} />}
+
+        <button className="admin-btn admin-btn--success" type="button" disabled={publishing} onClick={handleClick}>
+          {publishing ? 'Publishing…' : 'Put this product on sale online'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -948,6 +996,10 @@ export default function ProductEditor({ identifier, onClose, onCreated }) {
         {product && <StatusBadge status={product.status === 'published' ? 'approved' : 'pending'} label={product.status} />}
       </div>
 
+      {product && product.status !== 'published' && (
+        <PublishChecklist product={product} onPublish={handlePublish} />
+      )}
+
       <ProductForm
         key={`${identifier || 'new'}-${formVersion}`}
         product={product}
@@ -966,9 +1018,6 @@ export default function ProductEditor({ identifier, onClose, onCreated }) {
         <ImagesPanel product={product} onUploaded={handleImageUpload} onRemoved={handleImageRemove} />
       )}
 
-      {product && product.status !== 'published' && (
-        <PublishSection product={product} onPublish={handlePublish} />
-      )}
     </div>
   );
 }
