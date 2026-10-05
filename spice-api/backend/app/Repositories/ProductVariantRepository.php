@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Helpers\Barcode;
+
 final class ProductVariantRepository extends BaseRepository
 {
     protected function table(): string
@@ -107,6 +109,7 @@ final class ProductVariantRepository extends BaseRepository
     {
         return $this->db->selectOne(
             'SELECT v.*, p.`uuid` AS `product_uuid`, p.`name` AS `product_name`, p.`gst_rate`,
+                    p.`status` AS `product_status`,
                     p.`category_id`, c.`parent_id` AS `category_parent_id`,
                     c.`uuid` AS `category_uuid`, c.`name` AS `category_name`
                FROM `product_variants` v
@@ -149,19 +152,34 @@ final class ProductVariantRepository extends BaseRepository
      *
      * @return array<string, mixed>|null
      */
+    /**
+     * The pack size a scanned or typed code belongs to — by SKU or barcode,
+     * accepting every form the same printed barcode can arrive in
+     * (see Barcode::lookupCandidates): leading zeros, missing check digit,
+     * scanner prefixes, stray whitespace.
+     */
     public function findByCode(string $code): ?array
     {
-        return $this->findBySku($code) ?? $this->db->selectOne(
-            'SELECT v.*, p.`uuid` AS `product_uuid`, p.`name` AS `product_name`, p.`gst_rate`,
-                    p.`category_id`, c.`parent_id` AS `category_parent_id`,
-                    c.`uuid` AS `category_uuid`, c.`name` AS `category_name`
-               FROM `product_variants` v
-               INNER JOIN `products` p ON p.`id` = v.`product_id`
-               INNER JOIN `categories` c ON c.`id` = p.`category_id`
-              WHERE v.`barcode` = :barcode AND v.`is_deleted` = 0
-              LIMIT 1',
-            ['barcode' => $code]
-        );
+        foreach (Barcode::lookupCandidates($code) as $candidate) {
+            $found = $this->findBySku($candidate) ?? $this->db->selectOne(
+                'SELECT v.*, p.`uuid` AS `product_uuid`, p.`name` AS `product_name`, p.`gst_rate`,
+                        p.`status` AS `product_status`,
+                        p.`category_id`, c.`parent_id` AS `category_parent_id`,
+                        c.`uuid` AS `category_uuid`, c.`name` AS `category_name`
+                   FROM `product_variants` v
+                   INNER JOIN `products` p ON p.`id` = v.`product_id`
+                   INNER JOIN `categories` c ON c.`id` = p.`category_id`
+                  WHERE v.`barcode` = :barcode AND v.`is_deleted` = 0
+                  LIMIT 1',
+                ['barcode' => $candidate]
+            );
+
+            if ($found !== null) {
+                return $found;
+            }
+        }
+
+        return null;
     }
 
     public function countForProduct(int $productId): int

@@ -176,12 +176,9 @@ export default function SellTab({ defaultWarehouseUuid, shopLabel, onShopLabelCh
     return matches.map((m) => ({ ...m, isDuplicate: seen[`${m.product_name}|${m.weight_grams}`] > 1 }));
   }
 
+  // Any item with stock and a price can be sold at the counter. "Published"
+  // only controls whether it shows on the website and app.
   async function handlePickMatch(match) {
-    if (match.product_status !== 'published') {
-      notify('This item is not published, so it cannot be sold. Ask an administrator to publish it first.', 'danger');
-      return;
-    }
-
     await addVariantToCart(match);
   }
 
