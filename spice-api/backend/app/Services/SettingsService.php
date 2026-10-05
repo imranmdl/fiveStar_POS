@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Core\Config;
 use App\Core\Exceptions\HttpException;
 use App\Core\Request;
 use App\Repositories\SettingRepository;
@@ -56,6 +57,7 @@ final class SettingsService
         private readonly SettingRepository $settings,
         private readonly FileUploadService $uploads,
         private readonly AuditService $audit,
+        private readonly Config $config,
     ) {
     }
 
@@ -78,6 +80,10 @@ final class SettingsService
             // active; see CheckoutService::review()/place() for where a
             // customer actually sees and chooses it.
             'cod_enabled' => $this->settings->boolValue('cod_enabled', false),
+            // Text messages (OTP codes, order updates). Any SMS_DRIVER but "http" means
+            // nothing is actually sent unless SMS_DRIVER=http — the dashboard warns about it.
+            'sms_configured' => (string) $this->config->get('notifications.sms.driver', 'log') === 'http',
+            'otp_shown_on_screen' => $this->config->get('auth.otp.expose_in_response', false) === true,
             // POS due-payment reminders (see 043_pos_due_reminders.sql):
             // whether the pos.due_reminders scheduled task is even allowed to
             // fire lives on that task's own is_enabled column, changed via

@@ -404,6 +404,7 @@ final class CheckoutService
                 'expires_in_seconds' => $challenge['expires_in_seconds'] ?? null,
                 'sent_to' => $this->maskMobile((string) $order['ship_mobile']),
                 'debug_otp' => $challenge['debug_otp'] ?? null,
+                'delivery' => $challenge['delivery'] ?? 'sms',
             ],
             'next_step' => $nextStep,
         ];
@@ -491,6 +492,7 @@ final class CheckoutService
             'expires_in_seconds' => $challenge['expires_in_seconds'] ?? null,
             'sent_to' => $this->maskMobile((string) $order['ship_mobile']),
             'debug_otp' => $challenge['debug_otp'] ?? null,
+            'delivery' => $challenge['delivery'] ?? 'sms',
         ];
     }
 

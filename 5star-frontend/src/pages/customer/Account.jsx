@@ -19,6 +19,7 @@ export default function Account() {
   const [registerData, setRegisterData] = useState({ full_name: '', mobile: '', email: '', password: '' });
   const [otp, setOtp] = useState('');
   const [debugOtp, setDebugOtp] = useState(null);
+  const [otpNotSent, setOtpNotSent] = useState(false);
   const [pendingMobile, setPendingMobile] = useState(null);
   const [pendingReference, setPendingReference] = useState(null);
 
@@ -58,6 +59,7 @@ export default function Account() {
       setPendingMobile(payload.mobile);
       setPendingReference(response.data.verification.reference_token);
       setDebugOtp(response.data.verification.debug_otp || null);
+      setOtpNotSent(response.data.verification.delivery === 'not_sent' && !response.data.verification.debug_otp);
       setStep('verify');
       setBusy(false);
     } catch (err) {
@@ -216,10 +218,17 @@ export default function Account() {
         {step === 'verify' && (
           <>
             <h1 className="account-card__title">Verify your number</h1>
-            <p className="text-muted">We sent a code to {pendingMobile}.</p>
+            {otpNotSent ? (
+              <p className="text-muted">
+                We couldn&apos;t text a code to {pendingMobile} — this shop hasn&apos;t switched on text messages yet.
+                Please contact the shop.
+              </p>
+            ) : (
+              <p className="text-muted">We sent a code to {pendingMobile}.</p>
+            )}
             {debugOtp && (
               <div className="account-info">
-                Development mode: your code is <span className="fw-semibold">{debugOtp}</span>.
+                Test mode: your code is <span className="fw-semibold">{debugOtp}</span>.
               </div>
             )}
 
