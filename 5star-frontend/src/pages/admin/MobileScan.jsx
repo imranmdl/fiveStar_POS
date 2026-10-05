@@ -4,6 +4,7 @@ import { api, formatMoney, ApiError } from '../../lib/api';
 import { LoadingState, ErrorState } from '../../components/admin/shared.jsx';
 import { toast } from '../../components/admin/toast.js';
 import CameraScanner from '../../components/CameraScanner';
+import LinkBarcode from '../../components/LinkBarcode';
 import './MobileScan.css';
 
 /**
@@ -212,6 +213,7 @@ export default function MobileScan() {
 
   const inputRef = useRef(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [linking, setLinking] = useState(false); // linking the unknown barcode to an existing item
 
   useEffect(() => {
     let active = true;
@@ -300,6 +302,7 @@ export default function MobileScan() {
       if (error instanceof ApiError && error.status === 404) {
         setFeedback({ tone: 'warning', text: `Unrecognised barcode: ${value}` });
         setQuickCreate(emptyQuickCreate(value));
+        setLinking(false);
         // The quick-create form needs the screen — close the camera.
         setCameraOpen(false);
 
@@ -496,8 +499,22 @@ export default function MobileScan() {
           )}
 
           {quickCreate && (
+            linking ? (
+              <LinkBarcode
+                code={quickCreate.barcode}
+                onCancel={() => setLinking(false)}
+                onLinked={(variant) => {
+                  setLinking(false);
+                  setQuickCreate(null);
+                  scanInward(variant.barcode || variant.sku);
+                }}
+              />
+            ) : (
             <form className="mscan-quick-create" onSubmit={handleQuickCreateSubmit}>
               <h2 className="mscan-quick-create__title">Create this pack size</h2>
+              <button type="button" className="admin-btn" style={{ alignSelf: 'flex-start', marginBottom: 8 }} onClick={() => setLinking(true)}>
+                It&apos;s an existing item — link this barcode to it
+              </button>
 
               <label className="mscan-field">
                 <span>Category</span>
@@ -573,6 +590,7 @@ export default function MobileScan() {
                 {quickCreateBusy ? 'Creating…' : 'Create and add to cart'}
               </button>
             </form>
+            )
           )}
 
           <div className="mscan-cart-header">

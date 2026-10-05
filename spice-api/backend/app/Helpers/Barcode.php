@@ -60,6 +60,15 @@ final class Barcode
      *
      * @return array<int, string>
      */
+    /** A scanned code as it should be stored: no control characters, scanner prefix or spaces. */
+    public static function clean(string $raw): string
+    {
+        $code = trim((string) preg_replace('/[\x00-\x1F\x7F]/', '', $raw));
+        $code = (string) preg_replace('/^\][A-Za-z][0-9A-Za-z]/', '', $code);
+
+        return preg_match('/^[\d\s]+$/', $code) === 1 ? (string) preg_replace('/\s+/', '', $code) : $code;
+    }
+
     public static function lookupCandidates(string $raw): array
     {
         $code = trim((string) preg_replace('/[\x00-\x1F\x7F]/', '', $raw));

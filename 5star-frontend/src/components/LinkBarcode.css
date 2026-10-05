@@ -1,0 +1,94 @@
+/* "Link this barcode to an item" panel — Till, Purchase Inward, Mobile Scan. */
+.link-barcode {
+  border: 1px solid var(--warning, #b7791f);
+  background: var(--warning-bg, #fff8e6);
+  border-radius: var(--radius-md, 8px);
+  padding: 12px;
+  margin: 8px 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.link-barcode__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.link-barcode__head span {
+  font-size: 13px;
+  color: var(--ink-700, #4a4647);
+}
+
+.link-barcode__input {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 16px;
+  box-sizing: border-box;
+}
+
+.link-barcode__error {
+  color: var(--danger, #8d241b);
+  font-size: 13px;
+}
+
+.link-barcode__results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.link-barcode__result {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px 12px;
+  text-align: left;
+  border: 1px solid var(--border, #ddd);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface, #fff);
+  cursor: pointer;
+}
+
+.link-barcode__result:hover {
+  background: var(--surface-muted, #f7f5f2);
+}
+
+.link-barcode__result > span:first-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.link-barcode__result small {
+  color: var(--ink-500, #6f6a6b);
+}
+
+.link-barcode__empty {
+  font-size: 13px;
+  color: var(--ink-500, #6f6a6b);
+}
+
+.link-barcode__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.link-barcode__cancel {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface, #fff);
+  cursor: pointer;
+}

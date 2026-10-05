@@ -166,7 +166,7 @@ a field never blanks it.
 | Method | Path |
 |---|---|
 | POST | `/admin/products/{uuid}/variants` — `sku` optional: left blank, a unique EAN-13 is generated and used as SKU and barcode (as on Purchase Inward) |
-| PATCH | `/admin/variants/{uuid}` — a changed `selling_price` is also written to the price-change log (`reference_type=manual`) |
+| PATCH | `/admin/variants/{uuid}` — a changed `selling_price` is also written to the price-change log (`reference_type=manual`); `barcode` sets the code printed on the pack (refused if another pack has it in any equivalent form) |
 | DELETE | `/admin/variants/{uuid}` |
 
 `weight_grams` is mandatory — courier selection (BR-007) and delivery charges

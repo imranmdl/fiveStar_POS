@@ -206,6 +206,7 @@ final class ProductController extends BaseController
     {
         $data = Validator::make($request->all(), [
             'sku' => 'nullable|string|min:3|max:50',
+            'barcode' => 'nullable|string|min:3|max:50',
             'variant_name' => 'nullable|string|min:2|max:80',
             'weight_grams' => 'nullable|int|min:1|max:100000',
             'packed_weight_grams' => 'nullable|int|min:1|max:120000',

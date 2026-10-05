@@ -446,12 +446,33 @@ final class InventoryService
      *
      * @return array<string, mixed>
      */
-    public function assignBarcode(string $variantUuid, Request $request): array
+    public function assignBarcode(string $variantUuid, Request $request, ?string $barcode = null): array
     {
         $variant = $this->variants->findByUuid($variantUuid);
 
         if ($variant === null) {
             throw new NotFoundException('That pack size does not exist.');
+        }
+
+        // Linking a specific (manufacturer) barcode to this pack — e.g. an item
+        // first created with an auto-generated code. Its SKU stays as it was,
+        // so labels already printed with the old code still scan.
+        if ($barcode !== null && Barcode::clean($barcode) !== '') {
+            $code = Barcode::clean($barcode);
+            $this->variants->assertCodeFree($code, (int) $variant['id']);
+            $this->variants->update((int) $variant['id'], ['barcode' => $code], $request->authUserId());
+
+            $this->audit->log(
+                entityName: 'product_variants',
+                entityId: (int) $variant['id'],
+                action: 'link_barcode',
+                oldValues: ['barcode' => $variant['barcode']],
+                newValues: ['barcode' => $code],
+                request: $request,
+                entityUuid: $variantUuid
+            );
+
+            return (array) $this->variants->findBySku((string) $variant['sku']);
         }
 
         if (!empty($variant['barcode'])) {

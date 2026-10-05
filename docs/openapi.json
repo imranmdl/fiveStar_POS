@@ -16039,6 +16039,11 @@
                                         "minLength": 3,
                                         "type": "string"
                                     },
+                                    "barcode": {
+                                        "maxLength": 50,
+                                        "minLength": 3,
+                                        "type": "string"
+                                    },
                                     "variant_name": {
                                         "maxLength": 80,
                                         "minLength": 2,

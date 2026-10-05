@@ -890,10 +890,12 @@ final class ImportService
                 throw new HttpException('Weight is too large.', 422, ['weight_grams' => ['Must be at most 100000.']]);
             }
 
-            $barcode = trim((string) ($spec['barcode'] ?? ''));
+            $barcode = Barcode::clean((string) ($spec['barcode'] ?? ''));
 
             if ($barcode !== '') {
-                if (isset($seenBarcodes[$barcode]) || $this->variants->barcodeExists($barcode)) {
+                // findByCode() also catches the same code in another form
+                // (leading 0, missing check digit) already on an item.
+                if (isset($seenBarcodes[$barcode]) || $this->variants->findByCode($barcode) !== null) {
                     throw new HttpException("Barcode {$barcode} is already mapped to another item.", 422, [
                         'barcode' => ['Already in use — try looking it up instead of creating it.'],
                     ]);

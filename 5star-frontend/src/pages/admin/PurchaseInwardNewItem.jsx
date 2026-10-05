@@ -32,7 +32,7 @@ const PROFILES = {
 const UNIT_GRAMS = { kg: 1000, g: 1, litre: 1000, ml: 1, piece: 1, dozen: 1 };
 const UNIT_NAMES = { kg: 'kg', g: 'gram', litre: 'litre', ml: 'ml', piece: 'piece', dozen: 'dozen' };
 
-export default function PurchaseInwardNewItem({ setup, onCategoryCreated, onAddLine, onClose }) {
+export default function PurchaseInwardNewItem({ setup, initialBarcode = '', onCategoryCreated, onAddLine, onClose }) {
   const categories = setup.categories || [];
   const tops = categories.filter((c) => !c.parent_uuid);
   const kids = (uuid) => categories.filter((c) => c.parent_uuid === uuid);
@@ -42,7 +42,9 @@ export default function PurchaseInwardNewItem({ setup, onCategoryCreated, onAddL
   const [subUuid, setSubUuid] = useState('');
   const [mode, setMode] = useState('packed'); // weighed sub-mode: packed | loose
   const [unit, setUnit] = useState('kg');
-  const [fields, setFields] = useState({});
+  // A barcode scanned before opening this form is the item's real barcode —
+  // kept through category changes so it's never replaced by an auto one.
+  const [fields, setFields] = useState(() => (initialBarcode ? { barcode: initialBarcode } : {}));
   const [sizes, setSizes] = useState([]);
   const [colours, setColours] = useState([]);
   const [customSizes, setCustomSizes] = useState([]);
@@ -75,6 +77,7 @@ export default function PurchaseInwardNewItem({ setup, onCategoryCreated, onAddL
     setCustomSizes([]);
     setCustomColours([]);
     setFields((f) => ({
+      barcode: f.barcode || '',
       brand: f.brand || '',
       hsn_code: f.hsn_code || '',
       unit_cost: f.unit_cost || '',
@@ -287,6 +290,11 @@ export default function PurchaseInwardNewItem({ setup, onCategoryCreated, onAddL
           <h3 className="pi-h6">New item</h3>
           <span className="pi-type-badge">{badgeText}</span>
         </div>
+        {val('barcode') && (
+          <div className="pi-feedback pi-feedback--success">
+            Barcode <b>{val('barcode')}</b> will be saved on this item, so it scans at the POS.
+          </div>
+        )}
 
         <div className="pi-grid pi-grid-2">
           <label className="pi-field">
@@ -376,8 +384,8 @@ export default function PurchaseInwardNewItem({ setup, onCategoryCreated, onAddL
                       </select>
                     </label>
                     <label className="pi-field">
-                      <span>Barcode</span>
-                      <input placeholder="Auto" value={val('barcode')} onChange={(e) => setField('barcode', e.target.value)} />
+                      <span>Barcode on the pack</span>
+                      <input placeholder="Scan the pack (blank = make one)" value={val('barcode')} onChange={(e) => setField('barcode', e.target.value)} />
                     </label>
                     <label className="pi-field">
                       <span>MRP per {UNIT_NAMES[unit]}</span>
@@ -414,8 +422,8 @@ export default function PurchaseInwardNewItem({ setup, onCategoryCreated, onAddL
                       </select>
                     </label>
                     <label className="pi-field">
-                      <span>Barcode</span>
-                      <input placeholder="Auto" value={val('barcode')} onChange={(e) => setField('barcode', e.target.value)} />
+                      <span>Barcode on the pack</span>
+                      <input placeholder="Scan the pack (blank = make one)" value={val('barcode')} onChange={(e) => setField('barcode', e.target.value)} />
                     </label>
                     <label className="pi-field">
                       <span>MRP</span>
@@ -486,8 +494,8 @@ export default function PurchaseInwardNewItem({ setup, onCategoryCreated, onAddL
                   <input maxLength={80} value={val('variant_name')} onChange={(e) => setField('variant_name', e.target.value)} />
                 </label>
                 <label className="pi-field">
-                  <span>Barcode</span>
-                  <input placeholder="Auto" value={val('barcode')} onChange={(e) => setField('barcode', e.target.value)} />
+                  <span>Barcode on the pack</span>
+                  <input placeholder="Scan the pack (blank = make one)" value={val('barcode')} onChange={(e) => setField('barcode', e.target.value)} />
                 </label>
                 <label className="pi-field">
                   <span>MRP</span>

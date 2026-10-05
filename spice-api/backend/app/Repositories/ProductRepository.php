@@ -252,13 +252,15 @@ final class ProductRepository extends BaseRepository
         $productId = (int) $product['id'];
 
         $product['variants'] = $this->db->select(
-            'SELECT `id`, `uuid`, `sku`, `variant_name`, `weight_grams`, `shipping_weight_grams`,
-                    `pack_type`, `mrp`, `selling_price`, `offer_price`, `effective_price`,
-                    `discount_percentage`, `price_per_kg`, `offer_is_live`,
-                    `max_order_quantity`, `is_default`
-               FROM `vw_variant_pricing`
-              WHERE `product_id` = :product_id
-              ORDER BY `display_order` ASC, `weight_grams` ASC',
+            'SELECT vp.`id`, vp.`uuid`, vp.`sku`, v.`barcode`, v.`expiry_date`, vp.`variant_name`,
+                    vp.`weight_grams`, vp.`shipping_weight_grams`,
+                    vp.`pack_type`, vp.`mrp`, vp.`selling_price`, vp.`offer_price`, vp.`effective_price`,
+                    vp.`discount_percentage`, vp.`price_per_kg`, vp.`offer_is_live`,
+                    vp.`max_order_quantity`, vp.`is_default`
+               FROM `vw_variant_pricing` vp
+               INNER JOIN `product_variants` v ON v.`id` = vp.`id`
+              WHERE vp.`product_id` = :product_id
+              ORDER BY vp.`display_order` ASC, vp.`weight_grams` ASC',
             ['product_id' => $productId]
         );
 

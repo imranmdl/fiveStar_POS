@@ -306,6 +306,7 @@ function VariantEditRow({ variant, onSave, onCancel }) {
     max_order_quantity: Number(variant.max_order_quantity) > 0 ? String(variant.max_order_quantity) : '',
     expiry_date: variant.expiry_date ? String(variant.expiry_date).slice(0, 10) : '',
     is_default: Boolean(variant.is_default),
+    barcode: variant.barcode || '',
   });
   const [saving, setSaving] = useState(false);
   const set = (field) => (event) => setForm((f) => ({ ...f, [field]: event.target.type === 'checkbox' ? event.target.checked : event.target.value }));
@@ -325,6 +326,7 @@ function VariantEditRow({ variant, onSave, onCancel }) {
     const oldExpiry = variant.expiry_date ? String(variant.expiry_date).slice(0, 10) : '';
     if (form.expiry_date !== oldExpiry && form.expiry_date !== '') changes.expiry_date = form.expiry_date;
     if (form.is_default && !variant.is_default) changes.is_default = true;
+    if (form.barcode.trim() !== '' && form.barcode.trim() !== (variant.barcode || '')) changes.barcode = form.barcode.trim();
 
     if (Object.keys(changes).length === 0) {
       onCancel();
@@ -364,6 +366,11 @@ function VariantEditRow({ variant, onSave, onCancel }) {
             <div className="col-2">
               <label className="admin-label">Expiry date</label>
               <input className="admin-input" type="date" value={form.expiry_date} onChange={set('expiry_date')} />
+            </div>
+            <div className="col-3">
+              <label className="admin-label">Barcode on the pack</label>
+              <input className="admin-input" value={form.barcode} onChange={set('barcode')} placeholder="Scan or type" inputMode="numeric" autoComplete="off" />
+              <div className="admin-hint">The code printed on the product — what the POS scans. The SKU keeps working too.</div>
             </div>
             <div className="col-2 admin-checkbox-row" style={{ alignSelf: 'flex-end' }}>
               <label>
@@ -447,7 +454,7 @@ function VariantsPanel({ product, sizeType, onAdded, onUpdated, onRemoved }) {
             <thead>
               <tr>
                 <th>Pack</th>
-                <th>SKU</th>
+                <th>SKU / barcode</th>
                 <th className="text-end">Weight</th>
                 <th className="text-end">MRP</th>
                 <th className="text-end">Selling</th>
@@ -462,7 +469,10 @@ function VariantsPanel({ product, sizeType, onAdded, onUpdated, onRemoved }) {
                       {variant.variant_name}
                       {variant.is_default && <span className="review-chip" style={{ background: '#7a7a7a', marginLeft: 6 }}>Default</span>}
                     </td>
-                    <td className="small" style={{ fontFamily: 'monospace' }}>{variant.sku}</td>
+                    <td className="small" style={{ fontFamily: 'monospace' }}>
+                      {variant.sku}
+                      {variant.barcode && variant.barcode !== variant.sku && <div className="text-muted">▮ {variant.barcode}</div>}
+                    </td>
                     <td className="text-end small">
                       {variant.weight_grams} g
                       {variant.size_label && <div className="text-muted">Size {variant.size_label}</div>}

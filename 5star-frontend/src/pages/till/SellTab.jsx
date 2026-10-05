@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
 import ScanInput from './ScanInput';
+import LinkBarcode from '../../components/LinkBarcode';
 import CustomerPanel from './CustomerPanel';
 import CartTable from './CartTable';
 import PaymentPanel from './PaymentPanel';
@@ -28,6 +29,7 @@ export default function SellTab({ defaultWarehouseUuid, shopLabel, onShopLabelCh
   const [delivery, setDelivery] = useState('delivered');
 
   const [feedback, setFeedback] = useState(null);
+  const [unknownCode, setUnknownCode] = useState(null); // a scanned code no item has yet
   const [offerPrompt, setOfferPrompt] = useState(null); // { candidates, itemLabel }
   const offerResolverRef = useRef(null);
 
@@ -149,11 +151,19 @@ export default function SellTab({ defaultWarehouseUuid, shopLabel, onShopLabelCh
   // match. The camera path calls this exact function too.
   async function addByExactCode(code) {
     setFeedback({ tone: 'muted', text: 'Looking up…' });
+    setUnknownCode(null);
 
     try {
       const response = await api.get('/admin/inventory/lookup', { sku: code });
       await addVariantToCart(response.data);
     } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        // Usually an item whose real barcode was never recorded — offer to
+        // link this code to it, instead of a dead end.
+        setFeedback(null);
+        setUnknownCode(code);
+        return;
+      }
       setFeedback({ tone: 'danger', text: error instanceof ApiError ? error.message : 'Not found.' });
     }
   }
@@ -308,6 +318,17 @@ export default function SellTab({ defaultWarehouseUuid, shopLabel, onShopLabelCh
         onPickMatch={handlePickMatch}
         feedback={feedback}
       />
+
+      {unknownCode && (
+        <LinkBarcode
+          code={unknownCode}
+          onCancel={() => setUnknownCode(null)}
+          onLinked={async (variant) => {
+            setUnknownCode(null);
+            await addVariantToCart(variant);
+          }}
+        />
+      )}
 
       <CartTable cart={cart} onLineChange={handleLineChange} onRemoveLine={handleRemoveLine} />
 
