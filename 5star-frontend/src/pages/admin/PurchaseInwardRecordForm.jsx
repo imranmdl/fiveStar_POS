@@ -6,6 +6,7 @@ import PurchaseInwardNewItem from './PurchaseInwardNewItem.jsx';
 import PurchaseInwardCsvUpload from './PurchaseInwardCsvUpload.jsx';
 import PurchaseInwardPriceQueue from './PurchaseInwardPriceQueue.jsx';
 import { printBarcodeLabels } from './purchaseInwardPrint.js';
+import CameraScanner from '../../components/CameraScanner';
 
 const TODAY = () => new Date().toISOString().slice(0, 10);
 
@@ -38,8 +39,12 @@ export default function PurchaseInwardRecordForm({ vendors, warehouses, inventor
 
   const [showNewItem, setShowNewItem] = useState(false);
   const [showCsv, setShowCsv] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   const [lines, setLines] = useState([]);
+  // Latest lines for the scan feedback text (scans can arrive faster than renders).
+  const linesRef = useRef(lines);
+  linesRef.current = lines;
   const [skuInput, setSkuInput] = useState('');
   const [skuFeedback, setSkuFeedback] = useState(null);
   const [searchResults, setSearchResults] = useState([]);
@@ -98,34 +103,46 @@ export default function PurchaseInwardRecordForm({ vendors, warehouses, inventor
     return added;
   }
 
+  /**
+   * Adds a scanned/picked pack to the order. Scanning one that's already on
+   * it adds one more to that row (same as Mobile Scan and the Till), so a
+   * scanner gun or the camera can count items by scanning each one.
+   */
   function addVariantLine(variant) {
-    const added = addLine({
-      variant_uuid: variant.uuid,
-      sku: variant.sku,
-      barcode: variant.barcode || null,
-      product_name: variant.product_name,
-      variant_name: variant.variant_name,
-      quantity: '1',
-      invoiced_quantity: '',
-      unit_cost: String(variant.selling_price ?? '0'),
-      batch_no: '',
-      expiry_date: '',
-      mrp: '',
-      selling_price: '',
-      gst_rate: '',
-      discount_amount: '',
-      is_new: false,
+    const existing = linesRef.current.find((l) => l.variant_uuid === variant.uuid);
+
+    setLines((prev) => {
+      const index = prev.findIndex((l) => l.variant_uuid === variant.uuid);
+      if (index >= 0) {
+        const next = [...prev];
+        next[index] = { ...next[index], quantity: String((Number(next[index].quantity) || 0) + 1) };
+        return next;
+      }
+      return [...prev, {
+        variant_uuid: variant.uuid,
+        sku: variant.sku,
+        barcode: variant.barcode || null,
+        product_name: variant.product_name,
+        variant_name: variant.variant_name,
+        quantity: '1',
+        invoiced_quantity: '',
+        unit_cost: String(variant.selling_price ?? '0'),
+        batch_no: '',
+        expiry_date: '',
+        mrp: '',
+        selling_price: '',
+        gst_rate: '',
+        discount_amount: '',
+        is_new: false,
+      }];
     });
 
-    if (!added) {
-      setSkuFeedback({ tone: 'warning', text: 'That item is already on this purchase order — edit its row below.' });
-      return;
-    }
-
-    setSkuFeedback({ tone: 'success', text: `Added: ${variant.product_name} — ${variant.variant_name}` });
+    setSkuFeedback(existing
+      ? { tone: 'success', text: `${variant.product_name} — ${variant.variant_name}: quantity now ${(Number(existing.quantity) || 0) + 1}` }
+      : { tone: 'success', text: `Added: ${variant.product_name} — ${variant.variant_name}` });
     setSkuInput('');
     setSearchResults([]);
-    skuInputRef.current?.focus();
+    if (!cameraOpen) skuInputRef.current?.focus();
   }
 
   /** Name matches for what was typed, shown as a pick-list under the input. */
@@ -141,6 +158,18 @@ export default function PurchaseInwardRecordForm({ vendors, warehouses, inventor
     }
 
     return matches;
+  }
+
+  /** Camera: exact barcode only. An unknown code closes the camera so it can be created with "+ New item". */
+  async function handleCameraCode(code) {
+    try {
+      const response = await api.get('/admin/inventory/lookup', { sku: code });
+      addVariantLine(response.data);
+    } catch {
+      setCameraOpen(false);
+      setSkuInput(code);
+      setSkuFeedback({ tone: 'warning', text: `No item has barcode ${code}. Use "+ New item" to create it, then scan again.` });
+    }
   }
 
   /** Exact SKU/barcode first; if nothing has that code, treat the text as an item name. */
@@ -431,6 +460,7 @@ export default function PurchaseInwardRecordForm({ vendors, warehouses, inventor
                   }}
                 />
                 <button type="button" className="admin-btn" onClick={() => lookupSku(skuInput)}>Add</button>
+                <button type="button" className="admin-btn" onClick={() => setCameraOpen(true)} aria-label="Scan with camera">📷 Camera</button>
               </div>
             </label>
             <button type="button" className="admin-btn" onClick={() => setShowNewItem((s) => !s)}>+ New item</button>
@@ -613,6 +643,14 @@ export default function PurchaseInwardRecordForm({ vendors, warehouses, inventor
           pending={priceQueue.pending}
           purchaseOrderId={priceQueue.purchaseOrderId}
           onDone={() => { setPriceQueue(null); onSaved(); }}
+        />
+      )}
+      {cameraOpen && (
+        <CameraScanner
+          title="Scan items received"
+          hint="Each scan adds the item, or one more of it. Keep scanning, then press Done."
+          onDetected={handleCameraCode}
+          onClose={() => { setCameraOpen(false); skuInputRef.current?.focus(); }}
         />
       )}
     </form>
