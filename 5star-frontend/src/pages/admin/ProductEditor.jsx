@@ -12,6 +12,10 @@ import './ProductEditor.css';
  * create a product with no pack size, so the new-product form asks for the
  * first pack size (SKU, weight, MRP, selling price) in the same submission.
  * Further pack sizes are added afterwards, one at a time, on the edit page.
+ *
+ * Packs that already exist — most come from Purchase Inward's "New item" —
+ * keep their pack name, SKU and weight; the edit page only changes their
+ * pricing and limits, so nothing typed at inward is asked for twice.
  */
 
 const PACK_TYPES = ['pouch', 'jar', 'box', 'tin', 'gift_box', 'refill', 'other'];
@@ -243,8 +247,9 @@ function ProductForm({ product, categories, sizeType, onSubmit, saving, onCancel
               <input className="admin-input" id="v_variant_name" name="v_variant_name" placeholder="250 g pouch" required />
             </div>
             <div className="col-3">
-              <label className="admin-label" htmlFor="v_sku">SKU <span className="text-danger">*</span></label>
-              <input className="admin-input" id="v_sku" name="v_sku" required minLength={3} />
+              <label className="admin-label" htmlFor="v_sku">SKU</label>
+              <input className="admin-input" id="v_sku" name="v_sku" minLength={3} placeholder="Auto" />
+              <div className="admin-hint">Blank = a scannable barcode is made for you.</div>
             </div>
             <div className="col-2">
               <label className="admin-label" htmlFor="v_weight_grams">Weight (g) <span className="text-danger">*</span></label>
@@ -266,8 +271,8 @@ function ProductForm({ product, categories, sizeType, onSubmit, saving, onCancel
             </div>
             <div className="col-2">
               <label className="admin-label" htmlFor="v_max_order_quantity">Max per order</label>
-              <input className="admin-input" id="v_max_order_quantity" name="v_max_order_quantity" type="number" min="1" max="500" placeholder="No limit" />
-              <div className="admin-hint">Blank means no limit. The cart refuses more than this.</div>
+              <input className="admin-input" id="v_max_order_quantity" name="v_max_order_quantity" type="number" min="1" max="500" placeholder="20" />
+              <div className="admin-hint">Blank means 20. The cart refuses more than this.</div>
             </div>
             <div className="col-2">
               <label className="admin-label" htmlFor="v_expiry_date">Expiry date</label>
@@ -293,10 +298,100 @@ function ProductForm({ product, categories, sizeType, onSubmit, saving, onCancel
   );
 }
 
-function VariantsPanel({ product, sizeType, onAdded, onRemoved }) {
+/** Inline editor for one existing pack: pricing and limits only. */
+function VariantEditRow({ variant, onSave, onCancel }) {
+  const [form, setForm] = useState({
+    mrp: String(variant.mrp ?? ''),
+    selling_price: String(variant.selling_price ?? ''),
+    max_order_quantity: Number(variant.max_order_quantity) > 0 ? String(variant.max_order_quantity) : '',
+    expiry_date: variant.expiry_date ? String(variant.expiry_date).slice(0, 10) : '',
+    is_default: Boolean(variant.is_default),
+  });
+  const [saving, setSaving] = useState(false);
+  const set = (field) => (event) => setForm((f) => ({ ...f, [field]: event.target.type === 'checkbox' ? event.target.checked : event.target.value }));
+
+  async function save() {
+    if (Number(form.selling_price) > Number(form.mrp)) {
+      toast('The selling price cannot be more than the MRP.', 'danger');
+      return;
+    }
+
+    // Only what actually changed, so the price history records real changes.
+    const changes = {};
+    if (Number(form.mrp) !== Number(variant.mrp)) changes.mrp = form.mrp;
+    if (Number(form.selling_price) !== Number(variant.selling_price)) changes.selling_price = form.selling_price;
+    const oldMax = Number(variant.max_order_quantity) > 0 ? String(variant.max_order_quantity) : '';
+    if (form.max_order_quantity !== oldMax && form.max_order_quantity !== '') changes.max_order_quantity = Number(form.max_order_quantity);
+    const oldExpiry = variant.expiry_date ? String(variant.expiry_date).slice(0, 10) : '';
+    if (form.expiry_date !== oldExpiry && form.expiry_date !== '') changes.expiry_date = form.expiry_date;
+    if (form.is_default && !variant.is_default) changes.is_default = true;
+
+    if (Object.keys(changes).length === 0) {
+      onCancel();
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await onSave(variant.uuid, changes);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="admin-card__body admin-card__body--bordered variant-edit-row">
+        <div className="variant-edit">
+          <div className="variant-edit__fixed">
+            <b>{variant.variant_name}</b>
+            <span>SKU {variant.sku}</span>
+            <span>{variant.weight_grams} g</span>
+            <span className="text-muted small">Pack name, SKU and weight come from Purchase Inward and stay as they are.</span>
+          </div>
+          <div className="admin-grid">
+            <div className="col-2">
+              <label className="admin-label">MRP</label>
+              <input className="admin-input" type="number" step="0.01" min="1" value={form.mrp} onChange={set('mrp')} />
+            </div>
+            <div className="col-2">
+              <label className="admin-label">Selling price</label>
+              <input className="admin-input" type="number" step="0.01" min="1" value={form.selling_price} onChange={set('selling_price')} />
+            </div>
+            <div className="col-2">
+              <label className="admin-label">Max per order</label>
+              <input className="admin-input" type="number" min="1" max="500" placeholder="20" value={form.max_order_quantity} onChange={set('max_order_quantity')} />
+            </div>
+            <div className="col-2">
+              <label className="admin-label">Expiry date</label>
+              <input className="admin-input" type="date" value={form.expiry_date} onChange={set('expiry_date')} />
+            </div>
+            <div className="col-2 admin-checkbox-row" style={{ alignSelf: 'flex-end' }}>
+              <label>
+                <input type="checkbox" checked={form.is_default} disabled={variant.is_default} onChange={set('is_default')} /> Default pack
+              </label>
+            </div>
+            <div className="col-2" style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+              <button className="admin-btn admin-btn--primary" type="button" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</button>
+              <button className="admin-btn" type="button" disabled={saving} onClick={onCancel}>Cancel</button>
+            </div>
+            <div className="col-12">
+              <div className="admin-hint">
+                Prices include GST. A new selling price shows on the website, the app and the counter straight away, and is
+                recorded in the price history like a change made on Purchase Inward.
+              </div>
+            </div>
+          </div>
+        </div>
+    </div>
+  );
+}
+
+function VariantsPanel({ product, sizeType, onAdded, onUpdated, onRemoved }) {
   const variants = product.variants || [];
   const formRef = useRef(null);
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [adding, setAdding] = useState(variants.length === 0);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -317,9 +412,15 @@ function VariantsPanel({ product, sizeType, onAdded, onRemoved }) {
     try {
       await onAdded(payload, sizeValue);
       form.reset();
+      setAdding(false);
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleUpdate(uuid, changes) {
+    await onUpdated(uuid, changes);
+    setEditing(null);
   }
 
   async function handleRemove(variant) {
@@ -337,7 +438,7 @@ function VariantsPanel({ product, sizeType, onAdded, onRemoved }) {
       {variants.length === 0 ? (
         <div className="admin-card__body">
           <div className="admin-alert admin-alert--warning">
-            This product has no pack sizes, so it cannot be sold. Add at least one below.
+            This product has no pack sizes, so it cannot be sold. Add one below, or receive it on Purchase Inward.
           </div>
         </div>
       ) : (
@@ -356,80 +457,101 @@ function VariantsPanel({ product, sizeType, onAdded, onRemoved }) {
             </thead>
             <tbody>
               {variants.map((variant) => (
-                <tr key={variant.uuid}>
-                  <td>
-                    {variant.variant_name}
-                    {variant.is_default && <span className="review-chip" style={{ background: '#7a7a7a', marginLeft: 6 }}>Default</span>}
-                  </td>
-                  <td className="small" style={{ fontFamily: 'monospace' }}>{variant.sku}</td>
-                  <td className="text-end small">
-                    {variant.weight_grams} g
-                    {variant.size_label && <div className="text-muted">Size {variant.size_label}</div>}
-                  </td>
-                  <td className="text-end small">{formatMoney(variant.mrp)}</td>
-                  <td className="text-end">{formatMoney(variant.selling_price)}</td>
-                  <td className="text-center small">
-                    {Number(variant.max_order_quantity) > 0 ? variant.max_order_quantity : <span className="text-muted">—</span>}
-                  </td>
-                  <td className="text-end">
-                    <button className="admin-btn admin-btn--danger-outline" type="button" onClick={() => handleRemove(variant)}>
-                      Remove
-                    </button>
-                  </td>
-                </tr>
+                  <tr key={variant.uuid} className={editing === variant.uuid ? 'variant-row--editing' : undefined}>
+                    <td>
+                      {variant.variant_name}
+                      {variant.is_default && <span className="review-chip" style={{ background: '#7a7a7a', marginLeft: 6 }}>Default</span>}
+                    </td>
+                    <td className="small" style={{ fontFamily: 'monospace' }}>{variant.sku}</td>
+                    <td className="text-end small">
+                      {variant.weight_grams} g
+                      {variant.size_label && <div className="text-muted">Size {variant.size_label}</div>}
+                    </td>
+                    <td className="text-end small">{formatMoney(variant.mrp)}</td>
+                    <td className="text-end">{formatMoney(variant.selling_price)}</td>
+                    <td className="text-center small">
+                      {Number(variant.max_order_quantity) > 0 ? variant.max_order_quantity : <span className="text-muted">—</span>}
+                    </td>
+                    <td className="text-end" style={{ whiteSpace: 'nowrap' }}>
+                      <button className="admin-btn" type="button" disabled={editing === variant.uuid} onClick={() => setEditing(variant.uuid)}>
+                        Edit price &amp; limits
+                      </button>{' '}
+                      <button className="admin-btn admin-btn--danger-outline" type="button" onClick={() => handleRemove(variant)}>
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
 
+      {editing && variants.some((v) => v.uuid === editing) && (
+        <VariantEditRow
+          key={editing}
+          variant={variants.find((v) => v.uuid === editing)}
+          onSave={handleUpdate}
+          onCancel={() => setEditing(null)}
+        />
+      )}
+
       <div className="admin-card__body admin-card__body--bordered">
-        <form ref={formRef} className="admin-grid" onSubmit={handleSubmit}>
-          <div className="col-3">
-            <label className="admin-label" htmlFor="variant_name">Pack name <span className="text-danger">*</span></label>
-            <input className="admin-input" id="variant_name" name="variant_name" placeholder="250 g pouch" required />
-          </div>
-          <div className="col-2">
-            <label className="admin-label" htmlFor="sku">SKU <span className="text-danger">*</span></label>
-            <input className="admin-input" id="sku" name="sku" required minLength={3} />
-          </div>
-          <div className="col-2">
-            <label className="admin-label" htmlFor="weight_grams">Weight (g) <span className="text-danger">*</span></label>
-            <input className="admin-input" id="weight_grams" name="weight_grams" type="number" min="1" max="100000" required />
-          </div>
-          <div className="col-2">
-            <label className="admin-label" htmlFor="size_value">Size (optional)</label>
-            <input className="admin-input" id="size_value" name="size_value" list="size-suggestions" placeholder="e.g. M, or 8" />
-          </div>
-          <div className="col-2">
-            <label className="admin-label" htmlFor="mrp">MRP <span className="text-danger">*</span></label>
-            <input className="admin-input" id="mrp" name="mrp" type="number" step="0.01" min="1" required />
-          </div>
-          <div className="col-2">
-            <label className="admin-label" htmlFor="selling_price">Selling price <span className="text-danger">*</span></label>
-            <input className="admin-input" id="selling_price" name="selling_price" type="number" step="0.01" min="1" required />
-          </div>
-          <div className="col-2">
-            <label className="admin-label" htmlFor="max_order_quantity">Max per order</label>
-            <input className="admin-input" id="max_order_quantity" name="max_order_quantity" type="number" min="1" max="500" placeholder="No limit" />
-          </div>
-          <div className="col-2">
-            <label className="admin-label" htmlFor="expiry_date">Expiry date</label>
-            <input className="admin-input" id="expiry_date" name="expiry_date" type="date" />
-          </div>
-          <div className="col-1" style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <button className="admin-btn admin-btn--primary" type="submit" disabled={saving} style={{ width: '100%' }}>
-              {saving ? '…' : 'Add'}
-            </button>
-          </div>
-          <div className="col-12">
-            <div className="admin-hint">
-              Prices INCLUDE GST. Expiry date here is optional and informational — stock actually received declares its
-              expiry on Purchase Inward instead, tracked per batch. Weight is always required.
+        {!adding ? (
+          <button className="admin-btn" type="button" onClick={() => setAdding(true)}>+ Add another pack size</button>
+        ) : (
+          <form ref={formRef} className="admin-grid" onSubmit={handleSubmit}>
+            <div className="col-12">
+              <b>New pack size</b>
+              <div className="admin-hint">
+                Only for a pack this product doesn&apos;t have yet. Stock you receive goes on Purchase Inward, which creates
+                packs too — you don&apos;t need to add them here as well.
+              </div>
             </div>
-          </div>
-          {sizeSuggestions(sizeType)}
-        </form>
+            <div className="col-3">
+              <label className="admin-label" htmlFor="variant_name">Pack name <span className="text-danger">*</span></label>
+              <input className="admin-input" id="variant_name" name="variant_name" placeholder="250 g pouch" required />
+            </div>
+            <div className="col-2">
+              <label className="admin-label" htmlFor="weight_grams">Weight (g) <span className="text-danger">*</span></label>
+              <input className="admin-input" id="weight_grams" name="weight_grams" type="number" min="1" max="100000" required />
+            </div>
+            <div className="col-2">
+              <label className="admin-label" htmlFor="sku">SKU</label>
+              <input className="admin-input" id="sku" name="sku" minLength={3} placeholder="Auto" />
+            </div>
+            <div className="col-2">
+              <label className="admin-label" htmlFor="size_value">Size (optional)</label>
+              <input className="admin-input" id="size_value" name="size_value" list="size-suggestions" placeholder="e.g. M, or 8" />
+            </div>
+            <div className="col-2">
+              <label className="admin-label" htmlFor="mrp">MRP <span className="text-danger">*</span></label>
+              <input className="admin-input" id="mrp" name="mrp" type="number" step="0.01" min="1" required />
+            </div>
+            <div className="col-2">
+              <label className="admin-label" htmlFor="selling_price">Selling price <span className="text-danger">*</span></label>
+              <input className="admin-input" id="selling_price" name="selling_price" type="number" step="0.01" min="1" required />
+            </div>
+            <div className="col-2">
+              <label className="admin-label" htmlFor="max_order_quantity">Max per order</label>
+              <input className="admin-input" id="max_order_quantity" name="max_order_quantity" type="number" min="1" max="500" placeholder="20" />
+            </div>
+            <div className="col-2">
+              <label className="admin-label" htmlFor="expiry_date">Expiry date</label>
+              <input className="admin-input" id="expiry_date" name="expiry_date" type="date" />
+            </div>
+            <div className="col-2" style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+              <button className="admin-btn admin-btn--primary" type="submit" disabled={saving}>{saving ? '…' : 'Add'}</button>
+              {variants.length > 0 && <button className="admin-btn" type="button" onClick={() => setAdding(false)}>Cancel</button>}
+            </div>
+            <div className="col-12">
+              <div className="admin-hint">
+                Prices INCLUDE GST. Leave SKU blank to get a scannable barcode automatically, as on Purchase Inward.
+              </div>
+            </div>
+            {sizeSuggestions(sizeType)}
+          </form>
+        )}
       </div>
     </div>
   );
@@ -721,11 +843,11 @@ export default function ProductEditor({ identifier, onClose, onCreated }) {
 
   async function handleVariantAdd(payload, sizeValue) {
     try {
+      const before = new Set((product.variants || []).map((v) => v.uuid));
       const response = await api.post(`/admin/products/${encodeURIComponent(product.uuid)}/variants`, payload);
-      // The API uppercases SKUs, so match case-insensitively against what was
-      // actually typed here.
-      const created = (response.data.product.variants || [])
-        .find((v) => v.sku.toUpperCase() === String(payload.sku).toUpperCase());
+      // The new pack is the one that wasn't there before (its SKU may have
+      // been generated by the server).
+      const created = (response.data.product.variants || []).find((v) => !before.has(v.uuid));
 
       if (created && sizeValue) {
         await attachSizeIfProvided(created.uuid, sizeValue);
@@ -735,6 +857,17 @@ export default function ProductEditor({ identifier, onClose, onCreated }) {
       await reload(product.uuid);
     } catch (err) {
       toast(err.message || 'Could not add the pack size.', 'danger');
+      throw err;
+    }
+  }
+
+  async function handleVariantUpdate(uuid, changes) {
+    try {
+      await api.patch(`/admin/variants/${encodeURIComponent(uuid)}`, changes);
+      toast('Pack size updated.');
+      await reload(product.uuid);
+    } catch (err) {
+      toast(err.message || 'Could not update the pack size.', 'danger');
       throw err;
     }
   }
@@ -816,7 +949,7 @@ export default function ProductEditor({ identifier, onClose, onCreated }) {
       />
 
       {product && (
-        <VariantsPanel product={product} sizeType={sizeType} onAdded={handleVariantAdd} onRemoved={handleVariantRemove} />
+        <VariantsPanel product={product} sizeType={sizeType} onAdded={handleVariantAdd} onUpdated={handleVariantUpdate} onRemoved={handleVariantRemove} />
       )}
 
       {product && (

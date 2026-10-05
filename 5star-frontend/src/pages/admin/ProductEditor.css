@@ -126,3 +126,25 @@
   align-items: center;
   margin-top: 6px;
 }
+
+.variant-edit-row {
+  background: #fafaf7;
+}
+
+.variant-row--editing > td {
+  background: #f3f1ea;
+}
+
+.variant-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.variant-edit__fixed {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  align-items: baseline;
+}

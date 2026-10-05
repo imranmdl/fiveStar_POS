@@ -450,9 +450,9 @@ final class ProductController extends BaseController
             }
 
             $clean = $this->validateVariant($row);
-            $sku = strtoupper($clean['sku']);
+            $sku = strtoupper(trim((string) ($clean['sku'] ?? '')));
 
-            if (isset($seenSkus[$sku])) {
+            if ($sku !== '' && isset($seenSkus[$sku])) {
                 throw new HttpException(
                     'Duplicate SKU in the request: ' . $sku,
                     422,
@@ -460,7 +460,9 @@ final class ProductController extends BaseController
                 );
             }
 
-            $seenSkus[$sku] = true;
+            if ($sku !== '') {
+                $seenSkus[$sku] = true;
+            }
             $validated[] = $clean;
         }
 
@@ -475,7 +477,9 @@ final class ProductController extends BaseController
     private function validateVariant(array $input): array
     {
         return Validator::make($input, [
-            'sku' => 'required|string|min:3|max:50',
+            // Optional: left blank, a unique barcode is generated and used as
+            // the SKU — the same as a new item created on Purchase Inward.
+            'sku' => 'nullable|string|min:3|max:50',
             'variant_name' => 'required|string|min:2|max:80',
             'weight_grams' => 'required|int|min:1|max:100000',
             'packed_weight_grams' => 'nullable|int|min:1|max:120000',
