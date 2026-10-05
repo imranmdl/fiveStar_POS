@@ -1,0 +1,87 @@
+/* =====================================================================
+   Admin console on phones and tablets.
+
+   Shared rules for the patterns every module uses, so a page fits a
+   390 px phone without its own media queries: form controls that can
+   shrink, toolbars and button rows that wrap, tables that scroll
+   sideways inside their card instead of pushing the page wider, and
+   bigger touch targets. Page-specific fixes live in each page's CSS.
+   ===================================================================== */
+
+.admin-main img,
+.admin-main video,
+.admin-main canvas {
+  max-width: 100%;
+}
+
+/* Wide tables scroll sideways inside their own box, at any width (wrap a
+   table in <div className="admin-table-scroll"> where a page doesn't already). */
+.admin-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 860px) {
+  .admin-main {
+    font-size: 14px;
+  }
+
+  .admin-page-title {
+    font-size: 19px;
+    margin-bottom: 12px;
+  }
+
+  /* Form controls never push their row wider than the screen. 16 px text
+     stops iOS zooming the page when a field is tapped. */
+  .admin-main input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+  .admin-main select,
+  .admin-main textarea {
+    max-width: 100%;
+    min-width: 0;
+    font-size: 16px;
+  }
+
+  .admin-main input[type='date'],
+  .admin-main input[type='datetime-local'],
+  .admin-main input[type='time'] {
+    min-height: 40px;
+  }
+
+  /* Grid and flex cells may shrink below their content's natural width —
+     otherwise one date field or long label widens the whole row. */
+  .admin-main [class*='grid'] > *,
+  .admin-main [class*='row'] > *,
+  .admin-main [class*='field'] {
+    min-width: 0;
+  }
+
+  /* Rows of buttons, filters and tabs wrap instead of running off-screen. */
+  .admin-toolbar,
+  .admin-card__footer,
+  .admin-card__header--flex,
+  .pl-card__header,
+  .pi-toolbar,
+  .pi-inline-group,
+  .content-tabs {
+    flex-wrap: wrap;
+  }
+
+  .admin-btn {
+    min-height: 40px;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  /* Long words, SKUs and URLs wrap rather than widening their box. */
+  .admin-main p,
+  .admin-main li,
+  .admin-main .admin-hint,
+  .admin-main .admin-alert {
+    overflow-wrap: anywhere;
+  }
+}

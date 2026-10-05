@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api, storeTokens, signOut, bootstrapSession, isSignedIn, ApiError } from '../../lib/api';
 import { BRAND_LOGO_ALT, BRAND_LOGO_URL, BRAND_NAME } from '../../lib/brand';
 import './AdminLayout.css';
+import './responsive.css';
 
 /** Falls back to the text wordmark if the logo image 404s, same as admin/console.js's brandMarkup(). */
 function BrandMark() {
@@ -133,6 +134,25 @@ export default function AdminLayout() {
   const [state, setState] = useState({ status: 'loading', user: null, message: null });
   const [bootVersion, setBootVersion] = useState(0);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  // Phones and tablets: the menu is a slide-out drawer behind the ☰ button.
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onKey = (event) => { if (event.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('keydown', onKey);
+    document.body.classList.add('admin-menu-open');
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.classList.remove('admin-menu-open');
+    };
+  }, [menuOpen]);
 
   useEffect(() => {
     let mounted = true;
@@ -202,9 +222,34 @@ export default function AdminLayout() {
     setState({ status: 'signedOut', user: null, message: null });
   }
 
+  const current = NAV_GROUPS.flatMap((g) => g.items)
+    .filter(([to]) => (to === '/admin' ? pathname === '/admin' || pathname === '/admin/' : pathname.startsWith(to)))
+    .sort((a, b) => b[0].length - a[0].length)[0];
+
   return (
-    <div className="admin-shell">
-      <nav className="admin-sidebar">
+    <div className={`admin-shell${menuOpen ? ' admin-shell--menu-open' : ''}`}>
+      <header className="admin-topbar">
+        <button
+          type="button"
+          className="admin-topbar__menu"
+          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={menuOpen}
+          aria-controls="admin-sidebar"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <span /><span /><span />
+        </button>
+        <span className="admin-topbar__title">{current ? current[1] : 'Admin'}</span>
+        <span className="admin-topbar__brand"><BrandMark /></span>
+      </header>
+      <button
+        type="button"
+        className="admin-backdrop"
+        aria-label="Close menu"
+        tabIndex={menuOpen ? 0 : -1}
+        onClick={() => setMenuOpen(false)}
+      />
+      <nav className="admin-sidebar" id="admin-sidebar" aria-label="Admin menu">
         <div className="admin-sidebar__brand">
           <BrandMark />
         </div>
