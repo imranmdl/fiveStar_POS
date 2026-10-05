@@ -7,6 +7,7 @@ import PurchaseInwardCsvUpload from './PurchaseInwardCsvUpload.jsx';
 import PurchaseInwardPriceQueue from './PurchaseInwardPriceQueue.jsx';
 import { printBarcodeLabels } from './purchaseInwardPrint.js';
 import CameraScanner from '../../components/CameraScanner';
+import LinkBarcode from '../../components/LinkBarcode';
 
 const TODAY = () => new Date().toISOString().slice(0, 10);
 
@@ -40,6 +41,10 @@ export default function PurchaseInwardRecordForm({ vendors, warehouses, inventor
   const [showNewItem, setShowNewItem] = useState(false);
   const [showCsv, setShowCsv] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  // A scanned code that matches no item: offer "new item with this barcode"
+  // or "link it to an existing item" — never a silent auto-generated code.
+  const [unknownCode, setUnknownCode] = useState(null); // { code, linking }
+  const [newItemBarcode, setNewItemBarcode] = useState('');
 
   const [lines, setLines] = useState([]);
   // Latest lines for the scan feedback text (scans can arrive faster than renders).
@@ -167,8 +172,8 @@ export default function PurchaseInwardRecordForm({ vendors, warehouses, inventor
       addVariantLine(response.data);
     } catch {
       setCameraOpen(false);
-      setSkuInput(code);
-      setSkuFeedback({ tone: 'warning', text: `No item has barcode ${code}. Use "+ New item" to create it, then scan again.` });
+      setSkuFeedback(null);
+      setUnknownCode({ code, linking: false });
     }
   }
 
@@ -178,6 +183,7 @@ export default function PurchaseInwardRecordForm({ vendors, warehouses, inventor
     if (!text) return;
 
     setSkuFeedback({ tone: 'muted', text: 'Looking up…' });
+    setUnknownCode(null);
 
     try {
       const response = await api.get('/admin/inventory/lookup', { sku: text });
@@ -196,6 +202,11 @@ export default function PurchaseInwardRecordForm({ vendors, warehouses, inventor
         setSearchResults([]);
       } else if (matches.length > 1) {
         setSkuFeedback({ tone: 'muted', text: 'Several items match — pick one from the list.' });
+      } else if (/^[\d\s]{6,}$|^\S{6,}$/.test(text)) {
+        // Looks like a scanned code, not a name.
+        setSkuFeedback(null);
+        setSkuInput('');
+        setUnknownCode({ code: text, linking: false });
       } else {
         setSkuFeedback({ tone: 'danger', text: 'No item has that name, SKU or barcode.' });
       }
@@ -463,7 +474,7 @@ export default function PurchaseInwardRecordForm({ vendors, warehouses, inventor
                 <button type="button" className="admin-btn" onClick={() => setCameraOpen(true)} aria-label="Scan with camera">📷 Camera</button>
               </div>
             </label>
-            <button type="button" className="admin-btn" onClick={() => setShowNewItem((s) => !s)}>+ New item</button>
+            <button type="button" className="admin-btn" onClick={() => { setNewItemBarcode(''); setShowNewItem((s) => !s); }}>+ New item</button>
             <button type="button" className="admin-btn" onClick={() => setShowCsv((s) => !s)}>Upload CSV</button>
           </div>
 
@@ -498,12 +509,41 @@ export default function PurchaseInwardRecordForm({ vendors, warehouses, inventor
 
           {skuFeedback && <div className={`pi-feedback pi-feedback--${skuFeedback.tone}`}>{skuFeedback.text}</div>}
 
+          {unknownCode && !unknownCode.linking && (
+            <div className="pi-feedback pi-feedback--warning pi-unknown-code">
+              <span>Barcode <b>{unknownCode.code}</b> isn&apos;t on any item yet.</span>
+              <div className="pi-toolbar">
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--primary"
+                  onClick={() => { setNewItemBarcode(unknownCode.code); setShowNewItem(true); setUnknownCode(null); }}
+                >
+                  New item with this barcode
+                </button>
+                <button type="button" className="admin-btn" onClick={() => setUnknownCode({ ...unknownCode, linking: true })}>
+                  It&apos;s an existing item — link it
+                </button>
+                <button type="button" className="admin-btn" onClick={() => setUnknownCode(null)}>Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {unknownCode && unknownCode.linking && (
+            <LinkBarcode
+              code={unknownCode.code}
+              onCancel={() => setUnknownCode(null)}
+              onLinked={(variant) => { setUnknownCode(null); addVariantLine(variant); }}
+            />
+          )}
+
           {showNewItem && (
             <PurchaseInwardNewItem
+              key={newItemBarcode || 'blank'}
               setup={inventorySetup}
+              initialBarcode={newItemBarcode}
               onCategoryCreated={onCategoryCreated}
               onAddLine={addLine}
-              onClose={() => setShowNewItem(false)}
+              onClose={() => { setShowNewItem(false); setNewItemBarcode(''); }}
             />
           )}
 

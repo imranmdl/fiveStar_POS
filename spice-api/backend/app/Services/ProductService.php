@@ -469,6 +469,15 @@ final class ProductService
             throw new HttpException('That SKU is already in use.', 409, ['sku' => ['Choose a unique SKU.']]);
         }
 
+        if (array_key_exists('barcode', $data) && $data['barcode'] !== null) {
+            $data['barcode'] = Barcode::clean((string) $data['barcode']);
+            if ($data['barcode'] === '') {
+                unset($data['barcode']);
+            } else {
+                $this->variants->assertCodeFree($data['barcode'], (int) $variant['id']);
+            }
+        }
+
         $this->assertVariantPricingIsCoherent(array_merge($variant, $data));
 
         $this->db->transaction(function () use ($variant, $data, $productId, $actorId): void {
@@ -1074,6 +1083,8 @@ final class ProductService
         $detail['variants'] = array_map(fn (array $variant): array => [
             'uuid' => $variant['uuid'],
             'sku' => $variant['sku'],
+            'barcode' => $variant['barcode'] ?? null,
+            'expiry_date' => $variant['expiry_date'] ?? null,
             'variant_name' => $variant['variant_name'],
             'weight_grams' => (int) $variant['weight_grams'],
             'shipping_weight_grams' => (int) $variant['shipping_weight_grams'],

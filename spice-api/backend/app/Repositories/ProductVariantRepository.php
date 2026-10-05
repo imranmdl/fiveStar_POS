@@ -182,6 +182,23 @@ final class ProductVariantRepository extends BaseRepository
         return null;
     }
 
+    /**
+     * Refuses a barcode/SKU that already belongs to ANOTHER pack, in any of its
+     * equivalent forms (so 0123… and 123… can't end up on two different items).
+     */
+    public function assertCodeFree(string $code, int $exceptVariantId): void
+    {
+        $owner = $this->findByCode($code);
+
+        if ($owner !== null && (int) $owner['id'] !== $exceptVariantId) {
+            throw new \App\Core\Exceptions\HttpException(
+                sprintf('Barcode %s is already on "%s — %s".', $code, $owner['product_name'], $owner['variant_name']),
+                409,
+                ['barcode' => ['Already used by another item.']]
+            );
+        }
+    }
+
     public function countForProduct(int $productId): int
     {
         return (int) $this->db->scalar(

@@ -97,9 +97,14 @@ final class InventoryController extends BaseController
      */
     public function assignBarcode(Request $request): Response
     {
-        $variant = $this->inventory->assignBarcode((string) $request->routeParam('variantUuid'), $request);
+        $barcode = $request->input('barcode');
+        $variant = $this->inventory->assignBarcode(
+            (string) $request->routeParam('variantUuid'),
+            $request,
+            is_string($barcode) ? mb_substr($barcode, 0, 50) : null
+        );
 
-        return Response::success(['variant' => $variant], 'Barcode ready');
+        return Response::success(['variant' => $variant], is_string($barcode) && $barcode !== '' ? 'Barcode linked' : 'Barcode ready');
     }
 
     /** GET /api/v1/admin/inventory/low-stock */
