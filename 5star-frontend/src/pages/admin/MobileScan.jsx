@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { api, formatMoney, ApiError } from '../../lib/api';
 import { LoadingState, ErrorState } from '../../components/admin/shared.jsx';
 import { toast } from '../../components/admin/toast.js';
+import CameraScanner from '../../components/CameraScanner';
 import './MobileScan.css';
 
 /**
@@ -21,18 +22,17 @@ import './MobileScan.css';
  * POST /admin/inventory/quick-create (gated server-side to managers — this
  * page doesn't duplicate that gate, it just lets a 403 surface normally).
  *
- * SCANNING, how it's implemented here: the live page drives the browser's
- * native BarcodeDetector camera API (getUserMedia) when available, with a
- * manual-entry text field always shown alongside it (never only as a
- * fallback). This port drops the camera path entirely — there's no device
- * camera access in this dev environment, and BarcodeDetector is unsupported
- * on iOS Safari in production anyway, so the live page already treats
- * manual entry as a first-class input, not a last resort. That one text
- * field now does double duty: a USB/Bluetooth barcode scanner "typing" into
- * a focused input and sending Enter submits it exactly like a human typing
- * then pressing Enter/Go, and the field is re-focused after every lookup —
- * success, "not found", or quick-create — so warehouse staff can keep
- * scanning item after item without touching the screen in between.
+ * SCANNING — three ways in, all ending in the same lookup:
+ *  - "Camera" opens the phone's camera (components/CameraScanner, the same
+ *    one the Till uses; works in a phone browser over https and in the
+ *    Android app). On Scan inward it stays open so several items can be
+ *    scanned in a row; it closes by itself when a barcode isn't recognised,
+ *    so the quick-create form can be filled in.
+ *  - A USB/Bluetooth barcode scanner "types" into the focused text field and
+ *    sends Enter.
+ *  - Typing the code and pressing Add / Look up.
+ * The text field is re-focused after every lookup so a hardware scanner can
+ * keep going without anyone touching the screen.
  */
 
 const TODAY = () => new Date().toISOString().slice(0, 10);
@@ -211,6 +211,7 @@ export default function MobileScan() {
   const [lookupError, setLookupError] = useState(null);
 
   const inputRef = useRef(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -257,6 +258,10 @@ export default function MobileScan() {
     const value = code.trim();
     if (!value) return;
     setCode('');
+    await scanInward(value);
+  }
+
+  async function scanInward(value) {
 
     setFeedback({ tone: 'muted', text: `Looking up ${value}…` });
 
@@ -295,6 +300,8 @@ export default function MobileScan() {
       if (error instanceof ApiError && error.status === 404) {
         setFeedback({ tone: 'warning', text: `Unrecognised barcode: ${value}` });
         setQuickCreate(emptyQuickCreate(value));
+        // The quick-create form needs the screen — close the camera.
+        setCameraOpen(false);
 
         if (categories.length === 0) {
           try {
@@ -416,6 +423,11 @@ export default function MobileScan() {
     event.preventDefault();
     const value = code.trim();
     if (!value) return;
+    await lookupStock(value);
+  }
+
+  async function lookupStock(value) {
+    setCameraOpen(false);
 
     setLookupBusy(true);
     setLookupError(null);
@@ -474,6 +486,9 @@ export default function MobileScan() {
               onChange={(event) => setCode(event.target.value)}
             />
             <button type="submit" className="admin-btn admin-btn--primary mscan-add-btn">Add</button>
+            <button type="button" className="admin-btn mscan-camera-btn" onClick={() => setCameraOpen(true)} aria-label="Scan with camera">
+              📷 Camera
+            </button>
           </form>
 
           {feedback && (
@@ -629,6 +644,9 @@ export default function MobileScan() {
               onChange={(event) => setCode(event.target.value)}
             />
             <button type="submit" className="admin-btn admin-btn--primary mscan-add-btn">Look up</button>
+            <button type="button" className="admin-btn mscan-camera-btn" onClick={() => setCameraOpen(true)} aria-label="Scan with camera">
+              📷 Camera
+            </button>
           </form>
 
           {lookupBusy && <p className="mscan-empty-hint">Looking up…</p>}
@@ -661,6 +679,16 @@ export default function MobileScan() {
           pending={priceQueue.pending}
           purchaseOrderId={priceQueue.purchaseOrderId}
           onDone={finishPriceQueue}
+        />
+      )}
+      {cameraOpen && (
+        <CameraScanner
+          title={mode === 'scan' ? 'Scan items to inward' : 'Scan to look up stock'}
+          hint={mode === 'scan'
+            ? 'Point at a barcode — each scan adds to the list. Keep scanning, then press Done.'
+            : 'Point at a barcode — the stock shows as soon as it reads.'}
+          onDetected={(scanned) => (mode === 'scan' ? scanInward(scanned) : lookupStock(scanned))}
+          onClose={() => { setCameraOpen(false); focusInput(); }}
         />
       )}
     </div>

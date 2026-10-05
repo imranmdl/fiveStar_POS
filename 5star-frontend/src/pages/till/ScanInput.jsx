@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { formatMoney } from '../../lib/api';
-import CameraScanner from './CameraScanner';
+import CameraScanner from '../../components/CameraScanner';
 
 /**
  * The universal scan input — the core of this page. One text field serves
@@ -19,9 +19,8 @@ import CameraScanner from './CameraScanner';
  *     doesn't resolve.
  *
  * Ported from the `data-sku-input` field in admin/assets/page-till.js
- * (addByExactCode / searchByName), split out here since the camera path has
- * no equivalent there — this page is the one place that needed it built for
- * real (contrast admin/MobileScan, which dropped the camera entirely).
+ * (addByExactCode / searchByName). The camera overlay is shared with
+ * admin/MobileScan (components/CameraScanner).
  */
 export default function ScanInput({ onCode, onSearch, onPickMatch, feedback, disabled }) {
   const [value, setValue] = useState('');

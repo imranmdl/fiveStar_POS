@@ -1,0 +1,107 @@
+/* Camera barcode overlay (Till and Mobile Scan). Uses the global tokens. */
+.cam-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(22, 24, 20, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4, 16px);
+  z-index: 60;
+}
+
+.cam-sheet {
+  width: min(32rem, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--surface, #fff);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-lg, 0 12px 32px rgba(0, 0, 0, .25));
+  padding: var(--space-4, 16px);
+}
+
+.cam-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3, 12px);
+}
+
+.cam-sheet__header h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.cam-close {
+  appearance: none;
+  border: none;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--ink-500, #6f6a6b);
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.cam-error {
+  border-radius: var(--radius-sm, 6px);
+  padding: var(--space-3, 12px);
+  margin-bottom: var(--space-3, 12px);
+  font-size: 14px;
+  background: var(--danger-bg, #fbe8e6);
+  color: var(--danger, #8d241b);
+}
+
+.cam-viewport {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-radius: var(--radius-md, 8px);
+  overflow: hidden;
+  margin-bottom: var(--space-3, 12px);
+}
+
+.cam-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cam-reticle {
+  position: absolute;
+  inset: 18% 12%;
+  border: 3px solid var(--brand-marigold, #e8972e);
+  border-radius: var(--radius-md, 8px);
+  pointer-events: none;
+}
+
+.cam-sheet__status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  font-weight: 600;
+}
+
+.cam-sheet__hint {
+  font-size: 13px;
+  color: var(--ink-500, #6f6a6b);
+  margin-bottom: var(--space-3, 12px);
+}
+
+.cam-done {
+  appearance: none;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border, #ece9e5);
+  background: var(--surface, #fff);
+  color: var(--ink-900, #2a2829);
+  border-radius: var(--radius-sm, 6px);
+  font-weight: 600;
+  cursor: pointer;
+}

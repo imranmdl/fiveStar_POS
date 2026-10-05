@@ -1,24 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
+import './CameraScanner.css';
 
-/** Ignore a second decode of the same code within this window — a continuous scanner re-reads the same label many times a second while it's still in frame. */
+/**
+ * A continuous scanner re-reads the same label many times a second while it
+ * stays in frame. A code counts again only after it has been OUT of view for
+ * this long — so holding the camera on one item adds it once, and moving
+ * away and back adds another.
+ */
 const DUPLICATE_SUPPRESS_MS = 1500;
 
 /**
- * Camera barcode scanning overlay — the one place in this migration where
- * camera scanning is the real thing, not skipped (contrast admin/MobileScan,
- * which dropped the camera path for dev-environment reasons and only ever
- * had manual/HID entry). Wraps @zxing/browser's BrowserMultiFormatReader,
- * which itself wraps getUserMedia + continuous decoding against a <video>
- * element.
+ * Camera barcode scanning overlay, shared by the Till and Mobile Scan.
+ * Wraps @zxing/browser's BrowserMultiFormatReader (getUserMedia + continuous
+ * decoding against a <video> element), so it works in a phone's browser and
+ * inside the Android app alike — the app declares the CAMERA permission and
+ * Android asks the person the first time.
  *
- * Feeds decoded codes to the SAME onDetected(code) callback the HID-scanner
- * path uses, so a scan from the camera adds to the cart exactly like a scan
- * from a physical scanner. Stays open for repeated scans (ringing up
- * several items without reopening the camera each time) until the cashier
- * closes it with "Done".
+ * Feeds decoded codes to the SAME onDetected(code) callback a USB/Bluetooth
+ * scanner or typing uses, so a camera scan behaves exactly like any other.
+ * Stays open for repeated scans until "Done" (or the caller closes it).
  */
-export default function CameraScanner({ onDetected, onClose }) {
+export default function CameraScanner({
+  onDetected,
+  onClose,
+  title = 'Scan with camera',
+  hint = 'It adds to the cart automatically — keep scanning, or press Done.',
+}) {
   const videoRef = useRef(null);
   const controlsRef = useRef(null);
   const lastRef = useRef({ code: null, at: 0 });
@@ -39,7 +47,7 @@ export default function CameraScanner({ onDetected, onClose }) {
 
     async function start() {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setError('This browser/device has no camera access available. Use the scanner or type the SKU instead.');
+        setError('This browser/device has no camera access available. Use a barcode scanner or type the code instead. (A phone browser needs the site on https.)');
         return;
       }
 
@@ -55,6 +63,8 @@ export default function CameraScanner({ onDetected, onClose }) {
             const now = Date.now();
 
             if (lastRef.current.code === code && now - lastRef.current.at < DUPLICATE_SUPPRESS_MS) {
+              // Still in view: keep the window open, don't count it again.
+              lastRef.current.at = now;
               return;
             }
 
@@ -76,10 +86,10 @@ export default function CameraScanner({ onDetected, onClose }) {
 
         const name = err && err.name;
         const message = name === 'NotAllowedError'
-          ? 'Camera permission was denied. Allow camera access and try again, or use the scanner/manual entry instead.'
+          ? 'Camera permission was denied. Allow camera access (in the app: Android Settings → Apps → 5Star Spices → Permissions → Camera) and try again, or type the code instead.'
           : name === 'NotFoundError'
-            ? 'No camera was found on this device. Use the scanner or type the SKU instead.'
-            : 'Could not start the camera. Use the scanner or type the SKU instead.';
+            ? 'No camera was found on this device. Use a barcode scanner or type the code instead.'
+            : 'Could not start the camera. Close other apps using it, then try again — or type the code instead.';
 
         setError(message);
       }
@@ -108,30 +118,30 @@ export default function CameraScanner({ onDetected, onClose }) {
   }, []);
 
   return (
-    <div className="till-overlay" role="dialog" aria-modal="true">
-      <div className="till-camera-sheet">
-        <div className="till-camera-sheet__header">
-          <h2>Scan with camera</h2>
-          <button type="button" className="till-icon-btn" aria-label="Close camera" onClick={onClose}>×</button>
+    <div className="cam-overlay" role="dialog" aria-modal="true">
+      <div className="cam-sheet">
+        <div className="cam-sheet__header">
+          <h2>{title}</h2>
+          <button type="button" className="cam-close" aria-label="Close camera" onClick={onClose}>×</button>
         </div>
 
         {error ? (
-          <div className="till-alert till-alert--danger till-camera-sheet__error">{error}</div>
+          <div className="cam-error cam-sheet__error">{error}</div>
         ) : (
           <>
-            <div className="till-camera-viewport">
+            <div className="cam-viewport">
               {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-              <video ref={videoRef} className="till-camera-video" muted playsInline />
-              <div className="till-camera-reticle" />
-              {status === 'starting' && <div className="till-camera-sheet__status">Starting camera…</div>}
+              <video ref={videoRef} className="cam-video" muted playsInline />
+              <div className="cam-reticle" />
+              {status === 'starting' && <div className="cam-sheet__status">Starting camera…</div>}
             </div>
-            <p className="till-camera-sheet__hint">
-              Point the camera at a barcode. {lastSeen ? `Last scanned: ${lastSeen}` : 'It adds to the cart automatically — keep scanning, or press Done.'}
+            <p className="cam-sheet__hint">
+              Point the camera at a barcode. {lastSeen ? `Last scanned: ${lastSeen}` : hint}
             </p>
           </>
         )}
 
-        <button type="button" className="till-btn till-btn--block" onClick={onClose}>Done</button>
+        <button type="button" className="cam-done" onClick={onClose}>Done</button>
       </div>
     </div>
   );
