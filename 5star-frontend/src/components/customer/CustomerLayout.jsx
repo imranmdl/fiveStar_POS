@@ -105,6 +105,7 @@ function Footer({ categories }) {
           <Link to="/faq">FAQ</Link>
           <Link to="/page/privacy-policy">Privacy</Link>
           <Link to="/page/terms-of-service">Terms</Link>
+          <Link to="/admin">Staff sign-in</Link>
         </div>
         <div className="sf-footer__col">
           <div className="sf-footer__brand">
