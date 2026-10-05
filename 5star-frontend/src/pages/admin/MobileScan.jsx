@@ -687,6 +687,7 @@ export default function MobileScan() {
           hint={mode === 'scan'
             ? 'Point at a barcode — each scan adds to the list. Keep scanning, then press Done.'
             : 'Point at a barcode — the stock shows as soon as it reads.'}
+          continuous={mode === 'scan'}
           onDetected={(scanned) => (mode === 'scan' ? scanInward(scanned) : lookupStock(scanned))}
           onClose={() => { setCameraOpen(false); focusInput(); }}
         />
