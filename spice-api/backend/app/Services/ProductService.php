@@ -9,11 +9,13 @@ use App\Core\Database;
 use App\Core\Exceptions\HttpException;
 use App\Core\Exceptions\NotFoundException;
 use App\Core\Request;
+use App\Helpers\Barcode;
 use App\Helpers\Str;
 use App\Repositories\CategoryRepository;
 use App\Repositories\ProductAttributeRepository;
 use App\Repositories\ProductMediaRepository;
 use App\Repositories\ProductNutritionRepository;
+use App\Repositories\PriceChangeLogRepository;
 use App\Repositories\ProductRepository;
 use App\Repositories\ProductVariantOptionRepository;
 use App\Repositories\ProductVariantRepository;
@@ -61,6 +63,7 @@ final class ProductService
         private readonly Database $db,
         private readonly Config $config,
         private readonly ProductVariantOptionRepository $variantOptions,
+        private readonly PriceChangeLogRepository $priceLog,
     ) {
     }
 
@@ -438,7 +441,7 @@ final class ProductService
             entityName: 'product_variants',
             entityId: $variantId,
             action: 'create',
-            newValues: ['sku' => $data['sku'], 'weight_grams' => $data['weight_grams']],
+            newValues: ['sku' => $data['sku'] ?? '(generated)', 'weight_grams' => $data['weight_grams']],
             request: $request,
             notes: 'Product ' . $product['product_code']
         );
@@ -470,6 +473,28 @@ final class ProductService
 
         $this->db->transaction(function () use ($variant, $data, $productId, $actorId): void {
             $this->variants->update((int) $variant['id'], $data, $actorId);
+
+            // A selling-price change made here goes in the same price history
+            // as Purchase Inward and the Pricing screen, so Reports → price
+            // changes and the stock-audit view stay complete.
+            if (
+                array_key_exists('selling_price', $data)
+                && abs((float) $data['selling_price'] - (float) $variant['selling_price']) > 0.001
+            ) {
+                $this->priceLog->create([
+                    'product_variant_id' => (int) $variant['id'],
+                    'reference_type' => 'manual',
+                    'reference_id' => null,
+                    'old_selling_price' => number_format((float) $variant['selling_price'], 2, '.', ''),
+                    'new_selling_price' => number_format((float) $data['selling_price'], 2, '.', ''),
+                    'purchase_price' => null,
+                    'average_cost' => null,
+                    'decision' => 'manual',
+                    'pricing_rule_id' => null,
+                    'reason' => 'Edited on the product page',
+                    'performed_by' => $actorId,
+                ], $actorId);
+            }
 
             if (($data['is_default'] ?? 0) == 1) {
                 $this->variants->clearDefaultFlag($productId, (int) $variant['id']);
@@ -738,7 +763,18 @@ final class ProductService
     /** @param array<string, mixed> $variant */
     private function insertVariant(int $productId, array $variant, bool $forceDefault, ?int $actorId): int
     {
-        $sku = strtoupper(trim((string) $variant['sku']));
+        $sku = strtoupper(trim((string) ($variant['sku'] ?? '')));
+        $barcode = null;
+
+        // No SKU typed: generate a unique EAN-13 and use it as both SKU and
+        // barcode, exactly as Purchase Inward's "New item" does, so a pack
+        // made here scans at the counter and on inward like any other.
+        if ($sku === '') {
+            do {
+                $sku = Barcode::generateEan13();
+            } while ($this->variants->skuExists($sku) || $this->variants->barcodeExists($sku));
+            $barcode = $sku;
+        }
 
         if ($this->variants->skuExists($sku)) {
             throw new HttpException(
@@ -759,6 +795,7 @@ final class ProductService
         return $this->variants->create([
             'product_id' => $productId,
             'sku' => $sku,
+            'barcode' => $barcode,
             'variant_name' => $variant['variant_name'],
             'weight_grams' => (int) $variant['weight_grams'],
             'packed_weight_grams' => isset($variant['packed_weight_grams'])
