@@ -65,7 +65,7 @@ final class InventoryController extends BaseController
         $variant = $this->inventory->lookupVariantBySku($data['sku']);
 
         if ($variant === null) {
-            throw new NotFoundException('No pack size has that SKU.');
+            throw new NotFoundException('No item has that barcode or SKU yet. Add it with Mobile Scan or Purchase Inward → New item.');
         }
 
         return Response::success($variant, 'Pack size found');

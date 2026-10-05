@@ -137,15 +137,17 @@ export default function ScanInput({ onCode, onSearch, onPickMatch, feedback, dis
                 <button
                   type="button"
                   key={match.sku || index}
-                  className={`till-scan__result ${isPublished ? '' : 'till-scan__result--muted'}`}
+                  className="till-scan__result"
                   onClick={() => handlePick(match)}
                 >
                   <span className="till-scan__result-text">
                     <span className="till-scan__result-name">{match.product_name}</span>
                     <span className="till-scan__result-meta">{match.variant_name} · {match.sku}</span>
                     {!isPublished && (
+                      // Counter sales don't need the item to be on the website —
+                      // this is only a heads-up that it isn't online yet.
                       <span className="till-badge till-badge--muted">
-                        {match.product_status === 'archived' ? 'Unpublished' : 'Draft — not published'}
+                        {match.product_status === 'archived' ? 'Not on website' : 'Not on website yet'}
                       </span>
                     )}
                     {match.isDuplicate && (
