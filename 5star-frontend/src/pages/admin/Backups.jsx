@@ -110,6 +110,7 @@ function BackupsList({ refreshKey }) {
         {!backups && !error && <LoadingState />}
         {backups && backups.length === 0 && <EmptyState title="No backups yet" hint='Use "Create backup" above to make the first one.' />}
         {backups && backups.length > 0 && (
+          <div className="admin-table-scroll">
           <table className="admin-table">
             <thead>
               <tr>
@@ -146,6 +147,7 @@ function BackupsList({ refreshKey }) {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>
@@ -232,6 +234,7 @@ function CleanupTable({ table, selected, onToggleRow, onToggleTable }) {
         </button>
       </div>
       {open && (
+        <div className="admin-table-scroll">
         <table className="admin-table">
           <thead>
             <tr>
@@ -258,6 +261,7 @@ function CleanupTable({ table, selected, onToggleRow, onToggleTable }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );
