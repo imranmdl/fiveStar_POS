@@ -76,7 +76,11 @@ First deploy only — creates the administrator, then **delete all four**
 | `ADMIN_EMAIL` | Your email |
 | `ADMIN_PASSWORD` | A strong password |
 
-Messaging, when ready (copy the values from the Hostinger `.env`):
+Messaging — **needed for customers to receive OTP codes** (order
+confirmation, OTP sign-in). Without it `SMS_DRIVER` defaults to `log`: codes
+are written to `/data/storage/logs` and never texted, and the admin Dashboard
+shows a "Text messages are switched off" warning. Copy the values from the
+Hostinger `.env`:
 `SMS_DRIVER=http`, `SMS_ENDPOINT`, `SMS_API_KEY`, `SMS_SENDER_ID`,
 `SMS_DLT_TEMPLATE_ID`, and the `SMS_FIELD_*` names if your provider differs.
 Razorpay / Shiprocket keys only if you switch those drivers on.
@@ -89,6 +93,7 @@ Optional switches:
 | `RUN_SEEDS` | `false` | Seeds run automatically on an empty database only; `true` forces them |
 | `RUN_SCHEDULER` | `true` | Background scheduler every 60 s |
 | `RUN_PREFLIGHT` | `true` | Print the go-live report in the deploy log |
+| `OTP_EXPOSE_IN_RESPONSE` | `false` | **Testing only.** `true` shows OTP codes on screen instead of texting them. Never on a live shop. |
 | `VITE_BRAND_LOGO_URL` | old Hostinger logo URL | Header logo used by the React app (build-time) |
 | `ALLOW_DATA_RESET` | `false` | **Test stores only.** `true` enables Admin → Backups → *Reset data*, which permanently deletes chosen data (orders, customers, products…) after taking a full backup. Leave unset on a live shop. |
 

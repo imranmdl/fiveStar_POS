@@ -52,7 +52,7 @@ final class OtpService
     /**
      * Issue and dispatch a code.
      *
-     * @return array{reference_token:string, expires_in_seconds:int, resend_available_in_seconds:int, debug_otp:?string}
+     * @return array{reference_token:string, expires_in_seconds:int, resend_available_in_seconds:int, debug_otp:?string, delivery:string}
      */
     public function issue(
         string $mobile,
@@ -100,6 +100,9 @@ final class OtpService
             // Only populated when OTP_EXPOSE_IN_RESPONSE=true, which is intended
             // for local development and automated tests only.
             'debug_otp' => $this->config->get('auth.otp.expose_in_response', false) === true ? $code : null,
+            // 'not_sent' unless SMS_DRIVER=http (see bootstrap/container.php): the code went to a log file, not
+            // a phone — screens must not tell the customer "we have sent a code".
+            'delivery' => (string) $this->config->get('notifications.sms.driver', 'log') === 'http' ? 'sms' : 'not_sent',
         ];
     }
 

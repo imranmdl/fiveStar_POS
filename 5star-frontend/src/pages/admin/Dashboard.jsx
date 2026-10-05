@@ -38,6 +38,56 @@ function greeting() {
   return 'Good evening';
 }
 
+/**
+ * Setup problems that silently break customer flows — today: text messages.
+ * With SMS off, customers are told nothing (or, before this, wrongly told a
+ * code was sent) and can't confirm orders or sign in by OTP. Administrators
+ * only (GET /admin/settings); other roles just don't see it.
+ */
+function SetupWarnings() {
+  const [settings, setSettings] = useState(null);
+
+  useEffect(() => {
+    api.get('/admin/settings').then((response) => setSettings(response.data)).catch(() => setSettings(null));
+  }, []);
+
+  if (!settings) return null;
+  const warnings = [];
+
+  if (settings.sms_configured === false && !settings.otp_shown_on_screen) {
+    warnings.push(
+      <>
+        <b>Text messages are switched off.</b> Customers don&apos;t receive OTP codes, so they can&apos;t confirm orders or
+        sign in with OTP. Add your SMS provider on the server (<code>SMS_DRIVER=http</code> plus <code>SMS_ENDPOINT</code>,{' '}
+        <code>SMS_API_KEY</code>, <code>SMS_SENDER_ID</code>, <code>SMS_DLT_TEMPLATE_ID</code>) and redeploy.
+      </>,
+    );
+  }
+  if (settings.otp_shown_on_screen) {
+    warnings.push(
+      <>
+        <b>Test mode: OTP codes are shown on screen</b> instead of being texted. Remove <code>OTP_EXPOSE_IN_RESPONSE</code>{' '}
+        from the server before real customers use the shop.
+      </>,
+    );
+  }
+  if (warnings.length === 0) return null;
+
+  return (
+    <div className="dash-card dash-card--attention" style={{ marginBottom: 16 }}>
+      <div className="dash-card__header">Shop setup</div>
+      <ul className="attention-list">
+        {warnings.map((w, i) => (
+          <li key={i} className="attention-list__item" style={{ alignItems: 'flex-start', lineHeight: 1.45 }}>
+            <span className="attention-list__dot" style={{ marginTop: 6 }} />
+            <span className="attention-list__label">{w}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function AttentionPanel({ counts }) {
   const live = ATTENTION.filter(([key]) => Number(counts[key] || 0) > 0);
 
@@ -219,6 +269,7 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {user && user.role === 'administrator' && <SetupWarnings />}
       <AttentionPanel counts={data.needs_attention || {}} />
 
       <div className="dash-section-label">Today's Overview</div>

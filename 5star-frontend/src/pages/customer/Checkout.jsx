@@ -85,8 +85,15 @@ function OtpStep({ order, otp, onResend, onVerify, resending }) {
   return (
     <div className="sf-panel sf-center">
       <h1 className="sf-h1">Confirm your order</h1>
-      <p>Order <b>{order.order_number}</b>. We have sent a code to {(otp && otp.sent_to) || 'your mobile'}.</p>
-      {otp && otp.debug_otp && <div className="sf-status">Development mode: your code is <b>{otp.debug_otp}</b>.</div>}
+      {otp && otp.delivery === 'not_sent' && !otp.debug_otp ? (
+        <p>
+          Order <b>{order.order_number}</b>. We couldn&apos;t text you a code — this shop hasn&apos;t switched on text
+          messages yet. Please contact the shop for your code, or try again later.
+        </p>
+      ) : (
+        <p>Order <b>{order.order_number}</b>. We have sent a code to {(otp && otp.sent_to) || 'your mobile'}.</p>
+      )}
+      {otp && otp.debug_otp && <div className="sf-status">Test mode: your code is <b>{otp.debug_otp}</b>.</div>}
       <form className="sf-otp" onSubmit={handleSubmit}>
         {error && <div className="sf-error">{error}</div>}
         <label className="sf-field">
