@@ -104,6 +104,11 @@ ln -s "$DATA_DIR/storage" "$APP_DIR/storage"
 if ! mountpoint -q "$DATA_DIR" 2>/dev/null; then
     log "WARNING: $DATA_DIR is not a mounted volume. Uploaded images and logs"
     log "         will be lost on the next deploy. Attach a Railway volume at $DATA_DIR."
+    # Read by the app (admin Dashboard → Shop setup) so the warning is seen
+    # by the shop owner, not only in the deploy log.
+    export DATA_VOLUME_MOUNTED=false
+else
+    export DATA_VOLUME_MOUNTED=true
 fi
 
 fix_ownership() {

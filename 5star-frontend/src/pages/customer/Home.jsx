@@ -7,6 +7,7 @@ import {
 import { useStorefrontTheme } from '../../hooks/useStorefrontTheme';
 import BannerSlide from '../../components/BannerSlide';
 import ProductCard, { AddControl, ProductMedia, Rating } from '../../components/customer/ProductCard';
+import SafeImage from '../../components/customer/SafeImage';
 
 /** Colours for the offer cards under the banner, as in the design. */
 const OFFER_STYLES = [
@@ -85,9 +86,7 @@ function CategoryStrip({ categories }) {
       {categories.map((category, index) => (
         <Link key={category.slug} to={`/shop?category=${encodeURIComponent(category.slug)}`}>
           <span className="sf-catstrip__circle" style={{ background: CATEGORY_TINTS[index % CATEGORY_TINTS.length] }}>
-            {category.image_url
-              ? <img src={category.image_url} alt="" loading="lazy" />
-              : <span>{category.name.charAt(0)}</span>}
+            <SafeImage src={category.image_url} alt="" loading="lazy" fallback={<span>{category.name.charAt(0)}</span>} />
           </span>
           <span className="sf-catstrip__name">{category.name}</span>
         </Link>

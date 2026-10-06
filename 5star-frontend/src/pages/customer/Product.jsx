@@ -6,6 +6,7 @@ import {
   cardFromListItem, discountPercent, perHundredGrams, rememberViewed, rupees, tintFor, variantLabel,
 } from '../../lib/store';
 import ProductCard, { ProductMedia } from '../../components/customer/ProductCard';
+import SafeImage from '../../components/customer/SafeImage';
 
 const PIN_KEY = 'spice.pincode';
 
@@ -222,7 +223,7 @@ export default function Product() {
                     onMouseEnter={() => setImageIndex(index)}
                     aria-label={`Photo ${index + 1}`}
                   >
-                    <img src={item.url} alt="" />
+                    <SafeImage src={item.url} alt="" />
                   </button>
                 ))}
               </div>

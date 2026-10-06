@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useCart } from '../../hooks/useCart';
 import { rupees } from '../../lib/store';
+import SafeImage from './SafeImage';
 
 /**
  * Product picture tile. Shows the product photo when there is one; until the
@@ -9,8 +10,12 @@ import { rupees } from '../../lib/store';
 export function ProductMedia({ image, tint, label, className = '', children, style, alt = '' }) {
   return (
     <div className={`sf-media ${className}`} style={{ background: tint, ...style }}>
-      {image && <img src={image} alt={alt} loading="lazy" />}
-      {!image && label && <span className="sf-media__label">{label}</span>}
+      <SafeImage
+        src={image}
+        alt={alt}
+        loading="lazy"
+        fallback={label ? <span className="sf-media__label">{label}</span> : null}
+      />
       {children}
     </div>
   );

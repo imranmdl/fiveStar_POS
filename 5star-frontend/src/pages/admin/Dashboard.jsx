@@ -63,6 +63,25 @@ function SetupWarnings() {
       </>,
     );
   }
+  const storage = settings.image_storage;
+  if (storage && storage.product_images_missing > 0) {
+    warnings.push(
+      <>
+        <b>{storage.product_images_missing} of {storage.product_images} product photos are missing</b>, so they show as blank
+        tiles on the shop.{' '}
+        {storage.volume_mounted === false
+          ? <>Uploaded files are wiped on every deploy because the server has no storage volume. In Railway, open the app service → <b>Settings → Volumes → Add volume</b>, mount path <code>/data</code>, redeploy, then upload the photos again (Products → edit each product).</>
+          : <>Upload the photos again from Products → edit each product.</>}
+      </>,
+    );
+  } else if (storage && storage.volume_mounted === false) {
+    warnings.push(
+      <>
+        <b>Uploaded photos will be lost on the next deploy.</b> The server has no storage volume — in Railway add a volume
+        mounted at <code>/data</code> (app service → Settings → Volumes) before uploading product photos.
+      </>,
+    );
+  }
   if (settings.otp_shown_on_screen) {
     warnings.push(
       <>
