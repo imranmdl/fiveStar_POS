@@ -13701,6 +13701,114 @@
                 }
             }
         },
+        "/api/v1/admin/referrals/settings": {
+            "get": {
+                "operationId": "walletControllerAdminReferralSettings",
+                "tags": [
+                    "Admin: Referrals"
+                ],
+                "summary": "Refer & earn rules: wallet credit for the referrer and the new customer, the minimum first order that qualifies, and how long the credit lasts.",
+                "description": "Requires one of these roles: administrator.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "walletControllerUpdateReferralSettings",
+                "tags": [
+                    "Admin: Referrals"
+                ],
+                "summary": "Change the refer & earn rules. Send only the fields to change. New amounts apply to referrals that qualify from now on.",
+                "description": "Requires one of these roles: administrator.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "referrer_reward": {
+                                        "maximum": 100000,
+                                        "minimum": 0,
+                                        "type": "number"
+                                    },
+                                    "referee_reward": {
+                                        "maximum": 100000,
+                                        "minimum": 0,
+                                        "type": "number"
+                                    },
+                                    "min_order_value": {
+                                        "maximum": 10000000,
+                                        "minimum": 0,
+                                        "type": "number"
+                                    },
+                                    "reward_expiry_days": {
+                                        "maximum": 3650,
+                                        "minimum": 0,
+                                        "type": "integer"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            }
+        },
         "/api/v1/admin/referrals/{uuid}/cancel": {
             "post": {
                 "operationId": "walletControllerAdminCancelReferral",
@@ -16908,6 +17016,107 @@
                 }
             }
         },
+        "/api/v1/admin/wallet/settings": {
+            "get": {
+                "operationId": "walletControllerAdminWalletSettings",
+                "tags": [
+                    "Admin: Wallet"
+                ],
+                "summary": "Rules for spending wallet credit at checkout: on/off, the most of an order it may cover (%), and the smallest amount that can be used.",
+                "description": "Requires one of these roles: administrator.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "walletControllerUpdateWalletSettings",
+                "tags": [
+                    "Admin: Wallet"
+                ],
+                "summary": "Change the wallet spending rules. Send only the fields to change.",
+                "description": "Requires one of these roles: administrator.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "enabled": {
+                                        "type": "boolean"
+                                    },
+                                    "max_redeem_percent": {
+                                        "maximum": 100,
+                                        "minimum": 0,
+                                        "type": "number"
+                                    },
+                                    "min_redeem_amount": {
+                                        "maximum": 100000,
+                                        "minimum": 0,
+                                        "type": "number"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            }
+        },
         "/api/v1/admin/wallet/transactions": {
             "get": {
                 "operationId": "walletControllerAdminTransactions",
@@ -17838,7 +18047,7 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Sign in with a number verified by the phone.email button. Send the user_json_url it returns; the server reads the verified number from phone.email. Creates a customer account when the number is new.",
+                "summary": "Sign in with a number verified by the phone.email button. Send the user_json_url it returns; the server reads the verified number from phone.email. Creates a customer account when the number is new; an optional `referral_code` (from a share link) is recorded for that new account.",
                 "description": "Rate limited to 10 requests per 600 seconds.",
                 "requestBody": {
                     "required": true,
@@ -17849,6 +18058,10 @@
                                 "properties": {
                                     "user_json_url": {
                                         "maxLength": 300,
+                                        "type": "string"
+                                    },
+                                    "referral_code": {
+                                        "maxLength": 40,
                                         "type": "string"
                                     }
                                 },

@@ -26,6 +26,8 @@ import AccessControl from '../pages/admin/AccessControl';
 import StockAudit from '../pages/admin/StockAudit';
 import CustomerDues from '../pages/admin/CustomerDues';
 import Backups from '../pages/admin/Backups';
+import Loyalty from '../pages/admin/Loyalty';
+import Referrals from '../pages/admin/Referrals';
 
 /**
  * Admin console routes, rendered inside AdminLayout. The sidebar (see
@@ -54,7 +56,8 @@ export const adminRoutes = [
   { path: 'reports', element: <Reports /> },
 
   // Reachable by direct URL only (not in the sidebar), same as live admin/console.js.
-  { path: 'loyalty', element: <ComingSoon title="Loyalty" note="Porting from admin/assets/page-loyalty.js" /> },
+  { path: 'loyalty', element: <Loyalty /> },
+  { path: 'referrals', element: <Referrals /> },
   { path: 'marketing', element: <ComingSoon title="Marketing" note="Porting from admin/assets/page-marketing.js" /> },
   { path: 'cashiers', element: <Cashiers /> },
   { path: 'customer-dues', element: <CustomerDues /> },

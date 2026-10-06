@@ -573,6 +573,63 @@ final class WalletService
         return $result;
     }
 
+    /**
+     * Rules for spending wallet credit at checkout, as the admin edits them.
+     *
+     * @return array<string, mixed>
+     */
+    public function settingsForAdmin(): array
+    {
+        return [
+            'enabled' => $this->redemptionEnabled(),
+            'max_redeem_percent' => $this->maxRedeemPercent(),
+            'min_redeem_amount' => (float) $this->minRedeemAmount()->toDecimal(),
+        ];
+    }
+
+    /**
+     * Partial update — only the keys present in the request body change.
+     *
+     * @param array<string, mixed> $data Validated input
+     *
+     * @return array<string, mixed>
+     */
+    public function updateSettings(array $data, Request $request): array
+    {
+        $raw = $request->all();
+        $old = $this->settingsForAdmin();
+        $changes = [];
+
+        if (array_key_exists('enabled', $raw) && $data['enabled'] !== null) {
+            $changes['wallet_enabled'] = (bool) $data['enabled'] ? '1' : '0';
+        }
+        if (array_key_exists('max_redeem_percent', $raw) && $data['max_redeem_percent'] !== null) {
+            $changes['wallet_max_redeem_percent'] = number_format((float) $data['max_redeem_percent'], 2, '.', '');
+        }
+        if (array_key_exists('min_redeem_amount', $raw) && $data['min_redeem_amount'] !== null) {
+            $changes['wallet_min_redeem_amount'] = number_format((float) $data['min_redeem_amount'], 2, '.', '');
+        }
+
+        if ($changes === []) {
+            throw new HttpException('No changes were supplied.', 422);
+        }
+
+        foreach ($changes as $key => $value) {
+            $this->settings->put($key, $value, $request->authUserId());
+        }
+
+        $this->audit->log(
+            entityName: 'settings',
+            entityId: null,
+            action: 'wallet_settings_update',
+            oldValues: $old,
+            newValues: $changes,
+            request: $request,
+        );
+
+        return $this->settingsForAdmin();
+    }
+
     private function redemptionEnabled(): bool
     {
         return $this->settings->boolValue('wallet_enabled', true);

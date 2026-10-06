@@ -4,6 +4,7 @@ import { api, formatMoney, ApiError } from '../../lib/api';
 import { EmptyState, ErrorState, LoadingState } from '../../components/admin/shared';
 import { toast } from '../../components/admin/toast';
 import './Wallets.css';
+import WalletRules from './WalletRules';
 
 /**
  * Wallets — a customer's balance, their full ledger, and the admin actions on
@@ -633,6 +634,8 @@ function WalletsPage() {
       </div>
 
       <DashboardTiles onOpenTile={setDrilldown} />
+
+      <WalletRules />
 
       {resolving ? (
         <LoadingState />

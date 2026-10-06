@@ -278,6 +278,65 @@ final class WalletController extends BaseController
         return $this->paginated($result['items'], $result['total'], $params, 'Referrals loaded');
     }
 
+    /**
+     * GET /api/v1/admin/referrals/settings
+     *
+     * Refer & earn rules: wallet credit for the referrer and the new customer, the minimum first order that qualifies, and how long the credit lasts.
+     */
+    public function adminReferralSettings(Request $request): Response
+    {
+        return Response::success(['settings' => $this->referrals->settingsForAdmin()], 'Referral settings loaded');
+    }
+
+    /**
+     * PATCH /api/v1/admin/referrals/settings
+     *
+     * Change the refer & earn rules. Send only the fields to change. New amounts apply to referrals that qualify from now on.
+     */
+    public function updateReferralSettings(Request $request): Response
+    {
+        $data = Validator::make($request->all(), [
+            'referrer_reward' => 'nullable|numeric|min:0|max:100000',
+            'referee_reward' => 'nullable|numeric|min:0|max:100000',
+            'min_order_value' => 'nullable|numeric|min:0|max:10000000',
+            'reward_expiry_days' => 'nullable|int|min:0|max:3650',
+        ]);
+
+        return Response::success(
+            ['settings' => $this->referrals->updateSettings($data, $request)],
+            'Referral settings saved'
+        );
+    }
+
+    /**
+     * GET /api/v1/admin/wallet/settings
+     *
+     * Rules for spending wallet credit at checkout: on/off, the most of an order it may cover (%), and the smallest amount that can be used.
+     */
+    public function adminWalletSettings(Request $request): Response
+    {
+        return Response::success(['settings' => $this->wallet->settingsForAdmin()], 'Wallet settings loaded');
+    }
+
+    /**
+     * PATCH /api/v1/admin/wallet/settings
+     *
+     * Change the wallet spending rules. Send only the fields to change.
+     */
+    public function updateWalletSettings(Request $request): Response
+    {
+        $data = Validator::make($request->all(), [
+            'enabled' => 'nullable|boolean',
+            'max_redeem_percent' => 'nullable|numeric|min:0|max:100',
+            'min_redeem_amount' => 'nullable|numeric|min:0|max:100000',
+        ]);
+
+        return Response::success(
+            ['settings' => $this->wallet->updateSettings($data, $request)],
+            'Wallet settings saved'
+        );
+    }
+
     /** POST /api/v1/admin/referrals/{uuid}/qualify */
     public function adminQualifyReferral(Request $request): Response
     {

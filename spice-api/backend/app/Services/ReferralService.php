@@ -43,6 +43,10 @@ final class ReferralService
         private readonly Database $db,
         private readonly Config $config,
         private readonly Logger $logger,
+        // payout() awards the referrer's bonus loyalty points. Missing from
+        // the constructor before, which made every referral payout — and so
+        // the referred customer's first payment confirmation — fail.
+        private readonly LoyaltyService $loyalty,
     ) {
     }
 
@@ -448,6 +452,72 @@ final class ReferralService
             'rewarded_date' => $row['rewarded_date'],
             'created_date' => $row['created_date'],
         ];
+    }
+
+    /**
+     * Refer & earn rules as the admin edits them.
+     *
+     * @return array<string, mixed>
+     */
+    public function settingsForAdmin(): array
+    {
+        $minimum = $this->minimumOrderValue();
+
+        return [
+            'referrer_reward' => (float) $this->referrerReward()->toDecimal(),
+            'referee_reward' => (float) $this->refereeReward()->toDecimal(),
+            'min_order_value' => $minimum === null ? 0.0 : (float) $minimum->toDecimal(),
+            'reward_expiry_days' => $this->rewardExpiryDays(),
+        ];
+    }
+
+    /**
+     * Partial update — only the keys present in the request body change.
+     * New amounts apply to referrals that qualify from now on; rewards already
+     * paid are untouched.
+     *
+     * @param array<string, mixed> $data Validated input
+     *
+     * @return array<string, mixed>
+     */
+    public function updateSettings(array $data, Request $request): array
+    {
+        $map = [
+            'referrer_reward' => 'referral_referrer_reward',
+            'referee_reward' => 'referral_referee_reward',
+            'min_order_value' => 'referral_min_order_value',
+            'reward_expiry_days' => 'referral_reward_expiry_days',
+        ];
+        $raw = $request->all();
+        $old = $this->settingsForAdmin();
+        $changes = [];
+
+        foreach ($map as $inputKey => $settingKey) {
+            if (!array_key_exists($inputKey, $raw) || $data[$inputKey] === null) {
+                continue;
+            }
+
+            $value = $inputKey === 'reward_expiry_days'
+                ? (string) (int) $data[$inputKey]
+                : number_format((float) $data[$inputKey], 2, '.', '');
+            $this->settings->put($settingKey, $value, $request->authUserId());
+            $changes[$settingKey] = $value;
+        }
+
+        if ($changes === []) {
+            throw new HttpException('No changes were supplied.', 422);
+        }
+
+        $this->audit->log(
+            entityName: 'settings',
+            entityId: null,
+            action: 'referral_settings_update',
+            oldValues: $old,
+            newValues: $changes,
+            request: $request,
+        );
+
+        return $this->settingsForAdmin();
     }
 
     private function referrerReward(): Money

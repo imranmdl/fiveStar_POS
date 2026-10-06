@@ -58,6 +58,8 @@ const NAV_GROUPS = [
     section: 'Customers & Support',
     items: [
       ['/admin/customers', 'Customers', 'Who buys, and how to reach them'],
+      ['/admin/loyalty', 'Loyalty Points', 'Earn and redeem rules, customer points'],
+      ['/admin/referrals', 'Refer & Earn', 'Referral rewards and referrals'],
       ['/admin/support', 'Support', 'Customer tickets'],
       ['/admin/reviews', 'Reviews', 'Moderation queue'],
     ],
