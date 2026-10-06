@@ -70,6 +70,7 @@ const EMPTY_FORM = {
   start_date: '',
   end_date: '',
   alt_text: '',
+  layout: 'split',
 };
 
 function flattenCategories(list, depth = 0) {
@@ -116,6 +117,7 @@ export default function ContentBanners() {
   const [removeImage, setRemoveImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef(null);
+  const mobileInputRef = useRef(null);
   const choicesCache = useRef({});
   const pendingLink = useRef(null);
 
@@ -210,6 +212,7 @@ export default function ContentBanners() {
     setImagePreview(null);
     setRemoveImage(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (mobileInputRef.current) mobileInputRef.current.value = '';
   }
 
   function startEdit(banner) {
@@ -229,10 +232,12 @@ export default function ContentBanners() {
       start_date: String(banner.schedule?.start_date || '').slice(0, 10),
       end_date: String(banner.schedule?.end_date || '').slice(0, 10),
       alt_text: banner.alt_text || '',
+      layout: banner.layout || 'split',
     });
     setImagePreview(null);
     setRemoveImage(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (mobileInputRef.current) mobileInputRef.current.value = '';
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -265,6 +270,7 @@ export default function ContentBanners() {
       promo_code: form.promo_code.toUpperCase(),
       bg_color: form.bg_color,
       text_color: form.text_color,
+      layout: form.layout,
       placement: form.placement,
       link_type: type,
       link_value: type === 'url' ? linkUrl.trim() : (type === 'none' ? '' : linkValue),
@@ -283,9 +289,11 @@ export default function ContentBanners() {
           if (patch[k] === '') patch[k] = null;
         });
         await api.patch(`/admin/banners/${encodeURIComponent(editing.uuid)}`, patch);
-        if (file) {
+        const mobileFile = mobileInputRef.current?.files[0];
+        if (file || mobileFile) {
           const body = new FormData();
-          body.append('image', file);
+          if (file) body.append('image', file);
+          if (mobileFile) body.append('mobile_image', mobileFile);
           await api.upload(`/admin/banners/${encodeURIComponent(editing.uuid)}/image`, body);
         } else if (removeImage && editing.image_url) {
           await api.delete(`/admin/banners/${encodeURIComponent(editing.uuid)}/image`);
@@ -297,6 +305,8 @@ export default function ContentBanners() {
           if (value !== '' && value !== null) body.append(key, value);
         });
         if (file) body.append('image', file);
+        const mobileFile = mobileInputRef.current?.files[0];
+        if (mobileFile) body.append('mobile_image', mobileFile);
         await api.upload('/admin/banners', body);
         toast('Banner added.');
       }
@@ -532,14 +542,36 @@ export default function ContentBanners() {
             </div>
 
             <div className="content-field">
+              <label htmlFor="b_layout">Layout</label>
+              <select id="b_layout" value={form.layout} onChange={set('layout')}>
+                <option value="split">Text panel + photo</option>
+                <option value="image">Picture only — my image already has the text</option>
+              </select>
+              <div className="content-hint">
+                {form.layout === 'image'
+                  ? 'The whole image is shown, never cut off, on every screen. Use a wide image (about 1600×600) and, for phones, a taller one below (about 1080×1080).'
+                  : 'The headline, text and button are drawn by the shop; the photo sits beside them (above them on phones).'}
+              </div>
+            </div>
+
+            <div className="content-field">
               <label htmlFor="b_image">Photo (optional)</label>
               <input id="b_image" type="file" accept="image/jpeg,image/png,image/webp" ref={fileInputRef} onChange={onPickImage} />
-              <div className="content-hint">Shown on the right of the banner. Roughly 1200×800 works well. Without one, the banner is the coloured panel only.</div>
+              <div className="content-hint">{form.layout === 'image' ? 'Required for a picture-only banner.' : 'Shown on the right of the banner. Roughly 1200×800 works well. Without one, the banner is the coloured panel only.'}</div>
               {editing && editing.image_url && !imagePreview && (
                 <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontWeight: 500, marginTop: 6 }}>
                   <input type="checkbox" checked={removeImage} onChange={(e) => setRemoveImage(e.target.checked)} /> Remove the current photo
                 </label>
               )}
+            </div>
+
+            <div className="content-field">
+              <label htmlFor="b_mobile_image">Phone photo (optional)</label>
+              <input id="b_mobile_image" type="file" accept="image/jpeg,image/png,image/webp" ref={mobileInputRef} />
+              <div className="content-hint">
+                Shown on phones instead of the photo above. Square or tall works best (about 1080×1080).
+                {editing && editing.mobile_image_url && editing.mobile_image_url !== editing.image_url ? ' A phone photo is already set — choose a file to replace it.' : ''}
+              </div>
             </div>
 
             <div className="content-field">

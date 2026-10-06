@@ -54,6 +54,7 @@ final class BannerService
             'promo_code' => $row['promo_code'],
             'bg_color' => $row['bg_color'],
             'text_color' => $row['text_color'],
+            'layout' => $row['layout'] ?? 'split',
         ], $banners);
     }
 
@@ -93,6 +94,7 @@ final class BannerService
                 'promo_code' => $data['promo_code'] ?? null,
                 'bg_color' => strtolower((string) ($data['bg_color'] ?? '#2a2829')),
                 'text_color' => strtolower((string) ($data['text_color'] ?? '#ffffff')),
+                'layout' => ($data['layout'] ?? 'split') === 'image' ? 'image' : 'split',
                 'mobile_image_path' => $mobile['file_path'] ?? null,
                 'alt_text' => $data['alt_text'] ?? $data['title'],
                 'placement' => $data['placement'],
@@ -146,7 +148,7 @@ final class BannerService
         $changes = array_intersect_key($data, array_flip([
             'title', 'subtitle', 'alt_text', 'placement', 'link_type', 'link_value',
             'cta_label', 'display_order', 'start_date', 'end_date', 'is_active',
-            'eyebrow', 'promo_code', 'bg_color', 'text_color',
+            'eyebrow', 'promo_code', 'bg_color', 'text_color', 'layout',
         ]));
 
         foreach (['bg_color', 'text_color'] as $colorField) {
@@ -199,13 +201,14 @@ final class BannerService
      *
      * @return array<string, mixed>
      */
-    public function replaceImage(string $uuid, array $file, Request $request): array
+    public function replaceImage(string $uuid, array $file, Request $request, bool $mobile = false): array
     {
         $banner = $this->requireBanner($uuid);
         $stored = $this->uploads->storeImage($file, 'banners');
+        $column = $mobile ? 'mobile_image_path' : 'image_path';
 
-        $this->banners->update((int) $banner['id'], ['image_path' => $stored['file_path']], $request->authUserId());
-        $this->uploads->delete($banner['image_path']);
+        $this->banners->update((int) $banner['id'], [$column => $stored['file_path']], $request->authUserId());
+        $this->uploads->delete($banner[$column]);
 
         $this->audit->log(
             entityName: 'banners',
@@ -362,6 +365,7 @@ final class BannerService
             'promo_code' => $row['promo_code'] ?? null,
             'bg_color' => $row['bg_color'] ?? '#2a2829',
             'text_color' => $row['text_color'] ?? '#ffffff',
+            'layout' => $row['layout'] ?? 'split',
             'display_order' => (int) $row['display_order'],
             'schedule' => ['start_date' => $row['start_date'], 'end_date' => $row['end_date']],
             'stats' => [

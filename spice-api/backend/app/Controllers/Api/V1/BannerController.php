@@ -66,6 +66,7 @@ final class BannerController extends BaseController
             'promo_code' => 'nullable|string|max:40',
             'bg_color' => 'nullable|string|max:7',
             'text_color' => 'nullable|string|max:7',
+            'layout' => 'nullable|in:split,image',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date',
         ]);
@@ -101,6 +102,7 @@ final class BannerController extends BaseController
             'promo_code' => 'nullable|string|max:40',
             'bg_color' => 'nullable|string|max:7',
             'text_color' => 'nullable|string|max:7',
+            'layout' => 'nullable|in:split,image',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date',
             'is_active' => 'nullable|boolean',
@@ -119,17 +121,30 @@ final class BannerController extends BaseController
     }
 
     /** DELETE /api/v1/admin/banners/{uuid} */
-    /** POST /api/v1/admin/banners/{uuid}/image — multipart field `image`. */
+    /**
+     * POST /api/v1/admin/banners/{uuid}/image
+     *
+     * Upload or replace banner artwork: multipart field `image` (wide / desktop) and/or `mobile_image` (shown on phones).
+     */
     public function replaceImage(Request $request): Response
     {
-        if (!isset($request->files['image'])) {
+        $uuid = (string) $request->routeParam('uuid');
+        $wide = $request->files['image'] ?? null;
+        $phone = $request->files['mobile_image'] ?? null;
+
+        if ($wide === null && $phone === null) {
             throw new HttpException('Choose an image to upload.', 422, ['image' => ['Upload the banner image.']]);
         }
 
-        return Response::success(
-            ['banner' => $this->banners->replaceImage((string) $request->routeParam('uuid'), $request->files['image'], $request)],
-            'Banner image saved'
-        );
+        $banner = null;
+        if ($wide !== null) {
+            $banner = $this->banners->replaceImage($uuid, $wide, $request);
+        }
+        if ($phone !== null) {
+            $banner = $this->banners->replaceImage($uuid, $phone, $request, mobile: true);
+        }
+
+        return Response::success(['banner' => $banner], 'Banner image saved');
     }
 
     /** DELETE /api/v1/admin/banners/{uuid}/image — back to a text banner. */
