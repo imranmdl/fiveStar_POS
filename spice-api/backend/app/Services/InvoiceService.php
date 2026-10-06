@@ -9,6 +9,7 @@ use App\Core\Exceptions\HttpException;
 use App\Core\Exceptions\NotFoundException;
 use App\Core\Request;
 use App\Repositories\CommunicationLogRepository;
+use App\Repositories\InvoiceRegisterRepository;
 use App\Repositories\PosSaleRepository;
 use App\Repositories\SettingRepository;
 use App\Repositories\UserRepository;
@@ -69,13 +70,33 @@ final class InvoiceService
         private readonly UserRepository $users,
         private readonly Config $config,
         private readonly SmsGatewayInterface $smsGateway,
+        private readonly InvoiceRegisterRepository $register,
     ) {
     }
 
     /** @return array<string, mixed> */
     public function summary(): array
     {
-        return $this->sales->invoiceSummary(PosDuePaymentService::overdueAfterDays());
+        $pos = $this->sales->invoiceSummary(PosDuePaymentService::overdueAfterDays());
+        $online = $this->register->onlineSummary();
+
+        // The cards show both channels together; the split is kept for the
+        // "Shop / Online" breakdown. Partially paid and overdue balances only
+        // exist on till credit sales.
+        return [
+            'total' => $pos['total'] + $online['total'],
+            'paid' => $pos['paid'] + $online['paid'],
+            'partial' => $pos['partial'],
+            'unpaid' => $pos['unpaid'] + $online['unpaid'],
+            'overdue' => $pos['overdue'],
+            'refunded' => $pos['refunded'] + $online['refunded'],
+            'cancelled' => $pos['cancelled'] + $online['cancelled'],
+            'todays_revenue' => number_format((float) $pos['todays_revenue'] + $online['todays_revenue'], 2, '.', ''),
+            'by_channel' => [
+                'pos' => $pos,
+                'online' => $online,
+            ],
+        ];
     }
 
     /**
@@ -90,7 +111,8 @@ final class InvoiceService
             $filters['overdue_days'] = PosDuePaymentService::overdueAfterDays();
         }
 
-        return $this->sales->searchInvoices($filters, $params);
+        // Both channels: till sales and confirmed online orders.
+        return $this->register->search($filters, $params);
     }
 
     /** @return array<string, mixed> */
@@ -316,7 +338,7 @@ final class InvoiceService
             $filters['overdue_days'] = PosDuePaymentService::overdueAfterDays();
         }
 
-        return $this->sales->searchInvoices($filters, $params)['items'];
+        return $this->register->search($filters, $params)['items'];
     }
 
     // -------------------------------------------------------------------

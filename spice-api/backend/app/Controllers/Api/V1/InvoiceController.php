@@ -31,13 +31,18 @@ final class InvoiceController extends BaseController
         return Response::success($this->invoices->summary(), 'Summary loaded');
     }
 
-    /** GET /api/v1/admin/invoices */
+    /**
+     * GET /api/v1/admin/invoices
+     *
+     * Invoices from both the till and online orders (confirmed ones), newest first. `channel` = all (default), pos or online. Each row has `channel`; online rows also carry `order_number`.
+     */
     public function index(Request $request): Response
     {
         $filters = Validator::make($request->all(), [
             'search' => 'nullable|string|max:150',
-            'payment_status' => 'nullable|in:unpaid,partial,paid',
-            'payment_method' => 'nullable|in:cash,upi,card,other',
+            'payment_status' => 'nullable|in:unpaid,partial,paid,refunded',
+            'payment_method' => 'nullable|in:cash,upi,card,other,cod',
+            'channel' => 'nullable|in:all,pos,online',
             'customer_uuid' => 'nullable|uuid',
             'overdue_only' => 'nullable|boolean',
             'from' => 'nullable|date',
@@ -57,8 +62,9 @@ final class InvoiceController extends BaseController
     {
         $filters = Validator::make($request->all(), [
             'search' => 'nullable|string|max:150',
-            'payment_status' => 'nullable|in:unpaid,partial,paid',
-            'payment_method' => 'nullable|in:cash,upi,card,other',
+            'payment_status' => 'nullable|in:unpaid,partial,paid,refunded',
+            'payment_method' => 'nullable|in:cash,upi,card,other,cod',
+            'channel' => 'nullable|in:all,pos,online',
             'overdue_only' => 'nullable|boolean',
             'from' => 'nullable|date',
             'to' => 'nullable|date',
@@ -71,7 +77,8 @@ final class InvoiceController extends BaseController
         $rows = $this->invoices->exportRows($filters);
 
         $columns = [
-            'sale_number' => 'Invoice Number', 'customer_name' => 'Customer', 'customer_mobile' => 'Phone',
+            'channel' => 'Channel', 'sale_number' => 'Invoice Number', 'order_number' => 'Order Number',
+            'customer_name' => 'Customer', 'customer_mobile' => 'Phone',
             'created_date' => 'Date', 'grand_total' => 'Total', 'amount_paid' => 'Paid',
             'balance_due' => 'Remaining', 'discount_amount' => 'Discount', 'payment_method' => 'Payment Method',
             'payment_status' => 'Status',

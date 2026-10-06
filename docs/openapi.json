@@ -7721,7 +7721,7 @@
                 "tags": [
                     "Admin: Invoices"
                 ],
-                "summary": "Index",
+                "summary": "Invoices from both the till and online orders (confirmed ones), newest first. `channel` = all (default), pos or online. Each row has `channel`; online rows also carry `order_number`.",
                 "description": "Requires one of these roles: administrator, supervisor, manager, cashier.",
                 "parameters": [
                     {

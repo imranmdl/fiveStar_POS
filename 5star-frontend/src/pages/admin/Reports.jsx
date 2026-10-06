@@ -52,7 +52,7 @@ function DailyTable({ series }) {
       <table className="admin-table">
         <thead>
           <tr>
-            <th>Date</th><th>Orders</th><th>Taken</th><th>Of which GST</th>
+            <th>Date</th><th>Orders</th><th>Online</th><th>Shop</th><th>Taken</th><th>Of which GST</th>
             <th>Discounts</th><th>Delivery</th><th>Refunded</th><th>Yours</th>
           </tr>
         </thead>
@@ -65,6 +65,8 @@ function DailyTable({ series }) {
               <tr key={row.date}>
                 <td style={{ fontWeight: 600 }}>{row.date}</td>
                 <td>{row.orders}</td>
+                <td className="reports-muted">{money(row.online_sales)}{Number(row.online_orders) > 0 ? ` (${row.online_orders})` : ''}</td>
+                <td className="reports-muted">{money(row.pos_sales)}{Number(row.pos_orders) > 0 ? ` (${row.pos_orders})` : ''}</td>
                 <td>{money(row.gross_sales)}</td>
                 <td className="reports-muted">{money(row.tax_collected)}</td>
                 <td className="reports-muted">{money(row.discount_given)}</td>
@@ -283,6 +285,10 @@ export default function Reports() {
   const refunded = total(series, 'refunded');
   const orders = total(series, 'orders');
   const kept = taken - tax - refunded;
+  const onlineSales = total(series, 'online_sales');
+  const shopSales = total(series, 'pos_sales');
+  const onlineOrders = total(series, 'online_orders');
+  const shopOrders = total(series, 'pos_orders');
 
   return (
     <div>
@@ -324,6 +330,8 @@ export default function Reports() {
             <div className="reports-clickable" onClick={() => openDrilldown('cash-money-in')}>
               <StatCard label="Money in" value={money(taken)} hint={`${orders} order(s)`} />
             </div>
+            <StatCard label="Online orders" value={money(onlineSales)} hint={`${onlineOrders} order(s)`} />
+            <StatCard label="Shop (till) sales" value={money(shopSales)} hint={`${shopOrders} sale(s)`} />
             <div className="reports-clickable" onClick={() => openDrilldown('cash-gst')}>
               <StatCard label="GST collected" value={money(tax)} hint="held for the government" />
             </div>
@@ -393,8 +401,9 @@ export default function Reports() {
       </div>
 
       <p className="reports-muted">
-        Only confirmed, non-cancelled orders count. An order placed but never paid for is not revenue
-        and never appears here. Counter-sale figures above exclude voided sales.
+        Figures cover both online orders and shop (till) sales. An online order counts from the day it is
+        confirmed — or placed, while it waits for payment; unpaid orders are cancelled automatically when
+        their payment window closes and then drop out. Voided till sales are never counted.
       </p>
 
       {drilldownKind && <TodayDrilldownModal kind={drilldownKind} onClose={() => setDrilldownKind(null)} />}

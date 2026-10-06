@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, formatMoney, ApiError } from '../../lib/api';
 import { EmptyState, ErrorState, LoadingState, StatCard, StatusBadge } from '../../components/admin/shared';
 import { toast } from '../../components/admin/toast';
@@ -10,7 +11,7 @@ function money(value) {
 }
 
 function statusLabel(status) {
-  return { unpaid: 'Unpaid', partial: 'Partially Paid', paid: 'Paid' }[status] || status;
+  return { unpaid: 'Unpaid', partial: 'Partially Paid', paid: 'Paid', refunded: 'Refunded' }[status] || status;
 }
 
 function CustomerCell({ row }) {
@@ -29,7 +30,19 @@ function CustomerCell({ row }) {
   );
 }
 
-const EMPTY_FILTERS = { search: '', payment_status: '', payment_method: '', from: '', to: '', amount_min: '', amount_max: '' };
+const EMPTY_FILTERS = { channel: '', search: '', payment_status: '', payment_method: '', from: '', to: '', amount_min: '', amount_max: '' };
+
+const CHANNEL_TABS = [
+  ['', 'All'],
+  ['pos', 'Shop (till)'],
+  ['online', 'Online orders'],
+];
+
+function ChannelBadge({ channel }) {
+  return channel === 'online'
+    ? <span className="inv-channel inv-channel--online">Online</span>
+    : <span className="inv-channel inv-channel--pos">Shop</span>;
+}
 
 export default function Invoices() {
   const [summary, setSummary] = useState(null);
@@ -42,6 +55,23 @@ export default function Invoices() {
   const [listError, setListError] = useState(null);
   const [openUuid, setOpenUuid] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const navigate = useNavigate();
+
+  // A till invoice opens the detail panel (payments, WhatsApp follow-ups);
+  // an online one opens the order itself.
+  function openRow(row) {
+    if (row.channel === 'online') {
+      navigate(`/admin/orders?uuid=${encodeURIComponent(row.uuid)}`);
+    } else {
+      setOpenUuid(row.uuid);
+    }
+  }
+
+  function setChannel(channel) {
+    setFilters((f) => ({ ...f, channel }));
+    setAppliedFilters((f) => ({ ...f, channel }));
+    setPage(1);
+  }
 
   function loadSummary() {
     setSummaryError(null);
@@ -68,8 +98,8 @@ export default function Invoices() {
   useEffect(loadList, [appliedFilters, page]);
 
   function applyAlert(patch) {
-    setFilters({ ...EMPTY_FILTERS, ...patch });
-    setAppliedFilters({ ...EMPTY_FILTERS, ...patch });
+    setFilters({ ...EMPTY_FILTERS, channel: appliedFilters.channel, ...patch });
+    setAppliedFilters({ ...EMPTY_FILTERS, channel: appliedFilters.channel, ...patch });
     setPage(1);
   }
 
@@ -118,7 +148,7 @@ export default function Invoices() {
             Invoice Tracking
           </h1>
           <p className="pl-sub" style={{ margin: 0 }}>
-            Till invoices, partial-payment balances and WhatsApp follow-ups.
+            Every invoice — shop (till) sales and online orders — with balances and WhatsApp follow-ups.
           </p>
         </div>
         <button type="button" className="admin-btn admin-btn--primary" onClick={exportCsv} disabled={exporting}>
@@ -131,14 +161,22 @@ export default function Invoices() {
       {summary && (
         <>
           <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))' }}>
-            <StatCard label="Total Invoices" value={summary.total} />
+            <StatCard
+              label="Total Invoices"
+              value={summary.total}
+              hint={summary.by_channel ? `Shop ${summary.by_channel.pos.total} · Online ${summary.by_channel.online.total}` : undefined}
+            />
             <StatCard label="Paid" value={summary.paid} />
             <StatCard label="Partially Paid" value={summary.partial} />
             <StatCard label="Unpaid" value={summary.unpaid} tone="danger" />
             <StatCard label="Overdue" value={summary.overdue} tone="danger" />
             <StatCard label="Refunded" value={summary.refunded} />
             <StatCard label="Cancelled" value={summary.cancelled} />
-            <StatCard label="Today's Revenue" value={money(summary.todays_revenue)} />
+            <StatCard
+              label="Today's Revenue"
+              value={money(summary.todays_revenue)}
+              hint={summary.by_channel ? `Shop ${money(summary.by_channel.pos.todays_revenue)} · Online ${money(summary.by_channel.online.todays_revenue)}` : undefined}
+            />
           </div>
 
           <div className="inv-alerts">
@@ -158,6 +196,21 @@ export default function Invoices() {
         </>
       )}
 
+      <div className="inv-tabs" role="tablist">
+        {CHANNEL_TABS.map(([key, label]) => (
+          <button
+            key={key || 'all'}
+            type="button"
+            role="tab"
+            aria-selected={appliedFilters.channel === key}
+            className={`admin-btn ${appliedFilters.channel === key ? 'admin-btn--primary' : ''}`}
+            onClick={() => setChannel(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="pl-card" style={{ padding: 16 }}>
         <div className="inv-filter-grid">
           <div>
@@ -176,6 +229,7 @@ export default function Invoices() {
               <option value="paid">Paid</option>
               <option value="partial">Partially Paid</option>
               <option value="unpaid">Unpaid</option>
+              <option value="refunded">Refunded</option>
             </select>
           </div>
           <div>
@@ -186,6 +240,7 @@ export default function Invoices() {
               <option value="upi">UPI</option>
               <option value="card">Card</option>
               <option value="other">Other</option>
+              <option value="cod">Cash on delivery (online)</option>
             </select>
           </div>
           <div>
@@ -224,6 +279,7 @@ export default function Invoices() {
             <thead>
               <tr>
                 <th>Invoice #</th>
+                <th>Channel</th>
                 <th>Customer</th>
                 <th>Date</th>
                 <th style={{ textAlign: 'right' }}>Total</th>
@@ -239,12 +295,16 @@ export default function Invoices() {
               {rows.map((row) => {
                 const remaining = Number(row.balance_due || 0);
                 return (
-                  <tr key={row.uuid}>
+                  <tr key={`${row.channel}-${row.uuid}`}>
                     <td>
-                      <button type="button" className="pl-link-btn" onClick={() => setOpenUuid(row.uuid)}>
+                      <button type="button" className="pl-link-btn" onClick={() => openRow(row)}>
                         {row.sale_number}
                       </button>
+                      {row.channel === 'online' && row.order_number && row.order_number !== row.sale_number && (
+                        <div className="pl-sub">Order {row.order_number}</div>
+                      )}
                     </td>
+                    <td><ChannelBadge channel={row.channel} /></td>
                     <td>
                       <CustomerCell row={row} />
                     </td>
@@ -260,8 +320,8 @@ export default function Invoices() {
                       <StatusBadge status={row.payment_status} label={statusLabel(row.payment_status)} />
                     </td>
                     <td>
-                      <button type="button" className="admin-btn" onClick={() => setOpenUuid(row.uuid)}>
-                        View
+                      <button type="button" className="admin-btn" onClick={() => openRow(row)}>
+                        {row.channel === 'online' ? 'Open order' : 'View'}
                       </button>
                     </td>
                   </tr>

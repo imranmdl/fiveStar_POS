@@ -243,3 +243,9 @@
 .inv-timeline__dot--warning::before {
   background: var(--warning);
 }
+
+/* Shop / Online tabs and channel badge */
+.inv-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.inv-channel { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.inv-channel--online { background: #e5effa; color: #1f4f80; }
+.inv-channel--pos { background: #f3ece2; color: #6b4b1f; }

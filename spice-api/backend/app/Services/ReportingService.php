@@ -588,9 +588,11 @@ final class ReportingService
             ['today' => $today]
         ) ?? 0);
 
+        // Same basis as $orderProfit above: an online order is a sale once it
+        // is confirmed (paid, or COD approved) — not while it waits for payment.
         $onlineSalesToday = (float) ($this->db->scalar(
             "SELECT COALESCE(SUM(`grand_total`), 0) FROM `orders`
-              WHERE DATE(COALESCE(`confirmed_date`, `placed_date`)) = :today AND `status` <> 'cancelled' AND `is_deleted` = 0",
+              WHERE DATE(`confirmed_date`) = :today AND `status` <> 'cancelled' AND `is_deleted` = 0",
             ['today' => $today]
         ) ?? 0);
 
@@ -924,6 +926,12 @@ final class ReportingService
             'wallet_redeemed' => (float) $row['wallet_redeemed'],
             'collected_online' => (float) $row['collected_online'],
             'refunded' => (float) $row['refunded'],
+            // Channel split (053): online orders vs till (shop) sales.
+            'online_orders' => (int) ($row['online_orders'] ?? $row['order_count']),
+            'online_sales' => (float) ($row['online_sales'] ?? $row['gross_sales']),
+            'pos_orders' => (int) ($row['pos_orders'] ?? 0),
+            'pos_sales' => (float) ($row['pos_sales'] ?? 0),
+            'pos_collected' => (float) ($row['pos_collected'] ?? 0),
         ], $this->db->select(
             'SELECT * FROM `vw_daily_sales`
               WHERE `sales_date` BETWEEN :from AND :to
@@ -951,34 +959,48 @@ final class ReportingService
             'units_sold' => (int) $row['units_sold'],
             'order_count' => (int) $row['order_count'],
             'revenue' => (float) $row['revenue'],
+            'online_units' => (int) $row['online_units'],
+            'pos_units' => (int) $row['pos_units'],
         ], $this->db->select(
             sprintf(
-                "SELECT oi.`product_name`, oi.`sku`,
-                        SUM(oi.`quantity`)              AS `units_sold`,
-                        COUNT(DISTINCT oi.`order_id`)   AS `order_count`,
-                        ROUND(SUM(oi.`line_payable`), 2) AS `revenue`
-                   FROM `order_items` oi
-                   INNER JOIN `orders` o ON o.`id` = oi.`order_id`
-                  WHERE DATE(o.`confirmed_date`) BETWEEN :from AND :to
-                    AND o.`status` <> 'cancelled'
-                    AND o.`is_deleted` = 0 AND oi.`is_deleted` = 0
-                  GROUP BY oi.`product_name`, oi.`sku`
+                "SELECT combined.`product_name`, combined.`sku`,
+                        SUM(combined.`qty`)                         AS `units_sold`,
+                        SUM(combined.`orders`)                      AS `order_count`,
+                        ROUND(SUM(combined.`revenue`), 2)           AS `revenue`,
+                        SUM(CASE WHEN combined.`channel` = 'online' THEN combined.`qty` ELSE 0 END) AS `online_units`,
+                        SUM(CASE WHEN combined.`channel` = 'pos' THEN combined.`qty` ELSE 0 END)    AS `pos_units`
+                   FROM (
+                        SELECT 'online' AS `channel`, oi.`product_name`, oi.`sku`,
+                               SUM(oi.`quantity`) AS `qty`, COUNT(DISTINCT oi.`order_id`) AS `orders`,
+                               SUM(oi.`line_payable`) AS `revenue`
+                          FROM `order_items` oi
+                          INNER JOIN `orders` o ON o.`id` = oi.`order_id`
+                         WHERE DATE(o.`confirmed_date`) BETWEEN :from1 AND :to1
+                           AND o.`status` <> 'cancelled'
+                           AND o.`is_deleted` = 0 AND oi.`is_deleted` = 0
+                         GROUP BY oi.`product_name`, oi.`sku`
+
+                        UNION ALL
+
+                        SELECT 'pos', psi.`product_name`, psi.`sku`,
+                               SUM(psi.`quantity`), COUNT(DISTINCT psi.`pos_sale_id`),
+                               SUM(psi.`line_total`)
+                          FROM `pos_sale_items` psi
+                          INNER JOIN `pos_sales` ps ON ps.`id` = psi.`pos_sale_id`
+                         WHERE DATE(ps.`created_date`) BETWEEN :from2 AND :to2
+                           AND ps.`status` = 'completed'
+                           AND ps.`is_deleted` = 0 AND psi.`is_deleted` = 0
+                         GROUP BY psi.`product_name`, psi.`sku`
+                   ) combined
+                  GROUP BY combined.`product_name`, combined.`sku`
                   ORDER BY `revenue` DESC
                   LIMIT %d",
                 max(1, min($limit, 100))
             ),
-            ['from' => $from, 'to' => $to]
+            ['from1' => $from, 'to1' => $to, 'from2' => $from, 'to2' => $to]
         ));
     }
 
-    /**
-     * Variants with real stock on hand but little or no movement in the last
-     * $days days, online + POS combined — the "slow-moving inventory" half of
-     * the Dynamic Offers brief. A variant out of stock isn't slow-moving, it's
-     * just sold out, so `qty_on_hand > 0` is a hard filter, not a sort key.
-     *
-     * @return array<int, array<string, mixed>>
-     */
     public function slowMovingProducts(int $days = 30, int $limit = 20): array
     {
         $days = max(1, min($days, 365));
@@ -1049,27 +1071,38 @@ final class ReportingService
         ], $this->db->select(
             sprintf(
                 "SELECT u.`uuid`, u.`full_name`, u.`mobile`,
-                        COUNT(o.`id`)                        AS `order_count`,
-                        ROUND(SUM(o.`grand_total`), 2)       AS `total_spent`,
-                        MAX(o.`confirmed_date`)              AS `last_order_date`,
+                        SUM(sales.`n`)                       AS `order_count`,
+                        ROUND(SUM(sales.`spent`), 2)         AS `total_spent`,
+                        MAX(sales.`last_date`)               AS `last_order_date`,
                         COALESCE(w.`balance_amount`, 0)      AS `wallet_balance`,
                         COALESCE(w.`is_frozen`, 0)           AS `wallet_frozen`
-                   FROM `orders` o
-                   INNER JOIN `users` u ON u.`id` = o.`user_id`
+                   FROM (
+                        SELECT o.`user_id` AS `user_id`, COUNT(*) AS `n`, SUM(o.`grand_total`) AS `spent`,
+                               MAX(o.`confirmed_date`) AS `last_date`
+                          FROM `orders` o
+                         WHERE DATE(o.`confirmed_date`) BETWEEN :from1 AND :to1
+                           AND o.`status` <> 'cancelled' AND o.`is_deleted` = 0
+                         GROUP BY o.`user_id`
+
+                        UNION ALL
+
+                        SELECT s.`customer_id`, COUNT(*), SUM(s.`grand_total`), MAX(s.`created_date`)
+                          FROM `pos_sales` s
+                         WHERE DATE(s.`created_date`) BETWEEN :from2 AND :to2
+                           AND s.`status` = 'completed' AND s.`is_deleted` = 0 AND s.`customer_id` IS NOT NULL
+                         GROUP BY s.`customer_id`
+                   ) sales
+                   INNER JOIN `users` u ON u.`id` = sales.`user_id`
                    LEFT JOIN `wallet_accounts` w ON w.`user_id` = u.`id` AND w.`is_deleted` = 0
-                  WHERE DATE(o.`confirmed_date`) BETWEEN :from AND :to
-                    AND o.`status` <> 'cancelled'
-                    AND o.`is_deleted` = 0
                   GROUP BY u.`id`, u.`uuid`, u.`full_name`, u.`mobile`, w.`balance_amount`, w.`is_frozen`
                   ORDER BY `total_spent` DESC
                   LIMIT %d",
                 max(1, min($limit, 100))
             ),
-            ['from' => $from, 'to' => $to]
+            ['from1' => $from, 'to1' => $to, 'from2' => $from, 'to2' => $to]
         ));
     }
 
-    /** @return array<string, mixed> */
     public function customerGrowth(string $from, string $to): array
     {
         $this->assertRange($from, $to);
