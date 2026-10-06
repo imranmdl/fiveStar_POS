@@ -84,7 +84,7 @@ final class BackupService
     {
         $pdo = $this->db->pdo();
 
-        fwrite($handle, "-- 5Star database backup\n");
+        fwrite($handle, "-- 5 Star database backup\n");
         fwrite($handle, '-- Generated ' . date('c') . "\n");
         fwrite($handle, "-- Restoring this file replaces data in tables/views it recreates.\n\n");
         fwrite($handle, "SET NAMES utf8mb4;\n");

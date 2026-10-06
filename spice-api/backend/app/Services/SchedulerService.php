@@ -303,7 +303,7 @@ final class SchedulerService
     {
         $delayHours = max(1, $this->settings->intValue('pos_due_reminder_delay_hours', 24));
         $repeatHours = max(1, $this->settings->intValue('pos_due_reminder_repeat_hours', 72));
-        $storeName = $this->settings->value('store_name', 'Spice & Dry Fruits');
+        $storeName = $this->settings->value('store_name', '5 Star Spices & Dry Fruits');
 
         $sales = $this->db->select(
             'SELECT s.`uuid`, s.`sale_number`, s.`grand_total`, s.`amount_paid`,

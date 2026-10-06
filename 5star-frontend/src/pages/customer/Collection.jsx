@@ -150,7 +150,7 @@ export default function Collection() {
         if (cancelled) return;
         setCollection(response.data.collection);
         setItems(response.data.items || []);
-        document.title = `${response.data.collection.meta_title || response.data.collection.title} · 5Star Spices`;
+        document.title = `${response.data.collection.meta_title || response.data.collection.title} · 5 Star`;
         setStatus('ready');
       })
       .catch((err) => {

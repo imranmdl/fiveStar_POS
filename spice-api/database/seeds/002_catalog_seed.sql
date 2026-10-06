@@ -76,7 +76,7 @@ FROM (
         'DEMO-TURMERIC' AS `product_code`,
         'organic-turmeric-powder' AS `slug`,
         'Organic Turmeric Powder' AS `name`,
-        'Spice & Dry Fruits' AS `brand`,
+        '5 Star Spices & Dry Fruits' AS `brand`,
         'Single-origin Erode turmeric, stone-ground, 3.5% curcumin' AS `short_description`,
         'Sun-dried Erode turmeric fingers, stone-ground in small batches to protect the volatile oils. Deep ochre colour, earthy aroma, no added colour or starch.' AS `description`,
         '100% turmeric (Curcuma longa)' AS `ingredients`,
@@ -91,7 +91,7 @@ FROM (
         'haldi, manjal, arishina, curcumin, halad, yellow spice' AS `search_keywords`
     UNION ALL SELECT
         'almonds', 'DEMO-ALMOND', 'california-almonds',
-        'California Almonds', 'Spice & Dry Fruits',
+        'California Almonds', '5 Star Spices & Dry Fruits',
         'Hand-sorted premium California almonds, crisp and unsalted',
         'Non-pareil grade California almonds, hand-sorted for uniform size and screened for shell fragments. Raw and unsalted.',
         '100% almonds (Prunus dulcis)',
@@ -100,7 +100,7 @@ FROM (
         'badam, badaam, nuts, almond, akhrot alternative'
     UNION ALL SELECT
         'whole-spices', 'DEMO-CARDAMOM', 'green-cardamom-8mm',
-        'Green Cardamom 8mm', 'Spice & Dry Fruits',
+        'Green Cardamom 8mm', '5 Star Spices & Dry Fruits',
         'Bold 8mm Idukki cardamom pods, intensely aromatic',
         'Grade AGEB 8mm green cardamom from the Idukki hills. Plump, tightly closed pods with a high volatile-oil content.',
         '100% green cardamom (Elettaria cardamomum)',

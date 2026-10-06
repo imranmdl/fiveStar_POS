@@ -64,7 +64,7 @@ final class SandboxGateway implements PaymentGatewayInterface
         // exercised properly rather than special-cased for tests.
         $upiIntent = sprintf(
             'upi://pay?pa=sandbox@upi&pn=%s&tr=%s&am=%s&cu=%s',
-            rawurlencode((string) ($context['merchant_name'] ?? 'Spice & Dry Fruits')),
+            rawurlencode((string) ($context['merchant_name'] ?? '5 Star Spices & Dry Fruits')),
             rawurlencode($reference),
             $amount->toDecimal(),
             $currencyCode

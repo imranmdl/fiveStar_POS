@@ -343,7 +343,7 @@ final class InvoiceService
     {
         $name = $sale['customer_name'] ?? $sale['walk_in_name'] ?? 'Customer';
         $mobile = $this->resolveMobile($sale);
-        $storeName = $this->settings->value('store_name', 'Spice & Dry Fruits');
+        $storeName = $this->settings->value('store_name', '5 Star Spices & Dry Fruits');
         $invoiceNo = $sale['sale_number'];
         $total = number_format((float) $sale['grand_total'], 2);
         $paid = number_format((float) $sale['amount_paid'], 2);

@@ -79,7 +79,7 @@ ON DUPLICATE KEY UPDATE `version` = `role_permissions`.`version` + 1;
 -- --------------------------------------------------------------------------
 INSERT INTO `settings` (`uuid`, `group_code`, `setting_key`, `setting_value`, `data_type`, `description`, `is_public`)
 VALUES
-    (UUID(), 'general', 'store_name',              'Spice & Dry Fruits', 'string', 'Public store name', 1),
+    (UUID(), 'general', 'store_name',              '5 Star Spices & Dry Fruits', 'string', 'Public store name', 1),
     (UUID(), 'general', 'support_mobile',          '',                   'string', 'Customer care number', 1),
     (UUID(), 'general', 'support_email',           '',                   'string', 'Customer care email', 1),
     (UUID(), 'general', 'currency_code',           'INR',                'string', 'ISO currency code', 1),

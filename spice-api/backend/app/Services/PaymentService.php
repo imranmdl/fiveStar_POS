@@ -119,7 +119,7 @@ final class PaymentService
             (string) $order['order_number'],
             [
                 'order_number' => (string) $order['order_number'],
-                'merchant_name' => (string) $this->config->get('app.brand_name', 'Spice & Dry Fruits'),
+                'merchant_name' => (string) $this->config->get('app.brand_name', '5 Star Spices & Dry Fruits'),
                 'customer_mobile' => (string) $order['ship_mobile'],
             ]
         );

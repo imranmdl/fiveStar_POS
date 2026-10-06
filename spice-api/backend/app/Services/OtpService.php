@@ -203,7 +203,7 @@ final class OtpService
     private function message(string $code, string $purpose, int $ttlSeconds): string
     {
         $minutes = (int) ceil($ttlSeconds / 60);
-        $brand = (string) $this->config->get('app.brand_name', 'Spice & Dry Fruits');
+        $brand = (string) $this->config->get('app.brand_name', '5 Star Spices & Dry Fruits');
 
         return match ($purpose) {
             self::PURPOSE_ORDER_CONFIRMATION => sprintf(
