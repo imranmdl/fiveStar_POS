@@ -37,7 +37,7 @@ export default function ContentCategories() {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get('/admin/categories');
+      const response = await api.get('/admin/categories', { per_page: 200 });
       setCategories(response.data.categories || response.data || []);
     } catch (err) {
       setError(err);

@@ -194,3 +194,8 @@
   flex: 1 1 200px;
   font-size: 14px;
 }
+
+/* "Write with AI" for product descriptions */
+.ai-writer { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px dashed #c9c1e6; border-radius: 8px; background: #f8f6ff; }
+.ai-writer__row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.ai-writer__link { background: none; border: 0; padding: 0; color: #4b3fa0; font-weight: 600; cursor: pointer; }

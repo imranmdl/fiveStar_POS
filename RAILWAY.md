@@ -93,6 +93,13 @@ order-confirmation step, and the server reads the verified number from
 `PHONE_EMAIL_CLIENT_ID` to change the id, or to an empty value to switch the
 button off. It works in browsers; the Android app keeps using SMS codes.
 
+AI product descriptions (optional) — Admin → Products → edit → **Write
+descriptions with AI** drafts the short and full description from the
+product's details using the Claude API. Set `ANTHROPIC_API_KEY` (from
+console.anthropic.com) to switch it on; `AI_MODEL` defaults to
+`claude-haiku-4-5-20251001`. Without a key the button fills a plain template
+from the same details. Nothing is saved until the admin presses Save.
+
 Optional switches:
 
 | Variable | Default | Effect |

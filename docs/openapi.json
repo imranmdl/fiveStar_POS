@@ -11925,6 +11925,117 @@
                 }
             }
         },
+        "/api/v1/admin/products/ai-description": {
+            "get": {
+                "operationId": "productControllerAiStatus",
+                "tags": [
+                    "Admin: Products"
+                ],
+                "summary": "Whether \"Write with AI\" uses the Claude API (ANTHROPIC_API_KEY set) or the plain template fallback.",
+                "description": "Requires one of these roles: administrator.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "productControllerAiDescription",
+                "tags": [
+                    "Admin: Products"
+                ],
+                "summary": "Draft a short and a full product description from what the admin has entered (name, category, brand, origin, packs, organic, notes). Returns text only — nothing is saved. `source` is \"ai\" or \"template\" (no API key).",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "maxLength": 200,
+                                        "minLength": 2,
+                                        "type": "string"
+                                    },
+                                    "category": {
+                                        "maxLength": 120,
+                                        "type": "string"
+                                    },
+                                    "brand": {
+                                        "maxLength": 120,
+                                        "type": "string"
+                                    },
+                                    "origin": {
+                                        "maxLength": 120,
+                                        "type": "string"
+                                    },
+                                    "notes": {
+                                        "maxLength": 1000,
+                                        "type": "string"
+                                    },
+                                    "is_organic": {
+                                        "type": "boolean"
+                                    },
+                                    "is_vegetarian": {
+                                        "type": "boolean"
+                                    },
+                                    "shelf_life_days": {
+                                        "maximum": 3650,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                    }
+                                },
+                                "required": [
+                                    "name"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            }
+        },
         "/api/v1/admin/products/sourcing": {
             "get": {
                 "operationId": "productSourcingControllerLookup",

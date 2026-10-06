@@ -9,12 +9,17 @@ use App\Core\Exceptions\HttpException;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Validator;
+use App\Repositories\SettingRepository;
+use App\Services\AiContentService;
 use App\Services\ProductService;
 
 final class ProductController extends BaseController
 {
-    public function __construct(private readonly ProductService $products)
-    {
+    public function __construct(
+        private readonly ProductService $products,
+        private readonly AiContentService $ai,
+        private readonly SettingRepository $settings,
+    ) {
     }
 
     // -----------------------------------------------------------------------
@@ -84,6 +89,42 @@ final class ProductController extends BaseController
             ['product' => $this->products->detail($identifier, includeUnpublished: true, countView: false)],
             'Product loaded'
         );
+    }
+
+    /**
+     * GET /api/v1/admin/products/ai-description
+     *
+     * Whether "Write with AI" uses the Claude API (ANTHROPIC_API_KEY set) or the plain template fallback.
+     */
+    public function aiStatus(Request $request): Response
+    {
+        return Response::success(['ai_available' => $this->ai->aiAvailable()]);
+    }
+
+    /**
+     * POST /api/v1/admin/products/ai-description
+     *
+     * Draft a short and a full product description from what the admin has entered (name, category, brand, origin, packs, organic, notes). Returns text only — nothing is saved. `source` is "ai" or "template" (no API key).
+     */
+    public function aiDescription(Request $request): Response
+    {
+        $data = Validator::make($request->all(), [
+            'name' => 'required|string|min:2|max:200',
+            'category' => 'nullable|string|max:120',
+            'brand' => 'nullable|string|max:120',
+            'origin' => 'nullable|string|max:120',
+            'notes' => 'nullable|string|max:1000',
+            'is_organic' => 'nullable|boolean',
+            'is_vegetarian' => 'nullable|boolean',
+            'shelf_life_days' => 'nullable|int|min:1|max:3650',
+        ]);
+        $packs = $request->input('packs');
+        $data['packs'] = is_array($packs)
+            ? array_values(array_filter(array_map(static fn ($v): string => mb_substr(trim((string) $v), 0, 60), array_slice($packs, 0, 10))))
+            : [];
+        $data['store_name'] = $this->settings->value('store_name', '5 Star Spices & Dry Fruits');
+
+        return Response::success($this->ai->productDescription($data), 'Description drafted');
     }
 
     /** POST /api/v1/admin/products */
