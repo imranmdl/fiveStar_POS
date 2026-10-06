@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, storeTokens, isSignedIn, mergeGuestCart } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
-import PhoneEmailButton, { usePhoneEmail } from '../../components/PhoneEmailButton';
+import PhoneEmailButton, { loadVerificationMethods, usePhoneEmail } from '../../components/PhoneEmailButton';
 import MyAccount from './MyAccount';
 import { forgetReferralCode, rememberedReferralCode } from './ReferralLink';
 import './Account.css';
@@ -32,6 +32,13 @@ export default function Account() {
   const [pendingMobile, setPendingMobile] = useState(null);
   const [pendingReference, setPendingReference] = useState(null);
   const phoneEmailClient = usePhoneEmail();
+  const [otpEnabled, setOtpEnabled] = useState(true);
+
+  useEffect(() => {
+    loadVerificationMethods().then((methods) => {
+      if (methods && methods.otp_enabled === false) setOtpEnabled(false);
+    });
+  }, []);
 
   // Signed in and sent here to sign in first: carry on to where they were going.
   useEffect(() => {
@@ -68,6 +75,16 @@ export default function Account() {
 
     try {
       const response = await api.post('/auth/register', payload);
+
+      // Mobile OTP switched off by the shop: the account is ready and signed in.
+      if (response.data.tokens) {
+        forgetReferralCode();
+        storeTokens(response.data.tokens);
+        await mergeGuestCart();
+        navigate(next, { replace: true });
+        return;
+      }
+
       setPendingMobile(payload.mobile);
       setPendingReference(response.data.verification.reference_token);
       setDebugOtp(response.data.verification.debug_otp || null);
@@ -242,7 +259,7 @@ export default function Account() {
                     value={registerData.mobile}
                     onChange={(e) => setRegisterData({ ...registerData, mobile: e.target.value })}
                   />
-                  <div className="field-hint">We will send a verification code to this number.</div>
+                  {otpEnabled && <div className="field-hint">We will send a verification code to this number.</div>}
                 </div>
                 <div className="field">
                   <label htmlFor="email">Email (optional)</label>

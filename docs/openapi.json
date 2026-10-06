@@ -15069,6 +15069,63 @@
                 }
             }
         },
+        "/api/v1/admin/settings/otp": {
+            "patch": {
+                "operationId": "settingsControllerSetOtpEnabled",
+                "tags": [
+                    "Admin: Settings"
+                ],
+                "summary": "Switch mobile OTP verification on or off for the whole shop: order confirmation codes, number verification at sign-up, and OTP / phone sign-in. Off = orders go straight to payment and new accounts are signed in at once.",
+                "description": "Requires one of these roles: administrator.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "enabled": {
+                                        "type": "boolean"
+                                    }
+                                },
+                                "required": [
+                                    "enabled"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            }
+        },
         "/api/v1/admin/settings/payment-driver": {
             "patch": {
                 "operationId": "settingsControllerSetPaymentDriver",
