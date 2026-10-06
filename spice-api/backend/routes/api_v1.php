@@ -216,6 +216,7 @@ return static function (Router $router): void {
         // Authenticated — any signed-in user
         // ===================================================================
         $router->get('/auth/me', [AuthController::class, 'me'], ['auth']);
+        $router->patch('/auth/me', [AuthController::class, 'updateMe'], ['auth', 'throttle:20,600']);
         $router->get('/auth/sessions', [AuthController::class, 'sessions'], ['auth']);
         $router->post('/auth/logout', [AuthController::class, 'logout'], ['auth']);
         $router->post('/auth/password/change', [AuthController::class, 'changePassword'], ['auth', 'throttle:10,900']);

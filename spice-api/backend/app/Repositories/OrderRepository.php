@@ -179,14 +179,21 @@ final class OrderRepository extends BaseRepository
      *
      * @return array{items:array<int, array<string, mixed>>, total:int}
      */
-    public function paginateForCustomer(int $userId, array $params, ?string $status = null): array
+    public function paginateForCustomer(int $userId, array $params, string|array|null $status = null): array
     {
         $where = ['o.`user_id` = :user_id', 'o.`is_deleted` = 0'];
         $bindings = ['user_id' => $userId];
 
-        if ($status !== null) {
+        if (is_string($status)) {
             $where[] = 'o.`status` = :status';
             $bindings['status'] = $status;
+        } elseif (is_array($status) && $status !== []) {
+            $names = [];
+            foreach (array_values($status) as $index => $value) {
+                $names[] = ':status' . $index;
+                $bindings['status' . $index] = $value;
+            }
+            $where[] = 'o.`status` IN (' . implode(', ', $names) . ')';
         }
 
         $whereSql = implode(' AND ', $where);

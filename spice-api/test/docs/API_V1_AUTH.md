@@ -195,6 +195,18 @@ Revokes all sessions on success, including the caller's.
 
 Returns the current profile. Never includes `password_hash` or any internal id.
 
+## PATCH /auth/me  *(authenticated)*
+
+Update your own name and/or email. Send only the fields to change.
+
+```json
+{ "full_name": "Ravi Kulkarni", "email": "ravi@example.com" }
+```
+
+An empty `email` removes it; a changed email is marked unverified. 409 if the
+email belongs to another account. The mobile number cannot be changed here —
+it is the sign-in identity. Returns `{ "user": { … } }` like `GET /auth/me`.
+
 ## GET /auth/sessions  *(authenticated)*
 
 Active device sessions: `uuid`, `device_id`, `device_name`, `platform`,

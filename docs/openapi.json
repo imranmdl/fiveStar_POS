@@ -17966,6 +17966,62 @@
                         "$ref": "#/components/responses/RateLimited"
                     }
                 }
+            },
+            "patch": {
+                "operationId": "authControllerUpdateMe",
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "(authenticated) Update your own name and email. Send only the fields to change; an empty email removes it. The mobile number cannot be changed here.",
+                "description": "Rate limited to 20 requests per 600 seconds.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "full_name": {
+                                        "maxLength": 120,
+                                        "minLength": 2,
+                                        "type": "string"
+                                    },
+                                    "email": {
+                                        "format": "email",
+                                        "maxLength": 190,
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
             }
         },
         "/api/v1/auth/methods": {
@@ -20925,7 +20981,7 @@
                 "tags": [
                     "Orders"
                 ],
-                "summary": "Order history for the signed-in customer.",
+                "summary": "Order history for the signed-in customer, newest first. Filter with `status`, or with `group` = all, active, delivered or cancelled (the history tabs). Each row carries an items preview and what the customer still has to do (`needs_verification`, `can_pay`).",
                 "parameters": [
                     {
                         "$ref": "#/components/parameters/Page"

@@ -3,13 +3,17 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, storeTokens, isSignedIn, mergeGuestCart } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
 import PhoneEmailButton, { usePhoneEmail } from '../../components/PhoneEmailButton';
+import MyAccount from './MyAccount';
 import './Account.css';
 
 export default function Account() {
   const { signedIn, ready } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const next = searchParams.get('next') || '/';
+  // Signed in with no ?next= → this page is "My account". Signing in from
+  // here with no ?next= lands on My account too.
+  const nextParam = searchParams.get('next');
+  const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/account';
 
   const [tab, setTab] = useState('signin');
   const [step, setStep] = useState('form'); // 'form' | 'verify'
@@ -25,12 +29,12 @@ export default function Account() {
   const [pendingReference, setPendingReference] = useState(null);
   const phoneEmailClient = usePhoneEmail();
 
-  // Already signed in: there is nothing to do here, so move on.
+  // Signed in and sent here to sign in first: carry on to where they were going.
   useEffect(() => {
-    if (ready && signedIn) {
+    if (ready && signedIn && nextParam && next !== '/account') {
       navigate(next, { replace: true });
     }
-  }, [ready, signedIn, next, navigate]);
+  }, [ready, signedIn, nextParam, next, navigate]);
 
   async function handleSignIn(event) {
     event.preventDefault();
@@ -120,7 +124,11 @@ export default function Account() {
     setError(null);
   }
 
-  if (!ready || (ready && signedIn)) {
+  if (ready && signedIn && (!nextParam || next === '/account')) {
+    return <MyAccount />;
+  }
+
+  if (!ready || signedIn) {
     return <div className="page"><p className="state-message">Loading…</p></div>;
   }
 
