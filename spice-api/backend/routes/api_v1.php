@@ -781,6 +781,8 @@ return static function (Router $router): void {
         // Dashboard drill-down (read-only) registered before /{userUuid} so
         // the router doesn't treat "transactions"/"accounts"/"pending-refunds"
         // as a uuid.
+        $router->get('/admin/wallet/settings', [WalletController::class, 'adminWalletSettings'], $administrator);
+        $router->patch('/admin/wallet/settings', [WalletController::class, 'updateWalletSettings'], $administrator);
         $router->get('/admin/wallet/transactions', [WalletController::class, 'adminTransactions'], $administrator);
         $router->get('/admin/wallet/accounts', [WalletController::class, 'adminAccounts'], $administrator);
         $router->get('/admin/wallet/pending-refunds', [WalletController::class, 'adminPendingRefunds'], $administrator);
@@ -794,6 +796,8 @@ return static function (Router $router): void {
 
         // --- Referrals (administrator) -------------------------------------
         $router->get('/admin/referrals', [WalletController::class, 'adminReferrals'], $administrator);
+        $router->get('/admin/referrals/settings', [WalletController::class, 'adminReferralSettings'], $administrator);
+        $router->patch('/admin/referrals/settings', [WalletController::class, 'updateReferralSettings'], $administrator);
         $router->post('/admin/referrals/{uuid}/qualify', [WalletController::class, 'adminQualifyReferral'], $administrator);
         $router->post('/admin/referrals/{uuid}/cancel', [WalletController::class, 'adminCancelReferral'], $administrator);
 

@@ -1,0 +1,68 @@
+/* Loyalty, Referrals and wallet rules — admin. Self-contained so the pages
+   look the same whichever admin page loaded first. */
+
+.rw-page { display: flex; flex-direction: column; gap: 16px; }
+.rw-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.rw-head h1 { margin: 0; }
+.rw-lead { margin: 0; color: #6b6466; font-size: 14px; line-height: 1.5; max-width: 72ch; }
+
+.rw-card { background: #fff; border: 1px solid #e7e2dc; border-radius: 10px; overflow: hidden; }
+.rw-card__head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid #efebe6; }
+.rw-card__head h2 { margin: 0; font-size: 15px; }
+.rw-card__body { padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+
+.rw-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.rw-tile { background: #fff; border: 1px solid #e7e2dc; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.rw-tile span { font-size: 12px; color: #7a7375; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+.rw-tile b { font-size: 22px; }
+.rw-tile small { font-size: 12px; color: #7a7375; }
+
+.rw-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px 18px; }
+.rw-field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600; color: #3d3839; min-width: 0; }
+.rw-field small { font-weight: 400; color: #7a7375; line-height: 1.4; }
+.rw-field input, .rw-field select, .rw-field textarea {
+  height: 40px; padding: 0 10px; border: 1px solid #d8d2cb; border-radius: 6px; font: inherit; font-weight: 400; min-width: 0; width: 100%; box-sizing: border-box; background: #fff;
+}
+.rw-field textarea { height: auto; padding: 8px 10px; }
+.rw-field--full { grid-column: 1 / -1; }
+.rw-input-unit { display: flex; align-items: center; gap: 6px; }
+.rw-input-unit span { color: #7a7375; font-weight: 500; white-space: nowrap; }
+
+.rw-switch { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.rw-switch input { width: 18px; height: 18px; accent-color: #c62d1f; }
+.rw-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.rw-note { background: #f7f5f2; border-radius: 6px; padding: 10px 12px; font-size: 13px; line-height: 1.5; color: #4a4647; }
+.rw-note--warn { background: #fff4d6; color: #6d500c; }
+.rw-example { font-size: 13px; color: #2e6b22; background: #eef6ec; border-radius: 6px; padding: 8px 12px; }
+
+.rw-search { display: flex; gap: 8px; flex-wrap: wrap; }
+.rw-search input { flex: 1 1 220px; height: 40px; padding: 0 10px; border: 1px solid #d8d2cb; border-radius: 6px; font: inherit; min-width: 0; }
+
+.rw-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.rw-tab { height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid #d8d2cb; background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.rw-tab.is-on { background: #2a2829; border-color: #2a2829; color: #fff; }
+
+.rw-pill { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.rw-pill--pending { background: #fff1d0; color: #7d5a0e; }
+.rw-pill--qualified { background: #e5effa; color: #1f4f80; }
+.rw-pill--rewarded { background: #e6f2e4; color: #2e6b22; }
+.rw-pill--cancelled { background: #eeecea; color: #5f5a5b; }
+.rw-pill--on { background: #e6f2e4; color: #2e6b22; }
+.rw-pill--off { background: #eeecea; color: #5f5a5b; }
+
+.rw-credit { color: #2e6b22; font-weight: 700; }
+.rw-debit { color: #8d241b; font-weight: 700; }
+.rw-sub { color: #7a7375; font-size: 12px; }
+.rw-num { text-align: right; white-space: nowrap; }
+
+.rw-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .4); display: flex; align-items: flex-start; justify-content: center; padding: 40px 12px; z-index: 1000; overflow-y: auto; }
+.rw-modal { background: #fff; border-radius: 10px; width: 100%; max-width: 640px; box-shadow: 0 10px 40px rgba(0, 0, 0, .2); }
+.rw-modal__head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid #efebe6; }
+.rw-modal__head h2 { margin: 0; font-size: 16px; }
+.rw-modal__head button { background: none; border: 0; font-size: 24px; line-height: 1; cursor: pointer; }
+.rw-modal__body { padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+
+@media (max-width: 640px) {
+  .rw-card__body, .rw-card__head { padding-left: 14px; padding-right: 14px; }
+  .rw-tile b { font-size: 19px; }
+}

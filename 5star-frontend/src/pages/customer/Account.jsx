@@ -4,6 +4,7 @@ import { api, storeTokens, isSignedIn, mergeGuestCart } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
 import PhoneEmailButton, { usePhoneEmail } from '../../components/PhoneEmailButton';
 import MyAccount from './MyAccount';
+import { forgetReferralCode, rememberedReferralCode } from './ReferralLink';
 import './Account.css';
 
 export default function Account() {
@@ -15,13 +16,16 @@ export default function Account() {
   const nextParam = searchParams.get('next');
   const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/account';
 
-  const [tab, setTab] = useState('signin');
+  // Arriving from a friend's share link (/r/CODE): open sign-up with the
+  // code filled in.
+  const initialReferral = (searchParams.get('ref') || rememberedReferralCode() || '').toUpperCase();
+  const [tab, setTab] = useState(searchParams.get('tab') === 'register' ? 'register' : 'signin');
   const [step, setStep] = useState('form'); // 'form' | 'verify'
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
   const [signinData, setSigninData] = useState({ identifier: '', password: '' });
-  const [registerData, setRegisterData] = useState({ full_name: '', mobile: '', email: '', password: '' });
+  const [registerData, setRegisterData] = useState({ full_name: '', mobile: '', email: '', password: '', referral_code: initialReferral });
   const [otp, setOtp] = useState('');
   const [debugOtp, setDebugOtp] = useState(null);
   const [otpNotSent, setOtpNotSent] = useState(false);
@@ -59,6 +63,8 @@ export default function Account() {
 
     const payload = { ...registerData };
     if (!payload.email) delete payload.email;
+    payload.referral_code = (payload.referral_code || '').trim().toUpperCase();
+    if (!payload.referral_code) delete payload.referral_code;
 
     try {
       const response = await api.post('/auth/register', payload);
@@ -80,6 +86,7 @@ export default function Account() {
     setError(null);
 
     try {
+      forgetReferralCode();
       const response = await api.post('/auth/register/verify', {
         mobile: pendingMobile,
         otp,
@@ -101,7 +108,12 @@ export default function Account() {
     setError(null);
 
     try {
-      const response = await api.post('/auth/login/phone-email', { user_json_url: userJsonUrl });
+      const referral = (registerData.referral_code || '').trim().toUpperCase();
+      const response = await api.post('/auth/login/phone-email', {
+        user_json_url: userJsonUrl,
+        ...(referral ? { referral_code: referral } : {}),
+      });
+      if (response.data.new_account) forgetReferralCode();
       storeTokens(response.data.tokens);
       await mergeGuestCart();
       navigate(next, { replace: true });
@@ -169,10 +181,17 @@ export default function Account() {
               </div>
             )}
 
-            {tab === 'signin' && phoneButton && (
-              <p className="text-muted account-phone-hint">Verify your mobile number to sign in — no password needed. New here? This creates your account.</p>
+            {tab === 'register' && registerData.referral_code && (
+              <div className="account-info">Referral code <b>{registerData.referral_code}</b> will be applied — you get wallet credit after your first order.</div>
             )}
-            {tab === 'signin' && phoneButton}
+            {phoneButton && (
+              <p className="text-muted account-phone-hint">
+                {tab === 'signin'
+                  ? 'Verify your mobile number to sign in — no password needed. New here? This creates your account.'
+                  : 'Quickest: verify your mobile number and your account is created — no password needed.'}
+              </p>
+            )}
+            {phoneButton}
 
             {tab === 'signin' ? (
               <form onSubmit={handleSignIn}>
@@ -234,6 +253,18 @@ export default function Account() {
                     value={registerData.email}
                     onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
                   />
+                </div>
+                <div className="field">
+                  <label htmlFor="referral_code">Referral code (optional)</label>
+                  <input
+                    id="referral_code"
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    maxLength={40}
+                    value={registerData.referral_code}
+                    onChange={(e) => setRegisterData({ ...registerData, referral_code: e.target.value.toUpperCase() })}
+                  />
+                  <div className="field-hint">Got a code from a friend? You both get wallet credit after your first order.</div>
                 </div>
                 <div className="field">
                   <label htmlFor="new-password">Password</label>

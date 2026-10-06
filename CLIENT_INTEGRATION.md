@@ -252,6 +252,29 @@ GET /api/v1/orders/{uuid}/shipments
 
 ---
 
+## Loyalty, refer & earn, wallet (admin)
+
+Rules are edited by administrators; earning and payouts are automatic.
+
+```
+GET|PATCH /api/v1/admin/loyalty/settings        enabled, rupees_per_point, redeem_value_per_point, limits, expiry, review/referral bonus points
+GET       /api/v1/admin/loyalty/summary | accounts?search= | accounts/{userUuid}/ledger
+POST      /api/v1/admin/loyalty/accounts/{userUuid}/adjust   { direction: credit|debit, points, reason }
+GET|PATCH /api/v1/admin/referrals/settings      referrer_reward, referee_reward, min_order_value, reward_expiry_days
+GET       /api/v1/admin/referrals?status=pending|qualified|rewarded|cancelled
+POST      /api/v1/admin/referrals/{uuid}/qualify | cancel
+GET|PATCH /api/v1/admin/wallet/settings         enabled, max_redeem_percent, min_redeem_amount
+GET|PATCH /api/v1/admin-privilege/wallet/welcome-bonus
+```
+
+Points are earned when an online order's payment is confirmed or a till sale
+completes. A referral qualifies on the referred customer's first paid order at
+or above `min_order_value`; both wallets are credited and the referrer gets
+bonus points if that is switched on. Share links are `/r/{CODE}` on the web
+app, which pre-fills the code at sign-up.
+
+---
+
 ## Pagination
 
 ```

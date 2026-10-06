@@ -15,6 +15,7 @@ import Invoice from '../pages/customer/Invoice';
 import Page from '../pages/customer/Page';
 import Shop from '../pages/customer/Shop';
 import About from '../pages/customer/About';
+import ReferralLink from '../pages/customer/ReferralLink';
 
 /**
  * Customer-facing routes, rendered inside CustomerLayout.
@@ -76,6 +77,7 @@ export const customerRoutes = [
     path: 'invoice/:uuid',
     element: <Invoice />,
   },
+  { path: 'r/:code', element: <ReferralLink /> },
   {
     path: 'page/:slug',
     element: <Page />,

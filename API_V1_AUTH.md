@@ -124,8 +124,12 @@ Sign in with a number verified by the phone.email "Sign in with Phone"
 button. Customers only — staff accounts get 403 and sign in with password.
 
 ```json
-{ "user_json_url": "https://user.phone.email/user_xxxxxxxx.json" }
+{ "user_json_url": "https://user.phone.email/user_xxxxxxxx.json", "referral_code": "RAV8T699K" }
 ```
+
+`referral_code` is optional (from a friend's share link `/r/CODE`). It is
+recorded only when this sign-in creates a new account; an unknown code is
+ignored rather than blocking the sign-up.
 
 The client sends only the `user_json_url` the button passed to
 `phoneEmailListener`. The server fetches it from `user.phone.email` itself

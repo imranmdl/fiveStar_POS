@@ -256,7 +256,7 @@ final class AuthService
      *
      * @return array<string, mixed>
      */
-    public function loginWithPhoneEmail(string $userJsonUrl, Request $request): array
+    public function loginWithPhoneEmail(string $userJsonUrl, Request $request, ?string $referralCode = null): array
     {
         $verified = $this->phoneEmail->consume($userJsonUrl, PhoneEmailService::PURPOSE_LOGIN);
         $mobile = $verified['mobile'];
@@ -264,7 +264,7 @@ final class AuthService
         $created = false;
 
         if ($user === null) {
-            $user = $this->createVerifiedCustomer($verified, $request);
+            $user = $this->createVerifiedCustomer($verified, $request, $referralCode);
             $created = true;
         }
 
@@ -677,8 +677,18 @@ final class AuthService
      *
      * @return array<string, mixed>
      */
-    private function createVerifiedCustomer(array $verified, Request $request): array
+    private function createVerifiedCustomer(array $verified, Request $request, ?string $referralCode = null): array
     {
+        // A referral code from a share link. Unlike register(), an unknown
+        // code does not stop the sign-up — the customer has already proved
+        // their number and should not be bounced over a mistyped code.
+        $referrer = null;
+        $referralCode = $referralCode === null ? '' : strtoupper(trim($referralCode));
+
+        if ($referralCode !== '') {
+            $referrer = $this->users->findByReferralCode($referralCode);
+        }
+
         $customerRoleId = (int) $this->db->scalar(
             "SELECT id FROM roles WHERE code = 'customer' AND is_deleted = 0 LIMIT 1"
         );
@@ -690,7 +700,7 @@ final class AuthService
         $name = trim($verified['first_name'] . ' ' . $verified['last_name']);
         $name = $name === '' ? 'Customer ' . substr($verified['mobile'], -4) : mb_substr($name, 0, 120);
 
-        $userId = $this->db->transaction(function () use ($verified, $name, $customerRoleId): int {
+        $userId = $this->db->transaction(function () use ($verified, $name, $customerRoleId, $referrer): int {
             return $this->users->create([
                 'role_id' => $customerRoleId,
                 'full_name' => $name,
@@ -701,7 +711,7 @@ final class AuthService
                 'password_hash' => $this->hashPassword(bin2hex(random_bytes(24))),
                 'status' => 'pending_verification',
                 'referral_code' => $this->generateReferralCode($name),
-                'referred_by_user_id' => null,
+                'referred_by_user_id' => $referrer === null ? null : (int) $referrer['id'],
                 'is_active' => 1,
             ]);
         });
@@ -710,10 +720,23 @@ final class AuthService
             entityName: 'users',
             entityId: $userId,
             action: 'register',
-            newValues: ['full_name' => $name, 'mobile' => Str::maskMobile($verified['mobile'])],
+            newValues: [
+                'full_name' => $name,
+                'mobile' => Str::maskMobile($verified['mobile']),
+                'referred_by_user_id' => $referrer === null ? null : (int) $referrer['id'],
+            ],
             request: $request,
             notes: 'Customer created by phone.email sign-in'
         );
+
+        if ($referrer !== null) {
+            $this->referrals->recordSignup(
+                refereeUserId: $userId,
+                referrerUserId: (int) $referrer['id'],
+                codeUsed: $referralCode,
+                request: $request,
+            );
+        }
 
         return (array) $this->users->findById($userId);
     }
