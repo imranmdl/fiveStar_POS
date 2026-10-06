@@ -259,6 +259,13 @@
 .sf-banner__nav--next { right: 0; border-radius: 6px 0 0 6px; }
 .sf-banner__dots { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; z-index: 2; }
 .sf-banner__dots button { height: 8px; border: none; border-radius: 999px; padding: 0; transition: width .3s; }
+/* Banner artwork: <picture> blocks; phones show the picture first at 16:9. */
+.sf-banner-art { display: block; }
+.sf-banner-poster picture { display: block; }
+@media (max-width: 640px) {
+  .sf-banner-split .sf-banner-art { order: -1; }
+  .sf-banner-split .sf-banner-art img { aspect-ratio: 16 / 9; height: auto !important; min-height: 0 !important; }
+}
 
 .sf-deals-row { display: flex; overflow-x: auto; scrollbar-width: thin; }
 .sf-deal { flex: none; width: 200px; border-right: 1px solid var(--sf-grid-line); padding: 12px; display: flex; flex-direction: column; gap: 7px; }

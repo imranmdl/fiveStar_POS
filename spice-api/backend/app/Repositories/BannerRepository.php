@@ -16,7 +16,7 @@ final class BannerRepository extends BaseRepository
         return [
             'title', 'subtitle', 'image_path', 'mobile_image_path', 'alt_text',
             'placement', 'link_type', 'link_value', 'cta_label', 'display_order',
-            'start_date', 'end_date', 'eyebrow', 'promo_code', 'bg_color', 'text_color',
+            'start_date', 'end_date', 'eyebrow', 'promo_code', 'bg_color', 'text_color', 'layout',
         ];
     }
 
@@ -36,7 +36,7 @@ final class BannerRepository extends BaseRepository
         return $this->db->select(
             'SELECT `uuid`, `title`, `subtitle`, `eyebrow`, `image_path`, `mobile_image_path`,
                     `alt_text`, `placement`, `link_type`, `link_value`, `cta_label`,
-                    `promo_code`, `bg_color`, `text_color`,
+                    `promo_code`, `bg_color`, `text_color`, `layout`,
                     `display_order`, `start_date`, `end_date`
                FROM `banners`
               WHERE `placement` = :placement
