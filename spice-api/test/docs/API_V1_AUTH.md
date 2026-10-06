@@ -106,6 +106,44 @@ recorded against the session and surface in `GET /auth/sessions`.
 Passwordless login. Same shape as `/auth/register/verify` but with
 `purpose = login`.
 
+## GET /auth/methods
+
+Which ways of verifying a mobile number the shop offers. Public.
+
+```json
+{ "phone_email": { "enabled": true, "client_id": "17034275435197403254" },
+  "sms_otp":     { "enabled": true, "delivered_by_sms": false } }
+```
+
+`delivered_by_sms: false` means SMS codes are not actually texted (no SMS
+provider configured) — offer phone.email instead.
+
+## POST /auth/login/phone-email
+
+Sign in with a number verified by the phone.email "Sign in with Phone"
+button. Customers only — staff accounts get 403 and sign in with password.
+
+```json
+{ "user_json_url": "https://user.phone.email/user_xxxxxxxx.json" }
+```
+
+The client sends only the `user_json_url` the button passed to
+`phoneEmailListener`. The server fetches it from `user.phone.email` itself
+(https only, that host only, no redirects) and reads the verified country
+code and number; nothing the client says about the number is trusted. Each
+URL works once (409 on reuse). Only +91 numbers are accepted (422).
+
+A number with no account gets a new, verified customer account (name from
+phone.email, no password — "forgot password" sets one). Response is the same
+as `/auth/login/otp` plus `new_account: true|false`.
+
+Errors: 422 bad URL or non-Indian number, 409 URL already used, 410 the
+verification expired on phone.email, 502 phone.email unreachable, 503
+phone.email switched off (`PHONE_EMAIL_CLIENT_ID` empty).
+
+The phone.email button works in browsers (it opens a pop-up). Inside the
+Android/iOS app the pop-up cannot report back, so the apps use the SMS code.
+
 ## POST /auth/token/refresh
 
 ```json

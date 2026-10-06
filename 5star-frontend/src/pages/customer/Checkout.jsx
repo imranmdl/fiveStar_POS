@@ -6,6 +6,7 @@ import { useCart } from '../../hooks/useCart';
 import { packLabel, rupees, tintFor } from '../../lib/store';
 import { ProductMedia } from '../../components/customer/ProductCard';
 import { PriceDetails } from './Cart';
+import PhoneEmailButton, { usePhoneEmail } from '../../components/PhoneEmailButton';
 
 const EMPTY_ADDRESS = {
   contact_name: '', contact_mobile: '', address_line1: '', address_line2: '', city: '', state: '', pincode: '',
@@ -65,46 +66,66 @@ function NewAddressForm({ onSaved, onCancel }) {
   );
 }
 
-function OtpStep({ order, otp, onResend, onVerify, resending }) {
+function OtpStep({ order, otp, onResend, onVerify, onVerifyPhone, resending }) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const phoneEmailClient = usePhoneEmail();
+  const notSent = otp && otp.delivery === 'not_sent' && !otp.debug_otp;
 
-  async function handleSubmit(event) {
-    event.preventDefault();
+  async function run(action) {
     setBusy(true);
     setError(null);
     try {
-      await onVerify(code);
+      await action();
     } catch (err) {
       setError(err.message);
       setBusy(false);
     }
   }
 
+  function handleSubmit(event) {
+    event.preventDefault();
+    run(() => onVerify(code));
+  }
+
+  const sentTo = (otp && otp.sent_to) || 'your mobile';
+
   return (
     <div className="sf-panel sf-center">
       <h1 className="sf-h1">Confirm your order</h1>
-      {otp && otp.delivery === 'not_sent' && !otp.debug_otp ? (
+      {phoneEmailClient ? (
+        <p>
+          Order <b>{order.order_number}</b>. Verify the delivery mobile number {otp && otp.sent_to ? <b>{otp.sent_to}</b> : null} to confirm it.
+        </p>
+      ) : notSent ? (
         <p>
           Order <b>{order.order_number}</b>. We couldn&apos;t text you a code — this shop hasn&apos;t switched on text
           messages yet. Please contact the shop for your code, or try again later.
         </p>
       ) : (
-        <p>Order <b>{order.order_number}</b>. We have sent a code to {(otp && otp.sent_to) || 'your mobile'}.</p>
+        <p>Order <b>{order.order_number}</b>. We have sent a code to {sentTo}.</p>
       )}
       {otp && otp.debug_otp && <div className="sf-status">Test mode: your code is <b>{otp.debug_otp}</b>.</div>}
-      <form className="sf-otp" onSubmit={handleSubmit}>
-        {error && <div className="sf-error">{error}</div>}
-        <label className="sf-field">
-          Verification code
-          <input inputMode="numeric" maxLength={6} autoComplete="one-time-code" required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
-        </label>
-        <button type="submit" className="sf-btn sf-btn--red sf-btn--lg" disabled={busy}>{busy ? 'Verifying…' : 'CONFIRM AND CONTINUE'}</button>
-        <button type="button" className="sf-btn sf-btn--ghost" onClick={onResend} disabled={resending}>
-          {resending ? 'Sending…' : 'Resend the code'}
-        </button>
-      </form>
+      {error && <div className="sf-error">{error}</div>}
+
+      {phoneEmailClient && (
+        <PhoneEmailButton clientId={phoneEmailClient} onVerified={(url) => run(() => onVerifyPhone(url))} disabled={busy} />
+      )}
+
+      {!(phoneEmailClient && notSent) && (
+        <form className="sf-otp" onSubmit={handleSubmit}>
+          {phoneEmailClient && <p className="sf-small">Or enter the code we texted to {sentTo}.</p>}
+          <label className="sf-field">
+            Verification code
+            <input inputMode="numeric" maxLength={6} autoComplete="one-time-code" required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
+          </label>
+          <button type="submit" className="sf-btn sf-btn--red sf-btn--lg" disabled={busy}>{busy ? 'Verifying…' : 'CONFIRM AND CONTINUE'}</button>
+          <button type="button" className="sf-btn sf-btn--ghost" onClick={onResend} disabled={resending}>
+            {resending ? 'Sending…' : 'Resend the code'}
+          </button>
+        </form>
+      )}
     </div>
   );
 }
@@ -235,6 +256,16 @@ export default function Checkout() {
     }
   }
 
+  async function handleVerifyPhone(userJsonUrl) {
+    await api.post(`/checkout/orders/${order.uuid}/verify-phone`, { user_json_url: userJsonUrl });
+
+    if (order.payment_method === 'cod') {
+      await chooseCod();
+    } else {
+      await startPayment();
+    }
+  }
+
   async function handleResendOtp() {
     setResending(true);
     try {
@@ -344,7 +375,7 @@ export default function Checkout() {
   }
 
   if (phase === 'otp') {
-    return <OtpStep order={order} otp={otp} onResend={handleResendOtp} onVerify={handleVerifyOtp} resending={resending} />;
+    return <OtpStep order={order} otp={otp} onResend={handleResendOtp} onVerify={handleVerifyOtp} onVerifyPhone={handleVerifyPhone} resending={resending} />;
   }
 
   if (phase === 'cod-wait') {

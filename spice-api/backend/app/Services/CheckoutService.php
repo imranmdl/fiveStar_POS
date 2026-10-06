@@ -11,6 +11,7 @@ use App\Core\Exceptions\NotFoundException;
 use App\Core\Logger;
 use App\Core\Request;
 use App\Helpers\Money;
+use App\Helpers\Str;
 use App\Repositories\CartRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\SettingRepository;
@@ -76,6 +77,7 @@ final class CheckoutService
         private readonly Database $db,
         private readonly Config $config,
         private readonly Logger $logger,
+        private readonly PhoneEmailService $phoneEmail,
     ) {
     }
 
@@ -425,12 +427,7 @@ final class CheckoutService
             return ['order' => $this->presentPlacement($order), 'already_verified' => true];
         }
 
-        if (!in_array($order['status'], [OrderStatus::CREATED, OrderStatus::AWAITING_PAYMENT], true)) {
-            throw new HttpException(
-                'This order can no longer be verified; it is ' . OrderStatus::label((string) $order['status']) . '.',
-                409
-            );
-        }
+        $this->assertVerifiable($order);
 
         $this->otp->verify(
             (string) $order['ship_mobile'],
@@ -439,6 +436,68 @@ final class CheckoutService
             $referenceToken
         );
 
+        return $this->markVerified($request, $order, $userId, 'Order verified by OTP', 'otp');
+    }
+
+    /**
+     * BR-003 by phone.email instead of an SMS code: the customer verifies the
+     * order's mobile number with the phone.email button and the client sends
+     * the resulting user_json_url. The number phone.email confirms must be
+     * the one the order ships to.
+     *
+     * @return array<string, mixed>
+     */
+    public function verifyPhone(Request $request, string $orderUuid, string $userJsonUrl): array
+    {
+        $userId = (int) $request->authUserId();
+        $order = $this->requireOwnedOrder($orderUuid, $userId);
+
+        if ((int) $order['otp_verified'] === 1) {
+            return ['order' => $this->presentPlacement($order), 'already_verified' => true];
+        }
+
+        $this->assertVerifiable($order);
+
+        $verified = $this->phoneEmail->consume(
+            $userJsonUrl,
+            PhoneEmailService::PURPOSE_ORDER_CONFIRMATION,
+            $userId,
+            (int) $order['id']
+        );
+
+        if ($verified['mobile'] !== (string) $order['ship_mobile']) {
+            throw new HttpException(
+                sprintf(
+                    'You verified %s, but this order is for %s. Verify the mobile number on the delivery address.',
+                    Str::maskMobile($verified['mobile']),
+                    Str::maskMobile((string) $order['ship_mobile'])
+                ),
+                422,
+                ['mobile' => ['The verified number must match the delivery mobile number.']]
+            );
+        }
+
+        return $this->markVerified($request, $order, $userId, 'Order verified by phone', 'phone_email');
+    }
+
+    /** @param array<string, mixed> $order */
+    private function assertVerifiable(array $order): void
+    {
+        if (!in_array($order['status'], [OrderStatus::CREATED, OrderStatus::AWAITING_PAYMENT], true)) {
+            throw new HttpException(
+                'This order can no longer be verified; it is ' . OrderStatus::label((string) $order['status']) . '.',
+                409
+            );
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $order
+     *
+     * @return array<string, mixed>
+     */
+    private function markVerified(Request $request, array $order, int $userId, string $title, string $method): array
+    {
         $this->orders->update((int) $order['id'], [
             'otp_verified' => 1,
             'otp_verified_date' => date('Y-m-d H:i:s'),
@@ -448,7 +507,7 @@ final class CheckoutService
             orderId: (int) $order['id'],
             fromStatus: (string) $order['status'],
             toStatus: (string) $order['status'],
-            title: 'Order verified by OTP',
+            title: $title,
             paymentStatus: (string) $order['payment_status'],
             note: 'BR-003 satisfied. The order can be confirmed once payment is received.',
             changedBy: $userId,
@@ -459,8 +518,9 @@ final class CheckoutService
             entityName: 'orders',
             entityId: (int) $order['id'],
             action: 'otp_verified',
+            newValues: ['method' => $method],
             request: $request,
-            entityUuid: $orderUuid,
+            entityUuid: (string) $order['uuid'],
         );
 
         return [

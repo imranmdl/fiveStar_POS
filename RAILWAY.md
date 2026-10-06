@@ -85,6 +85,14 @@ Hostinger `.env`:
 `SMS_DLT_TEMPLATE_ID`, and the `SMS_FIELD_*` names if your provider differs.
 Razorpay / Shiprocket keys only if you switch those drivers on.
 
+Phone verification without an SMS provider — **phone.email** ("Sign in with
+Phone"). It is on by default with the shop's client id; customers verify
+their number in a phone.email pop-up on the sign-in page and on the
+order-confirmation step, and the server reads the verified number from
+`user.phone.email` (the container needs outbound HTTPS to it). Set
+`PHONE_EMAIL_CLIENT_ID` to change the id, or to an empty value to switch the
+button off. It works in browsers; the Android app keeps using SMS codes.
+
 Optional switches:
 
 | Variable | Default | Effect |
@@ -93,7 +101,7 @@ Optional switches:
 | `RUN_SEEDS` | `false` | Seeds run automatically on an empty database only; `true` forces them |
 | `RUN_SCHEDULER` | `true` | Background scheduler every 60 s |
 | `RUN_PREFLIGHT` | `true` | Print the go-live report in the deploy log |
-| `OTP_EXPOSE_IN_RESPONSE` | `false` | **Testing only.** `true` shows OTP codes on screen instead of texting them. Never on a live shop. |
+| `OTP_EXPOSE_IN_RESPONSE` | `false` | **Local testing only.** Shows OTP codes on screen, but only when `APP_ENV=local` — it has no effect on a Railway (production) deploy. |
 | `VITE_BRAND_LOGO_URL` | old Hostinger logo URL | Header logo used by the React app (build-time) |
 | `ALLOW_DATA_RESET` | `false` | **Test stores only.** `true` enables Admin → Backups → *Reset data*, which permanently deletes chosen data (orders, customers, products…) after taking a full backup. Leave unset on a live shop. |
 
