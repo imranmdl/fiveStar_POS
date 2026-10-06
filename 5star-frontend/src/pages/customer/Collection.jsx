@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, ApiError, formatMoney } from '../../lib/api';
 import './Collection.css';
+import SafeImage from '../../components/customer/SafeImage';
 
 function perKilo(price, grams) {
   if (!price || !grams || grams <= 0) return '';
@@ -27,7 +28,7 @@ function Card({ item, wide }) {
   return (
     <article className={`collection-card ${wide ? 'collection-card--wide' : ''}`}>
       <Link className="collection-card__media" to={`/product/${item.slug}`} aria-label={item.name}>
-        {image ? <img src={image} alt={item.name} loading="lazy" /> : <span>{(item.name || '?').charAt(0)}</span>}
+        <SafeImage src={image} alt={item.name} loading="lazy" fallback={<span>{(item.name || '?').charAt(0)}</span>} />
         <div className="collection-card__badges">
           {saving > 0 && <span className="tag tag--save">{saving}% off</span>}
           {pricing.has_live_offer && <span className="tag tag--offer">Offer</span>}
@@ -192,7 +193,7 @@ export default function Collection() {
     <div className="page collection-page">
       <header className={`collection-header ${collection.hero_image_url ? 'collection-header--hero' : ''}`}>
         {collection.hero_image_url && (
-          <img src={collection.hero_image_url} alt={collection.hero_alt_text || collection.title} className="collection-header__image" />
+          <SafeImage src={collection.hero_image_url} alt={collection.hero_alt_text || collection.title} className="collection-header__image" />
         )}
         <div className="collection-header__body">
           <h1>{collection.title}</h1>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Core\Config;
+use App\Core\Database;
 use App\Core\Exceptions\HttpException;
 use App\Core\Request;
 use App\Repositories\SettingRepository;
@@ -58,6 +59,7 @@ final class SettingsService
         private readonly FileUploadService $uploads,
         private readonly AuditService $audit,
         private readonly Config $config,
+        private readonly Database $db,
     ) {
     }
 
@@ -84,6 +86,7 @@ final class SettingsService
             // nothing is actually sent unless SMS_DRIVER=http — the dashboard warns about it.
             'sms_configured' => (string) $this->config->get('notifications.sms.driver', 'log') === 'http',
             'otp_shown_on_screen' => $this->config->get('auth.otp.expose_in_response', false) === true,
+            'image_storage' => $this->imageStorage(),
             // POS due-payment reminders (see 043_pos_due_reminders.sql):
             // whether the pos.due_reminders scheduled task is even allowed to
             // fire lives on that task's own is_enabled column, changed via
@@ -269,5 +272,41 @@ final class SettingsService
             entityUuid: null,
             notes: $key,
         );
+    }
+
+    /**
+     * Whether uploaded images survive a redeploy, and how many product
+     * images the database lists whose file is gone. On Railway the files live
+     * on the /data volume; without one, every deploy starts with an empty
+     * uploads folder while the database still points at the old files, which
+     * shows as blank product photos.
+     *
+     * @return array{volume_mounted:?bool, product_images:int, product_images_missing:int}
+     */
+    private function imageStorage(): array
+    {
+        $mounted = getenv('DATA_VOLUME_MOUNTED');
+        $root = rtrim((string) $this->config->get('uploads.root_path', ''), '/');
+        $rows = $this->db->select(
+            "SELECT `file_path` FROM `product_media`
+              WHERE `media_type` = 'image' AND `is_deleted` = 0 AND `is_active` = 1
+                AND `file_path` IS NOT NULL AND `file_path` <> ''
+                AND (`external_url` IS NULL OR `external_url` = '')
+              LIMIT 5000"
+        );
+        $missing = 0;
+
+        foreach ($rows as $row) {
+            if ($root === '' || !is_file($root . '/' . ltrim((string) $row['file_path'], '/'))) {
+                ++$missing;
+            }
+        }
+
+        return [
+            // null = not running in the container (e.g. shared hosting): unknown.
+            'volume_mounted' => $mounted === false ? null : $mounted === 'true',
+            'product_images' => count($rows),
+            'product_images_missing' => $missing,
+        ];
     }
 }
