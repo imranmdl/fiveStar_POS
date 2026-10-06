@@ -121,6 +121,10 @@ The single most important sequence in the API. Every step is required.
 
 3. POST /api/v1/checkout/orders/{uuid}/verify-otp
        Required before payment. An unverified order cannot be confirmed.
+   or POST /api/v1/checkout/orders/{uuid}/verify-phone  { user_json_url }
+       Same result, verified with the phone.email button (browser only).
+       The number phone.email verified must equal the order's delivery
+       mobile (422 otherwise). See GET /auth/methods.
 
 4. POST /api/v1/checkout/orders/{uuid}/payment
        → UPI intent URL, QR payload, and the amount.

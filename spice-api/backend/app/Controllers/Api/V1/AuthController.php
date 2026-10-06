@@ -125,6 +125,32 @@ final class AuthController extends BaseController
     }
 
     /**
+     * GET /api/v1/auth/methods
+     *
+     * Which mobile-verification methods the shop offers: the phone.email button (with its client id) and the SMS code, and whether SMS codes are really delivered.
+     */
+    public function methods(Request $request): Response
+    {
+        return Response::success($this->auth->verificationMethods());
+    }
+
+    /**
+     * POST /api/v1/auth/login/phone-email
+     *
+     * Sign in with a number verified by the phone.email button. Send the user_json_url it returns; the server reads the verified number from phone.email. Creates a customer account when the number is new.
+     */
+    public function loginWithPhoneEmail(Request $request): Response
+    {
+        $data = Validator::make($request->all(), [
+            'user_json_url' => 'required|string|max:300',
+        ]);
+
+        $result = $this->auth->loginWithPhoneEmail($data['user_json_url'], $request);
+
+        return Response::success($result, $result['new_account'] ? 'Account created and signed in' : 'Signed in successfully');
+    }
+
+    /**
      * POST /api/v1/auth/token/refresh
      *
      * Exchange a refresh token for a new access token. The refresh token rotates, and presenting an old one revokes the whole session as suspected theft.

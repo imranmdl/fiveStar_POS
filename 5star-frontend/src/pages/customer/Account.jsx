@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, storeTokens, isSignedIn, mergeGuestCart } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
+import PhoneEmailButton, { usePhoneEmail } from '../../components/PhoneEmailButton';
 import './Account.css';
 
 export default function Account() {
@@ -22,6 +23,7 @@ export default function Account() {
   const [otpNotSent, setOtpNotSent] = useState(false);
   const [pendingMobile, setPendingMobile] = useState(null);
   const [pendingReference, setPendingReference] = useState(null);
+  const phoneEmailClient = usePhoneEmail();
 
   // Already signed in: there is nothing to do here, so move on.
   useEffect(() => {
@@ -88,6 +90,30 @@ export default function Account() {
     }
   }
 
+  // phone.email verified a number: the server reads it from phone.email and
+  // signs that number in, creating the account if it is new.
+  async function handlePhoneVerified(userJsonUrl) {
+    setBusy(true);
+    setError(null);
+
+    try {
+      const response = await api.post('/auth/login/phone-email', { user_json_url: userJsonUrl });
+      storeTokens(response.data.tokens);
+      await mergeGuestCart();
+      navigate(next, { replace: true });
+    } catch (err) {
+      setError(err);
+      setBusy(false);
+    }
+  }
+
+  const phoneButton = phoneEmailClient ? (
+    <>
+      <PhoneEmailButton clientId={phoneEmailClient} onVerified={handlePhoneVerified} disabled={busy} />
+      <div className="pe-divider">or</div>
+    </>
+  ) : null;
+
   function switchTab(newTab) {
     setTab(newTab);
     setStep('form');
@@ -134,6 +160,11 @@ export default function Account() {
                 )}
               </div>
             )}
+
+            {tab === 'signin' && phoneButton && (
+              <p className="text-muted account-phone-hint">Verify your mobile number to sign in — no password needed. New here? This creates your account.</p>
+            )}
+            {tab === 'signin' && phoneButton}
 
             {tab === 'signin' ? (
               <form onSubmit={handleSignIn}>
@@ -221,7 +252,7 @@ export default function Account() {
             {otpNotSent ? (
               <p className="text-muted">
                 We couldn&apos;t text a code to {pendingMobile} — this shop hasn&apos;t switched on text messages yet.
-                Please contact the shop.
+                {phoneEmailClient ? ' Verify your number with the button below instead.' : ' Please contact the shop.'}
               </p>
             ) : (
               <p className="text-muted">We sent a code to {pendingMobile}.</p>
@@ -238,6 +269,14 @@ export default function Account() {
               </div>
             )}
 
+            {phoneEmailClient && (
+              <>
+                <PhoneEmailButton clientId={phoneEmailClient} onVerified={handlePhoneVerified} disabled={busy} />
+                {!otpNotSent && <div className="pe-divider">or enter the code</div>}
+              </>
+            )}
+
+            {!(otpNotSent && phoneEmailClient) && (
             <form onSubmit={handleVerify}>
               <label htmlFor="otp">Verification code</label>
               <input
@@ -254,6 +293,7 @@ export default function Account() {
                 {busy ? 'Verifying…' : 'Verify'}
               </button>
             </form>
+            )}
           </>
         )}
       </div>
