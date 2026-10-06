@@ -72,6 +72,23 @@ final class SettingsController extends BaseController
     }
 
     /** PATCH /api/v1/admin/settings/cod */
+    /**
+     * PATCH /api/v1/admin/settings/otp
+     *
+     * Switch mobile OTP verification on or off for the whole shop: order confirmation codes, number verification at sign-up, and OTP / phone sign-in. Off = orders go straight to payment and new accounts are signed in at once.
+     */
+    public function setOtpEnabled(Request $request): Response
+    {
+        $data = Validator::make($request->all(), [
+            'enabled' => 'required|boolean',
+        ]);
+
+        return Response::success(
+            $this->settings->setOtpEnabled($request, (bool) $data['enabled']),
+            $data['enabled'] ? 'OTP verification switched on' : 'OTP verification switched off'
+        );
+    }
+
     public function setCodEnabled(Request $request): Response
     {
         $data = Validator::make($request->all(), [

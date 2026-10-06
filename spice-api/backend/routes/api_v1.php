@@ -608,6 +608,7 @@ return static function (Router $router): void {
         $router->patch('/admin/settings/payment-driver', [SettingsController::class, 'setPaymentDriver'], $administrator);
         $router->patch('/admin/settings/delivery-driver', [SettingsController::class, 'setDeliveryDriver'], $administrator);
         $router->patch('/admin/settings/cod', [SettingsController::class, 'setCodEnabled'], $administrator);
+        $router->patch('/admin/settings/otp', [SettingsController::class, 'setOtpEnabled'], $administrator);
         $router->patch('/admin/settings/price-change-mode', [SettingsController::class, 'setPriceChangeMode'], $administrator);
         $router->patch('/admin/settings/pos-due-reminder', [SettingsController::class, 'setPosDueReminderConfig'], $administrator);
         $router->patch('/admin/settings/manual', [SettingsController::class, 'updateManual'], $administrator);

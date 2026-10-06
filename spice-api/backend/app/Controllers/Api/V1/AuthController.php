@@ -46,7 +46,9 @@ final class AuthController extends BaseController
 
         return Response::created(
             $result,
-            'Registration successful. Please verify the code sent to your mobile number.'
+            isset($result['tokens'])
+                ? 'Account created. You are signed in.'
+                : 'Registration successful. Please verify the code sent to your mobile number.'
         );
     }
 

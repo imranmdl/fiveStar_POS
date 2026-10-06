@@ -11,6 +11,7 @@ use App\Core\Exceptions\HttpException;
 use App\Core\Exceptions\UnauthorizedException;
 use App\Core\Request;
 use App\Helpers\Str;
+use App\Repositories\SettingRepository;
 use App\Repositories\UserRepository;
 
 /**
@@ -30,6 +31,7 @@ final class AuthService
         private readonly Database $db,
         private readonly Config $config,
         private readonly PhoneEmailService $phoneEmail,
+        private readonly SettingRepository $settings,
     ) {
     }
 
@@ -82,14 +84,18 @@ final class AuthService
             throw new HttpException('Customer role is not configured. Run the database seed.', 500);
         }
 
-        $userId = $this->db->transaction(function () use ($data, $customerRoleId, $referrer): int {
+        $otpOn = $this->accountOtpRequired();
+
+        $userId = $this->db->transaction(function () use ($data, $customerRoleId, $referrer, $otpOn): int {
             return $this->users->create([
                 'role_id' => $customerRoleId,
                 'full_name' => $data['full_name'],
                 'mobile' => $data['mobile'],
                 'email' => empty($data['email']) ? null : strtolower((string) $data['email']),
                 'password_hash' => $this->hashPassword($data['password']),
-                'status' => 'pending_verification',
+                // With OTP switched off the account is usable straight away;
+                // the number simply stays unverified.
+                'status' => $otpOn ? 'pending_verification' : 'active',
                 'referral_code' => $this->generateReferralCode($data['full_name']),
                 'referred_by_user_id' => $referrer === null ? null : (int) $referrer['id'],
                 'is_active' => 1,
@@ -120,6 +126,13 @@ final class AuthService
                 codeUsed: (string) $data['referral_code'],
                 request: $request,
             );
+        }
+
+        if (!$otpOn) {
+            $user = (array) $this->users->findById($userId);
+            $signedIn = $this->completeLogin($user, $request, 'password');
+
+            return $signedIn + ['verification' => null];
         }
 
         $challenge = $this->otp->issue($data['mobile'], OtpService::PURPOSE_REGISTRATION, $userId, $request);
@@ -180,6 +193,8 @@ final class AuthService
      */
     public function requestLoginOtp(string $mobile, Request $request): array
     {
+        $this->assertOtpSignInOn();
+
         $user = $this->users->findByMobile($mobile);
 
         if ($user === null) {
@@ -203,6 +218,8 @@ final class AuthService
      */
     public function loginWithOtp(string $mobile, string $code, ?string $referenceToken, Request $request): array
     {
+        $this->assertOtpSignInOn();
+
         $user = $this->users->findByMobile($mobile);
 
         if ($user === null) {
@@ -235,13 +252,19 @@ final class AuthService
      */
     public function verificationMethods(): array
     {
+        $otpOn = $this->accountOtpRequired();
+        $phoneOn = $otpOn && $this->phoneEmail->isEnabled();
+
         return [
+            // false = the shop has switched mobile OTP off (Admin → Dashboard):
+            // no OTP sign-in, no number check at sign-up or checkout.
+            'otp_enabled' => $otpOn,
             'phone_email' => [
-                'enabled' => $this->phoneEmail->isEnabled(),
-                'client_id' => $this->phoneEmail->isEnabled() ? $this->phoneEmail->clientId() : null,
+                'enabled' => $phoneOn,
+                'client_id' => $phoneOn ? $this->phoneEmail->clientId() : null,
             ],
             'sms_otp' => [
-                'enabled' => true,
+                'enabled' => $otpOn,
                 'delivered_by_sms' => (string) $this->config->get('notifications.sms.driver', 'log') === 'http',
             ],
         ];
@@ -258,6 +281,8 @@ final class AuthService
      */
     public function loginWithPhoneEmail(string $userJsonUrl, Request $request, ?string $referralCode = null): array
     {
+        $this->assertOtpSignInOn();
+
         $verified = $this->phoneEmail->consume($userJsonUrl, PhoneEmailService::PURPOSE_LOGIN);
         $mobile = $verified['mobile'];
         $user = $this->users->findByMobile($mobile);
@@ -739,6 +764,18 @@ final class AuthService
         }
 
         return (array) $this->users->findById($userId);
+    }
+
+    private function accountOtpRequired(): bool
+    {
+        return $this->settings->boolValue('account_otp_required', true);
+    }
+
+    private function assertOtpSignInOn(): void
+    {
+        if (!$this->accountOtpRequired()) {
+            throw new ForbiddenException('Sign-in with a mobile code is switched off for now. Please sign in with your password.');
+        }
     }
 
     private function generateReferralCode(string $name): string

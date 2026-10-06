@@ -86,6 +86,8 @@ final class SettingsService
             // nothing is actually sent unless SMS_DRIVER=http — the dashboard warns about it.
             'sms_configured' => (string) $this->config->get('notifications.sms.driver', 'log') === 'http',
             'otp_shown_on_screen' => $this->config->get('auth.otp.expose_in_response', false) === true,
+            'otp_enabled' => $this->settings->boolValue('order_otp_required', true)
+                || $this->settings->boolValue('account_otp_required', true),
             'image_storage' => $this->imageStorage(),
             // POS due-payment reminders (see 043_pos_due_reminders.sql):
             // whether the pos.due_reminders scheduled task is even allowed to
@@ -114,6 +116,20 @@ final class SettingsService
     }
 
     /** Turns Cash on Delivery on or off at checkout. */
+    /**
+     * One switch for mobile OTP verification: order confirmation codes,
+     * verifying the number at sign-up, and OTP / phone sign-in. Off is meant
+     * for a shop with no working SMS yet — orders go straight to payment and
+     * new accounts are active at once (their number stays unverified).
+     */
+    public function setOtpEnabled(Request $request, bool $enabled): array
+    {
+        $this->write('order_otp_required', $enabled ? '1' : '0', $request);
+        $this->write('account_otp_required', $enabled ? '1' : '0', $request);
+
+        return $this->current();
+    }
+
     public function setCodEnabled(Request $request, bool $enabled): array
     {
         $this->write('cod_enabled', $enabled ? '1' : '0', $request);

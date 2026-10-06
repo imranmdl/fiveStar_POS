@@ -118,6 +118,12 @@ Which ways of verifying a mobile number the shop offers. Public.
 `delivered_by_sms: false` means SMS codes are not actually texted (no SMS
 provider configured) — offer phone.email instead.
 
+`otp_enabled: false` means the shop has switched mobile OTP off
+(`PATCH /admin/settings/otp`): `POST /auth/register` then returns `tokens`
+straight away (account active, number unverified, `verification: null`), OTP
+and phone sign-in return 403, and `POST /checkout/place` returns
+`next_step` `start_payment` / `await_cod_approval` with `otp: null`.
+
 ## POST /auth/login/phone-email
 
 Sign in with a number verified by the phone.email "Sign in with Phone"

@@ -46,6 +46,7 @@ function greeting() {
  */
 function SetupWarnings() {
   const [settings, setSettings] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     api.get('/admin/settings').then((response) => setSettings(response.data)).catch(() => setSettings(null));
@@ -54,7 +55,7 @@ function SetupWarnings() {
   if (!settings) return null;
   const warnings = [];
 
-  if (settings.sms_configured === false && !settings.otp_shown_on_screen) {
+  if (settings.otp_enabled !== false && settings.sms_configured === false && !settings.otp_shown_on_screen) {
     warnings.push(
       <>
         <b>Text messages are switched off.</b> Customers don&apos;t receive OTP codes, so they can&apos;t confirm orders or
@@ -90,11 +91,40 @@ function SetupWarnings() {
       </>,
     );
   }
-  if (warnings.length === 0) return null;
+  async function toggleOtp() {
+    const turningOn = settings.otp_enabled === false;
+    const question = turningOn
+      ? 'Switch mobile OTP verification back on? Customers will need a code (or the phone button) to sign up, sign in with OTP and confirm orders.'
+      : 'Switch mobile OTP verification off? Orders go straight to payment, new accounts are signed in at once, and OTP / phone sign-in is hidden until you switch it back on.';
+    if (!window.confirm(question)) return;
+    setBusy(true);
+    try {
+      const response = await api.patch('/admin/settings/otp', { enabled: turningOn });
+      setSettings(response.data);
+    } catch (err) {
+      window.alert(err.message || 'Could not change the OTP setting.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const otpOff = settings.otp_enabled === false;
 
   return (
-    <div className="dash-card dash-card--attention" style={{ marginBottom: 16 }}>
+    <div className={`dash-card ${warnings.length || otpOff ? 'dash-card--attention' : ''}`} style={{ marginBottom: 16 }}>
       <div className="dash-card__header">Shop setup</div>
+      <div className="dash-otp-row" style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', padding: '10px 16px', borderBottom: '1px solid #eee' }}>
+        <span style={{ lineHeight: 1.45 }}>
+          <b>Mobile OTP verification: {otpOff ? 'OFF' : 'ON'}</b>
+          {otpOff
+            ? ' — orders skip the code and new accounts are signed in at once. Customers’ numbers are not checked.'
+            : ' — customers confirm their number when they sign up and when they place an order.'}
+        </span>
+        <button type="button" className="admin-btn" onClick={toggleOtp} disabled={busy}>
+          {busy ? 'Saving…' : otpOff ? 'Switch on' : 'Switch off for now'}
+        </button>
+      </div>
+      {warnings.length > 0 && (
       <ul className="attention-list">
         {warnings.map((w, i) => (
           <li key={i} className="attention-list__item" style={{ alignItems: 'flex-start', lineHeight: 1.45 }}>
@@ -103,6 +133,7 @@ function SetupWarnings() {
           </li>
         ))}
       </ul>
+      )}
     </div>
   );
 }

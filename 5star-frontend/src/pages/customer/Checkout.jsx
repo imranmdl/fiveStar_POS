@@ -188,12 +188,22 @@ export default function Checkout() {
         payment_method: paymentMethod,
       });
 
-      setOrder(response.data.order);
+      const placed = response.data.order;
+      setOrder(placed);
       setOtpReference(response.data.otp && response.data.otp.reference_token);
       setOtp(response.data.otp);
       refreshCart();
-      setPhase('otp');
       window.scrollTo(0, 0);
+
+      // The shop can switch order OTP off (Admin → Dashboard). Then there is
+      // no code to enter: go straight to payment, or to COD approval.
+      if (response.data.next_step === 'start_payment') {
+        await startPayment(placed);
+      } else if (response.data.next_step === 'await_cod_approval') {
+        await chooseCod(placed);
+      } else {
+        setPhase('otp');
+      }
     } catch (err) {
       setError(err.message);
       if (err instanceof ApiError && err.status === 409) {
@@ -234,8 +244,8 @@ export default function Checkout() {
     }
   }
 
-  async function chooseCod() {
-    const response = await api.post(`/checkout/orders/${order.uuid}/cod`, {});
+  async function chooseCod(forOrder = order) {
+    const response = await api.post(`/checkout/orders/${forOrder.uuid}/cod`, {});
     setOrder(response.data.order);
     setPhase('cod-wait');
     setPollStatus('waiting');
@@ -269,8 +279,8 @@ export default function Checkout() {
     }, attempt === 0 ? 0 : 5000);
   }
 
-  async function startPayment() {
-    const response = await api.post(`/checkout/orders/${order.uuid}/payment`, {});
+  async function startPayment(forOrder = order) {
+    const response = await api.post(`/checkout/orders/${forOrder.uuid}/payment`, {});
 
     if (response.data.fully_paid_by_wallet) {
       setPhase('confirmed');
