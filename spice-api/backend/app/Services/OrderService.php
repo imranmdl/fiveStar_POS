@@ -547,7 +547,7 @@ final class OrderService
                 'is_interstate' => $isInterstate,
             ],
             'seller' => [
-                'legal_name' => $this->settings->value('seller_legal_name', 'Spice & Dry Fruits'),
+                'legal_name' => $this->settings->value('seller_legal_name', '5 Star Spices & Dry Fruits'),
                 'gstin' => $this->settings->value('seller_gstin', ''),
                 'state' => $this->settings->value('seller_state', 'Karnataka'),
             ],

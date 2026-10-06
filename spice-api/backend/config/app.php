@@ -5,8 +5,8 @@ declare(strict_types=1);
 use App\Core\Env;
 
 return [
-    'name' => Env::get('APP_NAME', 'Spice & Dry Fruits Commerce Platform'),
-    'brand_name' => Env::get('APP_BRAND_NAME', 'Spice & Dry Fruits'),
+    'name' => Env::get('APP_NAME', '5 Star Spices & Dry Fruits Commerce Platform'),
+    'brand_name' => Env::get('APP_BRAND_NAME', '5 Star Spices & Dry Fruits'),
     'env' => Env::get('APP_ENV', 'production'),
     'debug' => Env::bool('APP_DEBUG', false),
     'url' => Env::get('APP_URL', 'http://localhost'),

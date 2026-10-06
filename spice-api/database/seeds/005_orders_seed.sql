@@ -17,7 +17,7 @@ VALUES
     (UUID(), 'order',   'order_cancellable_until',    'packed','string',  'Last status at which a customer may still cancel', 1),
     (UUID(), 'order',   'seller_state',               'Karnataka','string','Seller state; decides CGST+SGST versus IGST', 0),
     (UUID(), 'order',   'seller_gstin',               '',      'string',  'Seller GSTIN, printed on every invoice', 0),
-    (UUID(), 'order',   'seller_legal_name',          'Spice & Dry Fruits', 'string', 'Legal entity name on the invoice', 0),
+    (UUID(), 'order',   'seller_legal_name',          '5 Star Spices & Dry Fruits', 'string', 'Legal entity name on the invoice', 0),
     (UUID(), 'payment', 'payment_gateway',            'sandbox','string', 'Active gateway: razorpay or sandbox', 0),
     (UUID(), 'payment', 'payment_currency',           'INR',   'string',  'Only INR is supported for UPI', 1),
     (UUID(), 'payment', 'payment_methods',            'upi',   'string',  'BR-004: prepaid UPI only', 1)

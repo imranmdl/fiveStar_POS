@@ -47,7 +47,7 @@ export default function InstallPrompt() {
 
   return (
     <div className="install-prompt">
-      <span>Install 5Star Spices for quicker access — works offline too.</span>
+      <span>Install 5 Star for quicker access — works offline too.</span>
       <div className="install-prompt__actions">
         <button type="button" className="install-prompt__install" onClick={install}>
           Install

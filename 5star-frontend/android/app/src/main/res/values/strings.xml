@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">5Star Spices</string>
-    <string name="title_activity_main">5Star Spices</string>
+    <string name="app_name">5 Star</string>
+    <string name="title_activity_main">5 Star</string>
     <string name="package_name">com.fivestarspices.app</string>
     <string name="custom_url_scheme">com.fivestarspices.app</string>
 </resources>

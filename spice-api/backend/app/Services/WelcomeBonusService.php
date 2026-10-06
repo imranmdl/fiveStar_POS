@@ -89,7 +89,7 @@ final class WelcomeBonusService
                 userId: $userId,
                 amount: Money::fromDecimal($config['amount']),
                 source: 'promotional',
-                narration: 'Welcome bonus for joining Spice & Dry Fruits',
+                narration: 'Welcome bonus for joining ' . ($this->settings->value('store_name', '5 Star Spices & Dry Fruits') ?? '5 Star Spices & Dry Fruits'),
                 // One per customer, ever — however many times this method is
                 // called for the same account, WalletService::credit()'s own
                 // idempotency check makes every call after the first a no-op.

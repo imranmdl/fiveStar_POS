@@ -345,7 +345,7 @@ final class ReferralService
         }
 
         $summary = $this->referrals->summaryForUser($userId);
-        $brand = (string) $this->config->get('app.brand_name', 'Spice & Dry Fruits');
+        $brand = (string) $this->config->get('app.brand_name', '5 Star Spices & Dry Fruits');
         $code = (string) $user['referral_code'];
 
         $referrerReward = $this->referrerReward();

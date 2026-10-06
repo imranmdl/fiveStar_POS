@@ -99,7 +99,7 @@ export default function Invoice() {
       <div className="invoice-card">
         <div className="invoice-head">
           <div>
-            <div className="invoice-head__seller">{seller.legal_name || '5Star Spices'}</div>
+            <div className="invoice-head__seller">{seller.legal_name || '5 Star Spices & Dry Fruits'}</div>
             {seller.state && <div className="small text-muted">{seller.state}</div>}
             {seller.gstin && <div className="small">GSTIN: {seller.gstin}</div>}
           </div>

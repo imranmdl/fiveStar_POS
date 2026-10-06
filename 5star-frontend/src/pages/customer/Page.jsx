@@ -39,7 +39,7 @@ export default function Page() {
       .then((response) => {
         if (cancelled) return;
         setPage(response.data.page);
-        document.title = `${response.data.page.title} · 5Star Spices`;
+        document.title = `${response.data.page.title} · 5 Star`;
         setStatus('ready');
       })
       .catch((err) => {

@@ -296,7 +296,7 @@ function WebScanner({ title, hint, onDetectedRef, onClose }) {
         if (cancelled) return;
         const name = err && err.name;
         setError(name === 'NotAllowedError'
-          ? 'Camera permission was denied. Allow camera access (in the app: Android Settings → Apps → 5Star Spices → Permissions → Camera) and try again, or type the code instead.'
+          ? 'Camera permission was denied. Allow camera access (in the app: Android Settings → Apps → 5 Star → Permissions → Camera) and try again, or type the code instead.'
           : name === 'NotFoundError'
             ? 'No camera was found on this device. Use a barcode scanner or type the code instead.'
             : 'Could not start the camera. Close other apps using it, then try again — or type the code instead.');
