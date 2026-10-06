@@ -104,9 +104,131 @@ function GstField({ formRef, initial }) {
   );
 }
 
+/**
+ * "Write with AI": drafts the short and full description from what is
+ * already on the form (name, category, brand, origin, packs, organic) plus
+ * an optional note. The text lands in the two fields for review — nothing is
+ * saved until the form is saved. Without an AI key on the server it fills a
+ * plain template from the same details instead.
+ */
+function AiDescriptionWriter({ formRef, packs }) {
+  const [aiAvailable, setAiAvailable] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [showNotes, setShowNotes] = useState(false);
+  const [lastSource, setLastSource] = useState(null);
+
+  useEffect(() => {
+    api.get('/admin/products/ai-description')
+      .then((r) => setAiAvailable(Boolean(r.data.ai_available)))
+      .catch(() => setAiAvailable(false));
+  }, []);
+
+  async function write() {
+    const form = formRef.current;
+    if (!form) return;
+    const el = (name) => form.elements.namedItem(name);
+    const name = (el('name')?.value || '').trim();
+    if (!name) {
+      toast('Enter the product name first.', 'warning');
+      el('name')?.focus();
+      return;
+    }
+    const shortEl = el('short_description');
+    const descEl = el('description');
+    if ((shortEl?.value.trim() || descEl?.value.trim())
+      && !window.confirm('Replace the short and full description with a new draft?')) {
+      return;
+    }
+
+    const categorySelect = el('category_slug');
+    const category = categorySelect && categorySelect.selectedIndex > 0
+      ? categorySelect.options[categorySelect.selectedIndex].text
+      : '';
+    const newPack = (el('v_variant_name')?.value || '').trim();
+    const shelf = Number(el('shelf_life_days')?.value || 0);
+
+    setBusy(true);
+    try {
+      const r = await api.post('/admin/products/ai-description', {
+        name,
+        category: category || undefined,
+        brand: (el('brand')?.value || '').trim() || undefined,
+        origin: (el('origin_region')?.value || '').trim() || undefined,
+        is_organic: Boolean(el('is_organic')?.checked),
+        is_vegetarian: Boolean(el('is_vegetarian')?.checked),
+        shelf_life_days: shelf > 0 ? shelf : undefined,
+        packs: [...packs, ...(newPack ? [newPack] : [])],
+        notes: notes.trim() || undefined,
+      });
+      if (shortEl) shortEl.value = r.data.short_description;
+      if (descEl) descEl.value = r.data.description;
+      setLastSource(r.data.source);
+      toast(r.data.source === 'ai' ? 'Description drafted — read it through before saving.' : 'Description filled from the product details — edit as needed.', 'success');
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : 'Could not draft the description.', 'danger');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="col-12 ai-writer">
+      <div className="ai-writer__row">
+        <button type="button" className="admin-btn admin-btn--primary" onClick={write} disabled={busy || aiAvailable === null}>
+          {busy ? 'Writing…' : aiAvailable ? '✨ Write descriptions with AI' : '✨ Fill descriptions from details'}
+        </button>
+        <button type="button" className="ai-writer__link" onClick={() => setShowNotes((v) => !v)}>
+          {showNotes ? 'Hide extra details' : '+ Add details for the writer'}
+        </button>
+      </div>
+      {showNotes && (
+        <textarea
+          className="admin-input"
+          rows={2}
+          maxLength={1000}
+          placeholder="Anything worth mentioning — e.g. stone-ground, sun-dried, Kashmiri saffron grade A, used in biryani"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
+      )}
+      <div className="admin-hint">
+        {aiAvailable === false
+          ? 'Uses the product name, category, packs and the details above. For AI-written text, add ANTHROPIC_API_KEY on the server.'
+          : 'Uses the product name, category, brand, origin and packs above. Nothing is saved until you press Save — check the text first.'}
+        {lastSource === 'ai' && ' AI can make mistakes: remove anything that isn’t true for this product.'}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The product detail API nests several fields (category.slug, flags.*,
+ * compliance.*, origin.region). The edit form reads flat names, so without
+ * this the form opened with no category, GST shown as 5%, and Organic /
+ * Featured unticked — and saving then wrote those wrong values back.
+ */
+function formValues(product) {
+  if (!product) return {};
+  const flags = product.flags || {};
+  const compliance = product.compliance || {};
+  const pick = (flat, nested) => (flat !== undefined && flat !== null ? flat : nested);
+  return {
+    ...product,
+    category_slug: pick(product.category_slug, product.category && product.category.slug),
+    gst_rate: pick(product.gst_rate, compliance.gst_rate),
+    hsn_code: pick(product.hsn_code, compliance.hsn_code),
+    fssai_license_no: pick(product.fssai_license_no, compliance.fssai_license_no),
+    origin_region: pick(product.origin_region, product.origin && product.origin.region),
+    is_organic: pick(product.is_organic, flags.is_organic),
+    is_vegetarian: pick(product.is_vegetarian, flags.is_vegetarian),
+    is_featured: pick(product.is_featured, flags.is_featured),
+  };
+}
+
 function ProductForm({ product, categories, sizeType, onSubmit, saving, onCancel }) {
   const editing = Boolean(product);
-  const p = product || {};
+  const p = formValues(product);
   const formRef = useRef(null);
 
   function handleSubmit(event) {
@@ -178,6 +300,8 @@ function ProductForm({ product, categories, sizeType, onSubmit, saving, onCancel
               defaultValue={p.shelf_life_days || ''}
             />
           </div>
+
+          <AiDescriptionWriter formRef={formRef} packs={(p.variants || []).map((v) => v.variant_name).filter(Boolean)} />
 
           <div className="col-12">
             <label className="admin-label" htmlFor="short_description">Short description</label>
@@ -809,7 +933,7 @@ export default function ProductEditor({ identifier, onClose, onCreated }) {
 
     try {
       const [categoriesResponse] = await Promise.all([
-        api.get('/admin/categories').catch(() => ({ data: [] })),
+        api.get('/admin/categories', { per_page: 200 }).catch(() => ({ data: [] })),
         loadSizeType(),
       ]);
       setCategories(categoriesResponse.data.categories || categoriesResponse.data || []);

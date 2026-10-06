@@ -147,7 +147,7 @@ export default function ContentBanners() {
     let options = [];
     try {
       if (type === 'category') {
-        const response = await api.get('/admin/categories');
+        const response = await api.get('/admin/categories', { per_page: 200 });
         options = flattenCategories(response.data.categories || response.data || []);
       } else if (type === 'product') {
         const response = await api.get('/admin/products', { per_page: 200 });

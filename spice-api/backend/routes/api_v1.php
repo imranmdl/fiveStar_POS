@@ -353,6 +353,8 @@ return static function (Router $router): void {
         // Registered before any /admin/products/{uuid} route so 'sourcing' is not read as a uuid.
         $router->get('/admin/products/sourcing', [ProductSourcingController::class, 'lookup'], $administrator);
         $router->get('/admin/products', [ProductController::class, 'adminIndex'], $administrator);
+        $router->get('/admin/products/ai-description', [ProductController::class, 'aiStatus'], $administrator);
+        $router->post('/admin/products/ai-description', [ProductController::class, 'aiDescription'], array_merge((array) $administrator, ['throttle:30,600']));
         $router->post('/admin/products', [ProductController::class, 'store'], $administrator);
         $router->get('/admin/products/{identifier}', [ProductController::class, 'adminShow'], $administrator);
         $router->patch('/admin/products/{uuid}', [ProductController::class, 'update'], $administrator);

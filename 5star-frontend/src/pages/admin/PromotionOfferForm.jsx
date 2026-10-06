@@ -377,7 +377,7 @@ function OfferScope({ offer }) {
         ...flatten(item.children || [], depth + 1),
       ]);
 
-      api.get('/admin/categories').then((response) => {
+      api.get('/admin/categories', { per_page: 200 }).then((response) => {
         setCategories(flatten(response.data.categories || response.data || []));
       }).catch(() => setCategories([]));
     }
