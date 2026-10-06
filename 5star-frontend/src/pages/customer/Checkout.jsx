@@ -7,10 +7,8 @@ import { packLabel, rupees, tintFor } from '../../lib/store';
 import { ProductMedia } from '../../components/customer/ProductCard';
 import { PriceDetails } from './Cart';
 import PhoneEmailButton, { usePhoneEmail } from '../../components/PhoneEmailButton';
-
-const EMPTY_ADDRESS = {
-  contact_name: '', contact_mobile: '', address_line1: '', address_line2: '', city: '', state: '', pincode: '',
-};
+import AddressForm from '../../components/customer/AddressForm';
+import PaymentPanel from '../../components/customer/PaymentPanel';
 
 function AddressChoice({ address, selected, onSelect }) {
   const line = [address.address_line1, address.address_line2, address.city, address.state, address.pincode]
@@ -23,46 +21,6 @@ function AddressChoice({ address, selected, onSelect }) {
         <span>{address.contact_mobile}</span>
       </span>
     </button>
-  );
-}
-
-function NewAddressForm({ onSaved, onCancel }) {
-  const [form, setForm] = useState(EMPTY_ADDRESS);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-
-  const set = (field) => (event) => setForm((f) => ({ ...f, [field]: event.target.value }));
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const response = await api.post('/addresses', form);
-      setForm(EMPTY_ADDRESS);
-      onSaved(response.data.address.uuid);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form className="sf-form-grid" onSubmit={handleSubmit}>
-      {error && <div className="sf-error sf-field--full">{error}</div>}
-      <label className="sf-field">Full name<input required placeholder="Priya Sharma" autoComplete="name" value={form.contact_name} onChange={set('contact_name')} /></label>
-      <label className="sf-field">Mobile<input required inputMode="numeric" maxLength={10} placeholder="9876543210" autoComplete="tel-national" value={form.contact_mobile} onChange={set('contact_mobile')} /></label>
-      <label className="sf-field sf-field--full">Address<input required placeholder="House no., street, area" autoComplete="address-line1" value={form.address_line1} onChange={set('address_line1')} /></label>
-      <label className="sf-field sf-field--full">Landmark (optional)<input placeholder="Near…" autoComplete="address-line2" value={form.address_line2} onChange={set('address_line2')} /></label>
-      <label className="sf-field">Pincode<input required inputMode="numeric" maxLength={6} placeholder="560001" autoComplete="postal-code" value={form.pincode} onChange={set('pincode')} /></label>
-      <label className="sf-field">City<input required placeholder="Bengaluru" autoComplete="address-level2" value={form.city} onChange={set('city')} /></label>
-      <label className="sf-field">State<input required placeholder="Karnataka" autoComplete="address-level1" value={form.state} onChange={set('state')} /></label>
-      <div className="sf-field--full" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <button type="submit" className="sf-btn sf-btn--red" disabled={busy}>{busy ? 'Saving…' : 'SAVE AND DELIVER HERE'}</button>
-        {onCancel && <button type="button" className="sf-btn sf-btn--ghost" onClick={onCancel}>CANCEL</button>}
-      </div>
-    </form>
   );
 }
 
@@ -322,37 +280,12 @@ export default function Checkout() {
 
     setPayment(response.data.payment);
     setPhase('pay');
-    setPollStatus('waiting');
-    pollPayment(0, response.data.payment.gateway === 'manual');
   }
 
-  function pollPayment(attempt, isManual) {
-    const delay = attempt === 0 ? 0 : (isManual ? 5000 : 2000);
-    setTimeout(async () => {
-      try {
-        const response = await api.get(`/orders/${order.uuid}`);
-        const o = response.data.order;
-        if (o.payment_status === 'paid') {
-          setOrder(o);
-          setPhase('confirmed');
-          refreshCart();
-          return;
-        }
-        if (o.status === 'cancelled') {
-          setPollStatus('cancelled');
-          return;
-        }
-      } catch {
-        // keep polling
-      }
-
-      const maxAttempts = isManual ? 40 : 15;
-      if (attempt >= maxAttempts) {
-        setPollStatus(isManual ? 'timeout-manual' : 'timeout-auto');
-        return;
-      }
-      pollPayment(attempt + 1, isManual);
-    }, delay);
+  function handlePaid(paidOrder) {
+    setOrder(paidOrder);
+    setPhase('confirmed');
+    refreshCart();
   }
 
   if (!ready || status === 'loading') {
@@ -394,45 +327,9 @@ export default function Checkout() {
   }
 
   if (phase === 'pay' && payment) {
-    const isManual = payment.gateway === 'manual';
-    const isQrImageUrl = isManual && typeof payment.qr_payload === 'string' && /^https?:\/\//i.test(payment.qr_payload);
-
     return (
       <div className="sf-panel sf-center">
-        <h1 className="sf-h1">Pay {rupees(payment.amount)}</h1>
-        <p>Order <b>{order.order_number}</b></p>
-
-        {!isManual && payment.upi_intent_url && (
-          <a className="sf-btn sf-btn--red sf-btn--lg sf-btn--block" href={payment.upi_intent_url}>Pay with a UPI app</a>
-        )}
-
-        {isQrImageUrl && (
-          <>
-            <p className="sf-small">Scan this QR code with GPay, PhonePe, Paytm or any UPI app.</p>
-            <img src={payment.qr_payload} alt="UPI payment QR code" className="sf-qr" />
-            {payment.upi_intent_url && (
-              <a className="sf-btn sf-btn--outline sf-btn--block" href={payment.upi_intent_url}>Or pay with a UPI app</a>
-            )}
-            <p className="sf-small">After paying, keep your payment reference handy — we verify manual payments and confirm your order, usually within a few hours.</p>
-          </>
-        )}
-
-        {!isManual && payment.qr_payload && !isQrImageUrl && (
-          <>
-            <p className="sf-small">Or scan this with any UPI app.</p>
-            <div className="sf-status" style={{ wordBreak: 'break-all' }}>{payment.qr_payload}</div>
-          </>
-        )}
-
-        <div className="sf-status">
-          {pollStatus === 'cancelled'
-            ? 'This order was cancelled because payment was not completed in time.'
-            : pollStatus === 'timeout-manual'
-              ? <>We have not confirmed your payment yet. We review manual payments within a few hours and will message you. <Link to="/orders">Check your orders</Link></>
-              : pollStatus === 'timeout-auto'
-                ? <>We have not seen your payment yet. If money has left your account it will be matched within a few minutes. <Link to="/orders">Check your orders</Link></>
-                : 'Waiting for your payment to be confirmed…'}
-        </div>
+        <PaymentPanel order={order} payment={payment} onPaid={handlePaid} />
       </div>
     );
   }
@@ -501,7 +398,7 @@ export default function Checkout() {
               </span>
             )}
             {showForm ? (
-              <NewAddressForm onSaved={handleAddressChange} onCancel={addresses.length > 0 ? () => setAddingAddress(false) : null} />
+              <AddressForm submitLabel="SAVE AND DELIVER HERE" onSaved={(address) => handleAddressChange(address.uuid)} onCancel={addresses.length > 0 ? () => setAddingAddress(false) : null} />
             ) : (
               <div><button type="button" className="sf-link-btn" onClick={() => setAddingAddress(true)}>+ ADD A NEW ADDRESS</button></div>
             )}

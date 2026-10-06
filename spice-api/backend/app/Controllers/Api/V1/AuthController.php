@@ -242,6 +242,33 @@ final class AuthController extends BaseController
         );
     }
 
+    /**
+     * PATCH /api/v1/auth/me (authenticated)
+     *
+     * Update your own name and email. Send only the fields to change; an empty email removes it. The mobile number cannot be changed here.
+     */
+    public function updateMe(Request $request): Response
+    {
+        $data = Validator::make($request->all(), [
+            'full_name' => 'nullable|string|min:2|max:120',
+            'email' => 'nullable|email|max:190',
+        ]);
+        $input = $request->all();
+        $fields = [];
+
+        if (array_key_exists('full_name', $input) && ($data['full_name'] ?? '') !== '') {
+            $fields['full_name'] = $data['full_name'];
+        }
+        if (array_key_exists('email', $input)) {
+            $fields['email'] = $data['email'] ?? null;
+        }
+
+        return Response::success(
+            ['user' => $this->auth->updateProfile((int) $request->authUserId(), $fields, $request)],
+            'Profile updated'
+        );
+    }
+
     /** GET /api/v1/auth/sessions (authenticated) */
     public function sessions(Request $request): Response
     {

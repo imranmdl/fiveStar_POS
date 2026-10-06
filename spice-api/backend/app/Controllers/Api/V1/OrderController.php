@@ -28,12 +28,12 @@ final class OrderController extends BaseController
     /**
      * GET /api/v1/orders
      *
-     * Order history for the signed-in customer.
+     * Order history for the signed-in customer, newest first. Filter with `status`, or with `group` = all, active, delivered or cancelled (the history tabs). Each row carries an items preview and what the customer still has to do (`needs_verification`, `can_pay`).
      */
     public function index(Request $request): Response
     {
         $params = $this->paginationParams($request, 'created_date', 50);
-        $status = $this->optionalStatus($request->query('status'));
+        $status = $this->optionalStatus($request->query('status')) ?? $this->statusGroup($request->query('group'));
 
         $result = $this->orders->listForCustomer($request, $params, $status);
 
@@ -245,6 +245,30 @@ final class OrderController extends BaseController
             $this->payments->expireUnpaidOrders($request),
             'Unpaid orders released'
         );
+    }
+
+    /**
+     * The order-history tabs: `active` (still on its way, or waiting on the
+     * customer), `delivered`, and `cancelled` (including returned/refunded).
+     *
+     * @return array<int, string>|null
+     */
+    private function statusGroup(mixed $group): ?array
+    {
+        if (!is_string($group) || $group === '' || $group === 'all') {
+            return null;
+        }
+
+        return match ($group) {
+            'active' => [
+                OrderStatus::CREATED, OrderStatus::AWAITING_PAYMENT, OrderStatus::CONFIRMED,
+                OrderStatus::PACKED, OrderStatus::READY_TO_SHIP, OrderStatus::ASSIGNED,
+                OrderStatus::SHIPPED, OrderStatus::OUT_FOR_DELIVERY,
+            ],
+            'delivered' => [OrderStatus::DELIVERED],
+            'cancelled' => [OrderStatus::CANCELLED, OrderStatus::RETURNED, OrderStatus::REFUNDED],
+            default => throw new HttpException('Unknown order group: ' . $group . '. Use all, active, delivered or cancelled.', 422),
+        };
     }
 
     private function optionalStatus(mixed $status): ?string

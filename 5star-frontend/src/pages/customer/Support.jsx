@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
 import './Support.css';
@@ -18,12 +18,21 @@ const CATEGORIES = [
 export default function Support() {
   const { signedIn, ready } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  // Arriving from an order's "Get help with this order" link.
+  const orderUuid = params.get('order');
+  const orderNumber = params.get('number');
   const [tickets, setTickets] = useState([]);
   const [ticketsLoaded, setTicketsLoaded] = useState(false);
 
-  const [form, setForm] = useState({
-    subject: '', category: 'other', contact_name: '', contact_mobile: '', message: '',
-  });
+  const [form, setForm] = useState(() => ({
+    subject: orderNumber ? `Help with order ${orderNumber}` : '',
+    category: orderUuid ? 'order' : 'other',
+    contact_name: '',
+    contact_mobile: '',
+    message: '',
+    ...(orderUuid ? { order_uuid: orderUuid } : {}),
+  }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 

@@ -219,6 +219,39 @@ Disable the button on first tap and wait for the response.
 
 ---
 
+## Order history and order detail
+
+```
+GET /api/v1/orders?group=active&page=1&per_page=10
+```
+
+`group` is the history tab: `all` (default), `active` (still on its way or
+waiting on the customer), `delivered`, `cancelled` (includes returned and
+refunded). `status=<one status>` still works. Each row has `items_preview`
+(first three lines with `image_url`), `courier_name` / `tracking_number` /
+`tracking_url`, `total_savings`, and what the customer must do next:
+
+- `needs_verification` — confirm the delivery mobile (verify-otp / verify-phone).
+- `can_pay` — UPI payment still due and the window is open; call
+  `POST /checkout/orders/{uuid}/payment` to get a fresh intent/QR.
+- `payment_window_closed` — unpaid and expired; it will be cancelled.
+
+`GET /api/v1/orders/{uuid}` adds `progress` (fulfilment steps with
+`complete`/`current`/`pending`), `timeline`, `payments`, `invoice`, and
+`pricing` with the full discount picture: `product_discount`,
+`offer_title`/`offer_code`/`offer_discount`, `coupon_code`/`coupon_title`/
+`coupon_discount`, `order_discount` (all order-level discounts together),
+`delivery_charge_before_waiver`/`delivery_charge`, `wallet_applied`,
+`tax_breakdown`. Items carry `product_slug` and `image_url`.
+
+Shipment tracking (courier, AWB, tracking link, expected date, scan events):
+
+```
+GET /api/v1/orders/{uuid}/shipments
+```
+
+---
+
 ## Pagination
 
 ```

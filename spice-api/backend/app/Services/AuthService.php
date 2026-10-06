@@ -298,6 +298,77 @@ final class AuthService
     }
 
     /**
+     * The signed-in person edits their own name and email. The mobile number
+     * is the sign-in identity and changes only through a verified flow.
+     *
+     * @param array{full_name?:string, email?:?string} $data
+     *
+     * @return array<string, mixed>
+     */
+    public function updateProfile(int $userId, array $data, Request $request): array
+    {
+        $user = $this->users->findById($userId);
+
+        if ($user === null) {
+            throw new UnauthorizedException('Please sign in again.');
+        }
+
+        $changes = [];
+
+        if (array_key_exists('full_name', $data)) {
+            $name = trim(preg_replace('/\s+/', ' ', (string) $data['full_name']));
+
+            if ($name !== (string) $user['full_name']) {
+                $changes['full_name'] = $name;
+            }
+        }
+
+        if (array_key_exists('email', $data)) {
+            $email = trim((string) ($data['email'] ?? ''));
+            $email = $email === '' ? null : strtolower($email);
+
+            if ($email !== $user['email']) {
+                if ($email !== null) {
+                    $owner = $this->users->findByEmail($email);
+
+                    if ($owner !== null && (int) $owner['id'] !== $userId) {
+                        throw new HttpException(
+                            'This email address is already used by another account.',
+                            409,
+                            ['email' => ['This email address is already registered.']]
+                        );
+                    }
+                }
+
+                $changes['email'] = $email;
+                // A new address has not been verified yet.
+                $changes['email_verified_date'] = null;
+            }
+        }
+
+        if ($changes !== []) {
+            $this->users->update($userId, $changes, $userId);
+
+            $this->audit->log(
+                entityName: 'users',
+                entityId: $userId,
+                action: 'profile_updated',
+                oldValues: [
+                    'full_name' => $user['full_name'],
+                    'email' => Str::maskEmail($user['email'] ?? null),
+                ],
+                newValues: [
+                    'full_name' => $changes['full_name'] ?? $user['full_name'],
+                    'email' => Str::maskEmail(array_key_exists('email', $changes) ? $changes['email'] : ($user['email'] ?? null)),
+                ],
+                request: $request
+            );
+        }
+
+        return $this->publicUser((array) $this->users->findById($userId));
+    }
+
+    /**
      * Password login with progressive lockout (SRS Module 2: Account Lock).
      *
      * @return array<string, mixed>

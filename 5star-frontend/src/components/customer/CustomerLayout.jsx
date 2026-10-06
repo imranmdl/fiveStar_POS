@@ -7,6 +7,7 @@ import { StorefrontThemeProvider, themeVars, useStorefrontTheme } from '../../ho
 import { BRAND_LOGO_ALT, BRAND_LOGO_URL } from '../../lib/brand';
 import '../../styles/customer-legacy.css';
 import '../../styles/storefront.css';
+import '../../styles/account.css';
 
 const NAV = [
   ['/shop', 'All products'],
@@ -151,7 +152,7 @@ function Shell({ signedIn }) {
                 <NavLink key={to} to={to}>{label}</NavLink>
               ))}
             </nav>
-            <Link className="sf-account-link" to={signedIn ? '/account' : '/account?next=/'}>
+            <Link className="sf-account-link" to="/account">
               {signedIn ? 'Account' : 'Sign in'}
             </Link>
             <Link className="sf-cart-btn" to="/cart" aria-label={`Cart, ${count} items`}>

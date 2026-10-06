@@ -49,6 +49,7 @@ final class OrderService
         private readonly Database $db,
         private readonly InventoryService $inventory,
         private readonly WalletService $wallet,
+        private readonly FileUploadService $uploads,
     ) {
     }
 
@@ -57,7 +58,7 @@ final class OrderService
      *
      * @return array{items:array<int, array<string, mixed>>, total:int}
      */
-    public function listForCustomer(Request $request, array $params, ?string $status): array
+    public function listForCustomer(Request $request, array $params, string|array|null $status): array
     {
         $result = $this->orders->paginateForCustomer((int) $request->authUserId(), $params, $status);
         $result['items'] = array_map(fn (array $row): array => $this->presentSummary($row), $result['items']);
@@ -790,31 +791,107 @@ final class OrderService
      *
      * @return array<string, mixed>
      */
-    private function presentSummary(array $order): array
+    private function presentSummary(array $order, ?array $items = null): array
     {
+        $items ??= $this->orders->itemsFor((int) $order['id']);
+        $products = $this->productCards(array_map(static fn (array $i): int => (int) $i['product_id'], $items));
+        $status = (string) $order['status'];
+        $paid = in_array((string) $order['payment_status'], [PaymentStatus::PAID, PaymentStatus::REFUNDED, PaymentStatus::PARTIALLY_REFUNDED], true);
+        $expired = $order['expires_date'] !== null && strtotime((string) $order['expires_date']) <= time();
+
         return [
             'uuid' => $order['uuid'],
             'order_number' => $order['order_number'],
-            'status' => $order['status'],
-            'status_label' => OrderStatus::label((string) $order['status']),
+            'status' => $status,
+            'status_label' => OrderStatus::label($status),
             'payment_status' => $order['payment_status'],
             'payment_status_label' => PaymentStatus::label((string) $order['payment_status']),
+            'payment_method' => $order['payment_method'] ?? 'upi',
             'grand_total' => (float) $order['grand_total'],
             'amount_payable' => (float) $order['amount_payable'],
             'wallet_applied' => (float) $order['wallet_applied'],
-            'item_count' => count($this->orders->itemsFor((int) $order['id'])),
+            'total_savings' => (float) $order['total_savings'],
+            'item_count' => count($items),
+            'unit_count' => array_sum(array_map(static fn (array $i): int => (int) $i['quantity'], $items)),
+            // The first few lines, so an order history row can show what was bought.
+            'items_preview' => array_map(static fn (array $i): array => [
+                'product_name' => $i['product_name'],
+                'variant_name' => $i['variant_name'],
+                'quantity' => (int) $i['quantity'],
+                'image_url' => $products[(int) $i['product_id']]['image_url'] ?? null,
+            ], array_slice($items, 0, 3)),
             'placed_date' => $order['placed_date'],
             'expected_delivery_date' => $order['expected_delivery_date'],
+            'delivered_date' => $order['delivered_date'],
             'invoice_number' => $order['invoice_number'],
+            'courier_name' => $order['courier_name'],
             'tracking_number' => $order['tracking_number'],
+            'tracking_url' => $order['tracking_url'],
+            // What the customer still has to do, if anything.
+            'needs_verification' => $status === OrderStatus::CREATED
+                && !(bool) $order['otp_verified']
+                && $this->otpRequired()
+                && !$expired,
+            'can_pay' => in_array($status, [OrderStatus::CREATED, OrderStatus::AWAITING_PAYMENT], true)
+                && ($order['payment_method'] ?? 'upi') !== 'cod'
+                && !$paid
+                && ((bool) $order['otp_verified'] || !$this->otpRequired())
+                && !$expired,
+            // Unpaid and past its payment window: the scheduler cancels it.
+            'payment_window_closed' => in_array($status, [OrderStatus::CREATED, OrderStatus::AWAITING_PAYMENT], true)
+                && !$paid
+                && $expired,
             'can_cancel' => $this->stateMachine->evaluate(
-                (string) $order['status'],
+                $status,
                 OrderStatus::CANCELLED,
                 (string) $order['payment_status'],
                 (bool) $order['otp_verified'],
                 $this->otpRequired()
             )['allowed'],
         ];
+    }
+
+    /**
+     * Slug and main photo for each product on an order, so lines can link back
+     * to the product page and show a picture. Products deleted since keep their
+     * snapshot name on the order and simply have no link or photo.
+     *
+     * @param array<int, int> $productIds
+     *
+     * @return array<int, array{slug:?string, image_url:?string}>
+     */
+    private function productCards(array $productIds): array
+    {
+        $productIds = array_values(array_unique(array_filter($productIds)));
+
+        if ($productIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($productIds), '?'));
+        $cards = [];
+
+        foreach ($this->db->select(
+            "SELECT `id`, `slug` FROM `products` WHERE `id` IN ({$placeholders}) AND `is_deleted` = 0 AND `status` = 'published'",
+            $productIds
+        ) as $row) {
+            $cards[(int) $row['id']] = ['slug' => $row['slug'], 'image_url' => null];
+        }
+
+        foreach ($this->db->select(
+            "SELECT `product_id`, `file_path`, `external_url`
+               FROM `product_media`
+              WHERE `product_id` IN ({$placeholders})
+                AND `media_type` = 'image' AND `is_deleted` = 0 AND `is_active` = 1
+              ORDER BY `is_primary` DESC, `display_order` ASC",
+            $productIds
+        ) as $row) {
+            $id = (int) $row['product_id'];
+            $cards[$id] ??= ['slug' => null, 'image_url' => null];
+            $cards[$id]['image_url'] ??= $row['external_url'] ?: $this->uploads->publicUrl($row['file_path']);
+        }
+
+        return $cards;
     }
 
     /**
@@ -825,9 +902,19 @@ final class OrderService
     private function presentDetail(array $order, bool $customerView): array
     {
         $orderId = (int) $order['id'];
+        $items = $this->orders->itemsFor($orderId);
+        $products = $this->productCards(array_map(static fn (array $i): int => (int) $i['product_id'], $items));
+        $offer = $order['offer_id'] === null ? null : $this->db->selectOne(
+            'SELECT `code`, `title`, `subtitle` FROM `offers` WHERE `id` = ?',
+            [(int) $order['offer_id']]
+        );
+        $coupon = $order['coupon_id'] === null ? null : $this->db->selectOne(
+            'SELECT `code`, `title`, `description` FROM `coupons` WHERE `id` = ?',
+            [(int) $order['coupon_id']]
+        );
 
         return [
-            'order' => $this->presentSummary($order) + [
+            'order' => $this->presentSummary($order, $items) + [
                 'otp_verified' => (bool) $order['otp_verified'],
                 'expires_date' => $order['expires_date'],
                 'confirmed_date' => $order['confirmed_date'],
@@ -848,16 +935,23 @@ final class OrderService
                 'unit_price' => (float) $item['unit_price'],
                 'unit_mrp' => (float) $item['unit_mrp'],
                 'line_payable' => (float) $item['line_payable'],
+                'product_discount' => (float) $item['product_discount'],
+                'order_discount_share' => (float) $item['apportioned_discount'],
                 'gst_rate' => (float) $item['gst_rate'],
                 'tax_amount' => (float) $item['tax_amount'],
                 'is_gift' => (bool) $item['is_gift'],
-            ], $this->orders->itemsFor($orderId)),
+                'product_slug' => $products[(int) $item['product_id']]['slug'] ?? null,
+                'image_url' => $products[(int) $item['product_id']]['image_url'] ?? null,
+            ], $items),
             'pricing' => [
                 'items_mrp_total' => (float) $order['items_mrp_total'],
                 'items_subtotal' => (float) $order['items_subtotal'],
                 'product_discount' => (float) $order['product_discount'],
                 'order_discount' => (float) $order['order_discount'],
+                'order_surcharge' => (float) ($order['order_surcharge'] ?? 0),
                 'delivery_charge' => (float) $order['delivery_charge'],
+                'delivery_charge_before_waiver' => (float) ($order['delivery_charge_before_waiver'] ?? $order['delivery_charge']),
+                'delivery_discount' => (float) ($order['delivery_discount'] ?? 0),
                 'taxable_value' => (float) $order['taxable_value'],
                 'tax_total' => (float) $order['tax_total'],
                 'grand_total' => (float) $order['grand_total'],
@@ -866,7 +960,12 @@ final class OrderService
                 'amount_refunded' => (float) $order['amount_refunded'],
                 'total_savings' => (float) $order['total_savings'],
                 'coupon_code' => $order['coupon_code'],
-                'offer_code' => $order['offer_code'],
+                'coupon_discount' => (float) $order['coupon_discount'],
+                'coupon_title' => $coupon['title'] ?? null,
+                'offer_code' => $order['offer_code'] ?? ($offer['code'] ?? null),
+                'offer_discount' => (float) $order['offer_discount'],
+                'offer_title' => $offer['title'] ?? null,
+                'offer_subtitle' => $offer['subtitle'] ?? null,
                 'tax_breakdown' => array_map(static fn (array $line): array => [
                     'gst_rate' => (float) $line['gst_rate'],
                     'taxable_value' => (float) $line['taxable_value'],
