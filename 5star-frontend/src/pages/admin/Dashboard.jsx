@@ -73,6 +73,13 @@ function SetupWarnings() {
         {storage.volume_mounted === false
           ? <>Uploaded files are wiped on every deploy because the server has no storage volume. In Railway, open the app service → <b>Settings → Volumes → Add volume</b>, mount path <code>/data</code>, redeploy, then upload the photos again (Products → edit each product).</>
           : <>Upload the photos again from Products → edit each product.</>}
+        {' '}
+        <button type="button" className="admin-btn" style={{ marginTop: 6 }} onClick={removeMissingPhotos} disabled={busy}>
+          Clear the {storage.product_images_missing} missing photo record(s)
+        </button>
+        <span className="admin-hint" style={{ display: 'block', marginTop: 4 }}>
+          Shows the plain placeholder instead of a blank image until you upload again. A newly uploaded photo also replaces a missing main photo automatically.
+        </span>
       </>,
     );
   } else if (storage && storage.volume_mounted === false) {
@@ -91,6 +98,21 @@ function SetupWarnings() {
       </>,
     );
   }
+  async function removeMissingPhotos() {
+    if (!window.confirm('Remove the records of photos whose files are missing? The files are already gone; this only stops the shop pointing at them.')) return;
+    setBusy(true);
+    try {
+      const response = await api.post('/admin/media/remove-missing', {});
+      window.alert(response.message || 'Done.');
+      const fresh = await api.get('/admin/settings');
+      setSettings(fresh.data);
+    } catch (err) {
+      window.alert(err.message || 'Could not remove the missing photo records.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function toggleOtp() {
     const turningOn = settings.otp_enabled === false;
     const question = turningOn

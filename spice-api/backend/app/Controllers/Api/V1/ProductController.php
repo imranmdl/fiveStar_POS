@@ -340,6 +340,20 @@ final class ProductController extends BaseController
         );
     }
 
+    /**
+     * POST /api/v1/admin/media/remove-missing
+     *
+     * Remove product photo records whose file is no longer on the server (lost before storage was persistent). Products then show the placeholder until a photo is uploaded again.
+     */
+    public function removeMissingMedia(Request $request): Response
+    {
+        $result = $this->products->removeMissingImages($request);
+
+        return Response::success($result, $result['removed'] === 0
+            ? 'No missing photos found'
+            : sprintf('Removed %d missing photo record(s) from %d product(s)', $result['removed'], $result['products']));
+    }
+
     /** DELETE /api/v1/admin/media/{uuid} */
     public function destroyMedia(Request $request): Response
     {

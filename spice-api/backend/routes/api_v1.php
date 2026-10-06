@@ -564,6 +564,7 @@ return static function (Router $router): void {
             array_merge($administrator, ['throttle:60,600'])
         );
         $router->post('/admin/products/{uuid}/videos', [ProductController::class, 'storeVideo'], $administrator);
+        $router->post('/admin/media/remove-missing', [ProductController::class, 'removeMissingMedia'], $administrator);
         $router->delete('/admin/media/{uuid}', [ProductController::class, 'destroyMedia'], $administrator);
 
         // --- Nutrition and specifications ----------------------------------

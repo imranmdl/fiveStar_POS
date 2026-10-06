@@ -611,8 +611,12 @@ final class ProductService
         }
 
         $stored = $store();
+        // Also the main photo when the current main photo's file is gone
+        // (lost from server storage) — otherwise a re-uploaded photo would sit
+        // behind a blank one.
         $makePrimary = (bool) ($data['is_primary'] ?? false)
-            || $this->media->countImagesForProduct($productId) === 0;
+            || $this->media->countImagesForProduct($productId) === 0
+            || $this->primaryImageMissing($productId);
 
         try {
             $mediaId = $this->db->transaction(function () use ($productId, $stored, $data, $makePrimary, $request): int {
@@ -682,6 +686,74 @@ final class ProductService
         );
 
         return $this->detail((string) $product['slug'], includeUnpublished: true, countView: false);
+    }
+
+    /**
+     * Product photos the database lists whose file is no longer on disk —
+     * e.g. uploaded before the server had a persistent volume, then wiped by
+     * a deploy. Removes those records so the shop shows the placeholder (and
+     * any remaining real photo becomes the main one); re-uploaded photos then
+     * show normally.
+     *
+     * @return array{removed:int, products:int}
+     */
+    public function removeMissingImages(Request $request): array
+    {
+        $rows = $this->db->select(
+            "SELECT `id`, `uuid`, `product_id`, `file_path`, `is_primary`
+               FROM `product_media`
+              WHERE `media_type` = 'image' AND `is_deleted` = 0
+                AND `file_path` IS NOT NULL AND `file_path` <> ''
+                AND (`external_url` IS NULL OR `external_url` = '')"
+        );
+        $removed = [];
+        $products = [];
+
+        foreach ($rows as $row) {
+            if (!$this->imageFileMissing((string) $row['file_path'])) {
+                continue;
+            }
+
+            $this->db->transaction(function () use ($row, $request): void {
+                $this->media->softDelete((int) $row['id'], $request->authUserId());
+                $this->media->ensurePrimaryExists((int) $row['product_id']);
+            });
+            $removed[] = $row['file_path'];
+            $products[(int) $row['product_id']] = true;
+        }
+
+        if ($removed !== []) {
+            $this->audit->log(
+                entityName: 'product_media',
+                entityId: null,
+                action: 'remove_missing_files',
+                oldValues: ['file_paths' => array_slice($removed, 0, 200)],
+                request: $request,
+                notes: count($removed) . ' photo record(s) whose file was missing from storage'
+            );
+        }
+
+        return ['removed' => count($removed), 'products' => count($products)];
+    }
+
+    private function primaryImageMissing(int $productId): bool
+    {
+        $path = $this->db->scalar(
+            "SELECT `file_path` FROM `product_media`
+              WHERE `product_id` = :product_id AND `media_type` = 'image' AND `is_deleted` = 0 AND `is_primary` = 1
+                AND (`external_url` IS NULL OR `external_url` = '')
+              LIMIT 1",
+            ['product_id' => $productId]
+        );
+
+        return is_string($path) && $path !== '' && $this->imageFileMissing($path);
+    }
+
+    private function imageFileMissing(string $relativePath): bool
+    {
+        $root = rtrim((string) $this->config->get('uploads.root_path', ''), '/');
+
+        return $root !== '' && !is_file($root . '/' . ltrim($relativePath, '/'));
     }
 
     public function deleteMedia(string $mediaUuid, Request $request): void
