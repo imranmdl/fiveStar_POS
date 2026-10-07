@@ -238,3 +238,12 @@ The app has the server address built in, so if the domain changes, update
 | `spice-api/database/migrations/012_…sql` | Registers itself in `schema_migrations` (was re-running on every migrate) |
 | `spice-api/database/migrations/016_…sql` | FK `ON UPDATE RESTRICT` — MySQL 8 rejects CASCADE on a CHECK column (error 3823) |
 | `5star-frontend/src/lib/brand.js` | `VITE_BRAND_LOGO_URL` override for the hot-linked Hostinger logo |
+
+## Finding an error by its request id
+
+When the API answers "An unexpected error occurred. Please quote request id
+XXXX", open Railway → the service → **Logs** and search for that id. The line
+reads `[spice-commerce] ERROR request_id=XXXX GET /api/v1/... — ExceptionClass:
+message at file:line`. The full entry, with the stack trace, is in
+`/data/storage/logs/error-YYYY-MM-DD.log` (Railway shell:
+`grep XXXX /data/storage/logs/error-*.log`).
