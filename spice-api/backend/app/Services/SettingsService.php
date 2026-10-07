@@ -82,6 +82,7 @@ final class SettingsService
             // active; see CheckoutService::review()/place() for where a
             // customer actually sees and chooses it.
             'cod_enabled' => $this->settings->boolValue('cod_enabled', false),
+            'razorpay' => $this->razorpayStatus(),
             // Text messages (OTP codes, order updates). Any SMS_DRIVER but "http" means
             // nothing is actually sent unless SMS_DRIVER=http — the dashboard warns about it.
             'sms_configured' => in_array((string) $this->config->get('notifications.sms.driver', 'log'), ['http', 'msg91'], true),
@@ -160,10 +161,27 @@ final class SettingsService
     }
 
     /**
-     * Switches the payment driver. Razorpay is allowed to be selected here
-     * without live keys present — the RazorpayGateway constructor itself
-     * refuses to build without RAZORPAY_KEY_ID/SECRET, so a half-configured
-     * switch fails loudly on the very next payment attempt rather than here.
+     * Whether Razorpay keys are present, and whether they are test or live
+     * keys. Never returns the keys themselves.
+     *
+     * @return array{configured:bool, mode:?string, webhook_configured:bool}
+     */
+    private function razorpayStatus(): array
+    {
+        $keyId = (string) $this->config->get('payment.razorpay.key_id', '');
+        $secret = (string) $this->config->get('payment.razorpay.key_secret', '');
+        $configured = $keyId !== '' && $secret !== '';
+
+        return [
+            'configured' => $configured,
+            'mode' => $configured ? (str_starts_with($keyId, 'rzp_live_') ? 'live' : 'test') : null,
+            'webhook_configured' => (string) $this->config->get('payment.razorpay.webhook_secret', '') !== '',
+        ];
+    }
+
+    /**
+     * Switches the payment driver. Razorpay can only be chosen once its keys
+     * are set; otherwise every customer payment would fail.
      */
     public function setPaymentDriver(Request $request, string $driver): array
     {
@@ -172,6 +190,14 @@ final class SettingsService
                 'Unknown payment driver "' . $driver . '".',
                 422,
                 ['driver' => ['Must be one of: ' . implode(', ', self::PAYMENT_DRIVERS)]]
+            );
+        }
+
+        if ($driver === 'razorpay' && !$this->razorpayStatus()['configured']) {
+            throw new HttpException(
+                'Razorpay keys are not set. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to the server settings first.',
+                422,
+                ['driver' => ['Razorpay keys are not configured.']]
             );
         }
 

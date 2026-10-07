@@ -89,7 +89,18 @@ Authkey) and `MSG91_OTP_TEMPLATE_ID` (the OTP template's ID; its approved text
 must contain `##OTP##`). The shop generates and checks the code; MSG91 only
 delivers it. Only OTP texts go through MSG91 — order-update texts are logged,
 not sent. Delivery results are in `/data/storage/logs/sms-*.log`.
-Razorpay / Shiprocket keys only if you switch those drivers on.
+Shiprocket keys only if you switch that driver on.
+
+**Razorpay** (online UPI payments — GPay, PhonePe, Paytm, BHIM):
+`RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` (Razorpay dashboard → Account &
+Settings → API Keys; `rzp_test_…` keys take no real money, `rzp_live_…` keys
+do), and `RAZORPAY_WEBHOOK_SECRET`. Create the webhook in the same dashboard
+→ Webhooks: URL `https://<your-domain>/api/v1/webhooks/payment`, events
+`payment.captured` and `payment.failed`, and the same secret. The webhook
+confirms orders whose customer closed the payment screen right after paying.
+Then Admin → Payments → Settings → Payment gateway = **razorpay** → Save (it
+refuses until the keys are set, and shows whether they are test or live).
+Customers then pay in Razorpay's own payment screen, UPI only.
 
 AI product descriptions (optional) — Admin → Products → edit → **Write
 descriptions with AI** drafts the short and full description from the

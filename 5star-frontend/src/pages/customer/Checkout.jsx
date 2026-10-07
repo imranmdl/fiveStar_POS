@@ -270,7 +270,7 @@ export default function Checkout() {
       return;
     }
 
-    setPayment(response.data.payment);
+    setPayment({ ...response.data.payment, prefill: response.data.prefill });
     setPhase('pay');
   }
 

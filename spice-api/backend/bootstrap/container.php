@@ -92,6 +92,7 @@ $container->bind(PaymentGatewayInterface::class, static function (Container $c) 
             (string) $config->get('payment.razorpay.webhook_secret', ''),
             $logger,
             (int) $config->get('payment.timeout_seconds', 20),
+            (string) $config->get('payment.razorpay.base_url', 'https://api.razorpay.com/v1'),
         ),
         'sandbox' => new SandboxGateway(
             (string) $config->get('payment.sandbox.secret', ''),

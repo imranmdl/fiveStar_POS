@@ -33,6 +33,7 @@ final class RazorpayGateway implements PaymentGatewayInterface
         private readonly string $webhookSecret,
         private readonly Logger $logger,
         private readonly int $timeoutSeconds = 20,
+        private readonly string $apiBase = self::API_BASE,
     ) {
         if ($keyId === '' || $keySecret === '') {
             throw new \RuntimeException(
@@ -227,7 +228,7 @@ final class RazorpayGateway implements PaymentGatewayInterface
      */
     private function request(string $method, string $path, array $body = [], array $extraHeaders = []): array
     {
-        $handle = curl_init(self::API_BASE . $path);
+        $handle = curl_init(rtrim($this->apiBase, '/') . $path);
 
         $headers = array_merge([
             'Content-Type: application/json',

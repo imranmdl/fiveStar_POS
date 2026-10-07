@@ -2,11 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { rupees } from '../../lib/store';
+import { BRAND_NAME } from '../../lib/brand';
+import { openRazorpay } from '../../lib/razorpay';
 
 /**
  * "Pay ₹X" — the UPI intent link / QR for one payment attempt, and a watcher
  * that reports back once the payment lands. Used at the end of checkout and
  * from an order's page ("Complete payment").
+ *
+ * Razorpay: opens Razorpay's UPI payment screen straight away, sends the
+ * signed result to the server, and still watches the order in case the
+ * screen was closed after paying (the webhook confirms it then).
  *
  * `onPaid(order)` runs once the order shows as paid.
  */
@@ -16,15 +22,49 @@ export default function PaymentPanel({ order, payment, onPaid, heading = true })
   onPaidRef.current = onPaid;
 
   const isManual = payment.gateway === 'manual';
+  const isRazorpay = payment.gateway === 'razorpay';
+  const isTestKey = isRazorpay && String(payment.public_key || '').startsWith('rzp_test_');
+  const [rzpState, setRzpState] = useState(isRazorpay ? 'opening' : null); // opening | open | closed | verifying
+  const [rzpError, setRzpError] = useState(null);
+  const autoOpened = useRef(null);
+
+  async function payWithRazorpay() {
+    setRzpError(null);
+    setRzpState('open');
+    try {
+      const result = await openRazorpay({ payment, order, brand: BRAND_NAME });
+      if (!result) {
+        setRzpState('closed');
+        return;
+      }
+      setRzpState('verifying');
+      await api.post(`/checkout/orders/${order.uuid}/payment/callback`, result);
+      const response = await api.get(`/orders/${order.uuid}`);
+      if (response.data.order.payment_status === 'paid') {
+        onPaidRef.current(response.data.order);
+      }
+      // Not paid yet (e.g. bank still processing): the watcher below picks it up.
+    } catch (err) {
+      setRzpError(err.message);
+      setRzpState('closed');
+    }
+  }
+
+  useEffect(() => {
+    if (!isRazorpay || autoOpened.current === payment.gateway_order_id) return;
+    autoOpened.current = payment.gateway_order_id;
+    payWithRazorpay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRazorpay, payment.gateway_order_id]);
   const isQrImageUrl = isManual && typeof payment.qr_payload === 'string' && /^https?:\/\//i.test(payment.qr_payload);
 
   useEffect(() => {
     let stopped = false;
     let timer = null;
-    const maxAttempts = isManual ? 40 : 15;
+    const maxAttempts = isManual ? 40 : isRazorpay ? 150 : 15;
 
     function poll(attempt) {
-      const delay = attempt === 0 ? 0 : (isManual ? 5000 : 2000);
+      const delay = attempt === 0 ? 0 : (isManual ? 5000 : isRazorpay ? 4000 : 2000);
       timer = setTimeout(async () => {
         if (stopped) return;
         try {
@@ -55,7 +95,7 @@ export default function PaymentPanel({ order, payment, onPaid, heading = true })
       stopped = true;
       clearTimeout(timer);
     };
-  }, [order.uuid, isManual, payment.uuid]);
+  }, [order.uuid, isManual, isRazorpay, payment.uuid]);
 
   return (
     <div className="sf-pay">
@@ -63,6 +103,22 @@ export default function PaymentPanel({ order, payment, onPaid, heading = true })
         <>
           <h1 className="sf-h1">Pay {rupees(payment.amount)}</h1>
           <p>Order <b>{order.order_number}</b></p>
+        </>
+      )}
+
+      {isRazorpay && (
+        <>
+          <p className="sf-small">Pay with GPay, PhonePe, Paytm, BHIM or any UPI app.</p>
+          {isTestKey && <div className="sf-note">Test mode — no real money is taken.</div>}
+          {rzpError && <div className="sf-error">{rzpError}</div>}
+          <button
+            type="button"
+            className="sf-btn sf-btn--red sf-btn--lg sf-btn--block"
+            onClick={payWithRazorpay}
+            disabled={rzpState === 'opening' || rzpState === 'open' || rzpState === 'verifying'}
+          >
+            {rzpState === 'verifying' ? 'Confirming your payment…' : rzpState === 'closed' ? `Pay ${rupees(payment.amount)}` : 'Opening payment…'}
+          </button>
         </>
       )}
 

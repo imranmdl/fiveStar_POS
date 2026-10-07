@@ -288,7 +288,7 @@ export default function OrderDetail() {
       if (response.data.fully_paid_by_wallet) {
         await load(true);
       } else {
-        setPayment(response.data.payment);
+        setPayment({ ...response.data.payment, prefill: response.data.prefill });
         load(true);
       }
     } catch (err) {

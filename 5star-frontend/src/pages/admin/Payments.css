@@ -143,3 +143,7 @@
   background: #fff;
   padding: 4px;
 }
+
+.settings-note { background: #eef6ec; color: #2e6b22; border-radius: 6px; padding: 10px 12px; font-size: 13px; line-height: 1.5; margin: 4px 0 12px; }
+.settings-note--warn { background: #fff4d6; color: #6d500c; }
+.settings-note code { font-size: 12px; background: rgba(0, 0, 0, .06); padding: 1px 4px; border-radius: 3px; }
