@@ -22,8 +22,9 @@ export function loadRazorpay() {
 }
 
 /**
- * Opens Razorpay's payment screen for one payment attempt, UPI only (GPay,
- * PhonePe, Paytm, BHIM, any UPI app or QR). Resolves with Razorpay's
+ * Opens Razorpay's payment screen for one payment attempt, UPI shown first
+ * (GPay, PhonePe, Paytm, BHIM, any UPI app or QR), then the account's other
+ * prepaid methods. Resolves with Razorpay's
  * { razorpay_order_id, razorpay_payment_id, razorpay_signature } when the
  * customer pays, or null when they close the screen.
  */
@@ -44,7 +45,20 @@ export async function openRazorpay({ payment, order, brand }) {
       },
       notes: { order_number: order.order_number },
       theme: { color: '#c62d1f' },
-      method: { upi: true, card: false, netbanking: false, wallet: false, emi: false, paylater: false },
+      // UPI first (QR on a computer, GPay/PhonePe/Paytm/BHIM on a phone).
+      // The other prepaid methods switched on in the Razorpay account stay
+      // available below it: limiting the screen to UPI alone leaves nothing
+      // to show where UPI isn't offered (e.g. desktop without UPI QR) and
+      // Razorpay answers "No appropriate payment method found".
+      config: {
+        display: {
+          blocks: {
+            upi: { name: 'Pay using UPI', instruments: [{ method: 'upi' }] },
+          },
+          sequence: ['block.upi'],
+          preferences: { show_default_blocks: true },
+        },
+      },
       handler: (result) => resolve(result),
       modal: {
         ondismiss: () => resolve(null),

@@ -100,7 +100,7 @@ do), and `RAZORPAY_WEBHOOK_SECRET`. Create the webhook in the same dashboard
 confirms orders whose customer closed the payment screen right after paying.
 Then Admin → Payments → Settings → Payment gateway = **razorpay** → Save (it
 refuses until the keys are set, and shows whether they are test or live).
-Customers then pay in Razorpay's own payment screen, UPI only.
+Customers then pay in Razorpay's own payment screen: UPI first, then any other prepaid method switched on in the Razorpay account (payment record keeps the method used).
 
 AI product descriptions (optional) — Admin → Products → edit → **Write
 descriptions with AI** drafts the short and full description from the
