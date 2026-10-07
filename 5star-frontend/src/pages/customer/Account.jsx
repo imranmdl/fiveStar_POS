@@ -29,6 +29,8 @@ export default function Account() {
   const [otp, setOtp] = useState('');
   const [debugOtp, setDebugOtp] = useState(null);
   const [otpNotSent, setOtpNotSent] = useState(false);
+  const [otpFailed, setOtpFailed] = useState(false);
+  const [resending, setResending] = useState(false);
   const [pendingMobile, setPendingMobile] = useState(null);
   const [pendingReference, setPendingReference] = useState(null);
   const phoneEmailClient = usePhoneEmail();
@@ -89,6 +91,7 @@ export default function Account() {
       setPendingReference(response.data.verification.reference_token);
       setDebugOtp(response.data.verification.debug_otp || null);
       setOtpNotSent(response.data.verification.delivery === 'not_sent' && !response.data.verification.debug_otp);
+      setOtpFailed(response.data.verification.delivery === 'failed');
       setStep('verify');
       setBusy(false);
     } catch (err) {
@@ -146,6 +149,21 @@ export default function Account() {
       <div className="pe-divider">or</div>
     </>
   ) : null;
+
+  async function handleResend() {
+    setResending(true);
+    setError(null);
+    try {
+      const response = await api.post('/auth/otp/request', { mobile: pendingMobile, purpose: 'registration' });
+      setPendingReference(response.data.reference_token);
+      setDebugOtp(response.data.debug_otp || null);
+      setOtpFailed(response.data.delivery === 'failed');
+    } catch (err) {
+      setError(err);
+    } finally {
+      setResending(false);
+    }
+  }
 
   function switchTab(newTab) {
     setTab(newTab);
@@ -310,6 +328,8 @@ export default function Account() {
                 We couldn&apos;t text a code to {pendingMobile} — this shop hasn&apos;t switched on text messages yet.
                 {phoneEmailClient ? ' Verify your number with the button below instead.' : ' Please contact the shop.'}
               </p>
+            ) : otpFailed ? (
+              <div className="account-error">We couldn&apos;t send the code to {pendingMobile} just now. Tap &quot;Resend code&quot; below to try again.</div>
             ) : (
               <p className="text-muted">We sent a code to {pendingMobile}.</p>
             )}
@@ -347,6 +367,9 @@ export default function Account() {
               />
               <button type="submit" className="btn-marigold btn-block" disabled={busy}>
                 {busy ? 'Verifying…' : 'Verify'}
+              </button>
+              <button type="button" className="btn-link" onClick={handleResend} disabled={resending} style={{ marginTop: 10, background: 'none', border: 0, color: 'var(--sf-red, #c62d1f)', fontWeight: 700, cursor: 'pointer' }}>
+                {resending ? 'Sending…' : 'Resend code'}
               </button>
             </form>
             )}

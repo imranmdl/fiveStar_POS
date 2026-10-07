@@ -83,6 +83,12 @@ shows a "Text messages are switched off" warning. Copy the values from the
 Hostinger `.env`:
 `SMS_DRIVER=http`, `SMS_ENDPOINT`, `SMS_API_KEY`, `SMS_SENDER_ID`,
 `SMS_DLT_TEMPLATE_ID`, and the `SMS_FIELD_*` names if your provider differs.
+
+**MSG91** (OTP codes): `SMS_DRIVER=msg91`, `MSG91_AUTHKEY` (MSG91 panel →
+Authkey) and `MSG91_OTP_TEMPLATE_ID` (the OTP template's ID; its approved text
+must contain `##OTP##`). The shop generates and checks the code; MSG91 only
+delivers it. Only OTP texts go through MSG91 — order-update texts are logged,
+not sent. Delivery results are in `/data/storage/logs/sms-*.log`.
 Razorpay / Shiprocket keys only if you switch those drivers on.
 
 Phone verification without an SMS provider — **phone.email** ("Sign in with

@@ -84,7 +84,7 @@ final class SettingsService
             'cod_enabled' => $this->settings->boolValue('cod_enabled', false),
             // Text messages (OTP codes, order updates). Any SMS_DRIVER but "http" means
             // nothing is actually sent unless SMS_DRIVER=http — the dashboard warns about it.
-            'sms_configured' => (string) $this->config->get('notifications.sms.driver', 'log') === 'http',
+            'sms_configured' => in_array((string) $this->config->get('notifications.sms.driver', 'log'), ['http', 'msg91'], true),
             'otp_shown_on_screen' => $this->config->get('auth.otp.expose_in_response', false) === true,
             'otp_enabled' => $this->settings->boolValue('order_otp_required', true)
                 || $this->settings->boolValue('account_otp_required', true),

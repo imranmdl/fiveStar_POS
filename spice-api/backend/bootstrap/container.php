@@ -220,9 +220,11 @@ $container->bind(SmsGatewayInterface::class, static function (Container $c): Sms
 
     $smsConfig = (array) $config->get('notifications.sms');
 
-    return $smsConfig['driver'] === 'http'
-        ? new HttpSmsGateway($smsConfig, $logger)
-        : new LogSmsGateway($logger);
+    return match ($smsConfig['driver']) {
+        'http' => new HttpSmsGateway($smsConfig, $logger),
+        'msg91' => new \App\Services\Notifications\Msg91OtpGateway($smsConfig, $logger),
+        default => new LogSmsGateway($logger),
+    };
 });
 
 return $container;

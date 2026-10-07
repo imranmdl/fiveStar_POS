@@ -71,6 +71,11 @@ function VerifyOrder({ order, onVerified }) {
         </button>
       ) : notSent ? (
         <div className="sf-note">We couldn’t text you a code — text messages aren’t switched on for this shop yet.{phoneEmailClient ? ' Use the phone button above.' : ' Please contact the shop.'}</div>
+      ) : challenge.delivery === 'failed' ? (
+        <div className="sf-error">
+          We couldn’t send the code just now.{' '}
+          <button type="button" className="sf-link-btn" onClick={sendCode} disabled={busy}>{busy ? 'Sending…' : 'Try again'}</button>
+        </div>
       ) : (
         <form className="sf-otp-inline" onSubmit={submitCode}>
           <label className="sf-field">

@@ -240,8 +240,16 @@ if ($smsDriver === 'log') {
     block(
         'SMS_DRIVER is "log". Messages are written to a file instead of being sent, '
         . 'so no customer would receive an OTP — and no order could be confirmed.',
-        'Set SMS_DRIVER=http and fill in SMS_ENDPOINT and SMS_API_KEY.'
+        'Set SMS_DRIVER=msg91 with MSG91_AUTHKEY and MSG91_OTP_TEMPLATE_ID, or SMS_DRIVER=http with SMS_ENDPOINT and SMS_API_KEY.'
     );
+} elseif ($smsDriver === 'msg91') {
+    pass('SMS_DRIVER is msg91 (OTP codes via MSG91)');
+
+    foreach (['MSG91_AUTHKEY', 'MSG91_OTP_TEMPLATE_ID'] as $key) {
+        if ((string) env($key, '') === '') {
+            block(sprintf('%s is empty.', $key));
+        }
+    }
 } else {
     pass(sprintf('SMS_DRIVER is %s', $smsDriver));
 

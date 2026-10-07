@@ -265,7 +265,7 @@ final class AuthService
             ],
             'sms_otp' => [
                 'enabled' => $otpOn,
-                'delivered_by_sms' => (string) $this->config->get('notifications.sms.driver', 'log') === 'http',
+                'delivered_by_sms' => in_array((string) $this->config->get('notifications.sms.driver', 'log'), ['http', 'msg91'], true),
             ],
         ];
     }
