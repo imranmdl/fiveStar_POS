@@ -88,10 +88,11 @@ final class OtpService
             'resend_count' => 0,
         ], $userId);
 
-        $this->sms->send($mobile, $this->message($code, $purpose, $ttlSeconds), [
+        $sent = $this->sms->send($mobile, $this->message($code, $purpose, $ttlSeconds), [
             'otp' => $code,
             'minutes' => (string) (int) ceil($ttlSeconds / 60),
         ]);
+        $driver = (string) $this->config->get('notifications.sms.driver', 'log');
 
         return [
             'reference_token' => $referenceToken,
@@ -100,9 +101,13 @@ final class OtpService
             // Only populated when OTP_EXPOSE_IN_RESPONSE=true, which is intended
             // for local development and automated tests only.
             'debug_otp' => $this->config->get('auth.otp.expose_in_response', false) === true ? $code : null,
-            // 'not_sent' unless SMS_DRIVER=http (see bootstrap/container.php): the code went to a log file, not
-            // a phone — screens must not tell the customer "we have sent a code".
-            'delivery' => (string) $this->config->get('notifications.sms.driver', 'log') === 'http' ? 'sms' : 'not_sent',
+            // 'not_sent' unless SMS_DRIVER is http or msg91 (see bootstrap/container.php): the code went to a
+            // log file, not a phone — screens must not tell the customer "we have sent a code".
+            // 'failed' when the provider refused or could not be reached, so
+            // the customer is told to try again instead of waiting.
+            'delivery' => !in_array($driver, ['http', 'msg91'], true)
+                ? 'not_sent'
+                : (($sent['accepted'] ?? false) ? 'sms' : 'failed'),
         ];
     }
 

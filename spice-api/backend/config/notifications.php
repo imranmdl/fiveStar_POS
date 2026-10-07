@@ -6,7 +6,8 @@ use App\Core\Env;
 
 return [
     'sms' => [
-        // 'log' writes to storage/logs (development), 'http' calls the provider.
+        // 'log' writes to storage/logs (development), 'http' calls a generic
+        // provider endpoint, 'msg91' sends OTP codes through MSG91.
         'driver' => Env::get('SMS_DRIVER', 'log'),
         'endpoint' => Env::get('SMS_ENDPOINT', ''),
         'api_key' => Env::get('SMS_API_KEY', ''),
@@ -15,6 +16,15 @@ return [
         'template_id' => Env::get('SMS_DLT_TEMPLATE_ID', ''),
         'country_code' => Env::get('SMS_COUNTRY_CODE', '91'),
         'timeout_seconds' => Env::int('SMS_TIMEOUT_SECONDS', 10),
+        // SMS_DRIVER=msg91: OTP codes through MSG91's OTP API.
+        'msg91' => [
+            'authkey' => Env::get('MSG91_AUTHKEY', ''),
+            'otp_template_id' => Env::get('MSG91_OTP_TEMPLATE_ID', ''),
+            // Only a local test stack may point at a stand-in server.
+            'base_url' => Env::get('APP_ENV', 'production') === 'local'
+                ? Env::get('MSG91_BASE_URL', 'https://control.msg91.com')
+                : 'https://control.msg91.com',
+        ],
         'field_map' => [
             'mobile' => Env::get('SMS_FIELD_MOBILE', 'mobile'),
             'message' => Env::get('SMS_FIELD_MESSAGE', 'message'),

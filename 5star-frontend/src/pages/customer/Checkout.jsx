@@ -30,6 +30,7 @@ function OtpStep({ order, otp, onResend, onVerify, onVerifyPhone, resending }) {
   const [error, setError] = useState(null);
   const phoneEmailClient = usePhoneEmail();
   const notSent = otp && otp.delivery === 'not_sent' && !otp.debug_otp;
+  const sendFailed = otp && otp.delivery === 'failed';
 
   async function run(action) {
     setBusy(true);
@@ -65,6 +66,9 @@ function OtpStep({ order, otp, onResend, onVerify, onVerifyPhone, resending }) {
         <p>Order <b>{order.order_number}</b>. We have sent a code to {sentTo}.</p>
       )}
       {otp && otp.debug_otp && <div className="sf-status">Test mode: your code is <b>{otp.debug_otp}</b>.</div>}
+      {sendFailed && (
+        <div className="sf-error">We couldn&apos;t send the code to {(otp && otp.sent_to) || 'your mobile'} just now. Tap &quot;Resend the code&quot; to try again.</div>
+      )}
       {error && <div className="sf-error">{error}</div>}
 
       {phoneEmailClient && (
@@ -239,6 +243,7 @@ export default function Checkout() {
     try {
       const response = await api.post(`/checkout/orders/${order.uuid}/resend-otp`, {});
       setOtpReference(response.data.reference_token);
+      setOtp((current) => ({ ...(current || {}), ...response.data }));
     } finally {
       setResending(false);
     }
