@@ -30,13 +30,17 @@ return [
     'timeout_seconds' => Env::int('COURIER_TIMEOUT_SECONDS', 25),
 
     'shiprocket' => [
-        'email' => Env::get('SHIPROCKET_EMAIL', ''),
-        'password' => Env::get('SHIPROCKET_PASSWORD', ''),
+        'email' => trim((string) Env::get('SHIPROCKET_EMAIL', '')),
+        'password' => trim((string) Env::get('SHIPROCKET_PASSWORD', '')),
         // Configured on the Shiprocket webhook page. Without it, tracking
         // webhooks cannot be told apart from anyone posting to the endpoint.
         'webhook_secret' => Env::get('SHIPROCKET_WEBHOOK_SECRET', ''),
         // Must match a pickup location registered in the Shiprocket dashboard.
         'pickup_location' => Env::get('SHIPROCKET_PICKUP_LOCATION', 'Primary'),
+        // Only a local test stack may point at a stand-in server.
+        'base_url' => Env::get('APP_ENV', 'production') === 'local'
+            ? Env::get('SHIPROCKET_BASE_URL', 'https://apiv2.shiprocket.in/v1/external')
+            : 'https://apiv2.shiprocket.in/v1/external',
     ],
 
     'sandbox' => [

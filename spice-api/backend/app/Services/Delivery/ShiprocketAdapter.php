@@ -46,6 +46,7 @@ final class ShiprocketAdapter implements CourierAdapterInterface
         private readonly SettingRepository $settings,
         private readonly Logger $logger,
         private readonly int $timeoutSeconds = 25,
+        private readonly string $apiBase = self::API_BASE,
     ) {
         if ($email === '' || $password === '') {
             throw new \RuntimeException(
@@ -426,7 +427,7 @@ final class ShiprocketAdapter implements CourierAdapterInterface
             return $cached;
         }
 
-        $handle = curl_init(self::API_BASE . '/auth/login');
+        $handle = curl_init(rtrim($this->apiBase, '/') . '/auth/login');
         curl_setopt_array($handle, [
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
@@ -439,12 +440,22 @@ final class ShiprocketAdapter implements CourierAdapterInterface
 
         $raw = curl_exec($handle);
         $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($handle);
         curl_close($handle);
 
         $decoded = json_decode((string) $raw, true);
 
         if ($status >= 400 || !is_array($decoded) || !isset($decoded['token'])) {
-            throw new \RuntimeException('Could not authenticate with Shiprocket.');
+            $reason = $this->loginFailureReason($status, $raw === false ? null : (string) $raw, $curlError);
+
+            $this->logger->error('Shiprocket login failed', [
+                'http_status' => $status,
+                'email' => $this->maskedEmail(),
+                'shiprocket_message' => is_array($decoded) ? ($decoded['message'] ?? null) : null,
+                'curl_error' => $curlError !== '' ? $curlError : null,
+            ], 'delivery');
+
+            throw new \RuntimeException('Could not sign in to Shiprocket: ' . $reason);
         }
 
         $this->token = (string) $decoded['token'];
@@ -456,6 +467,40 @@ final class ShiprocketAdapter implements CourierAdapterInterface
         return $this->token;
     }
 
+    /** Plain-words reason a Shiprocket login failed, safe to show staff. */
+    private function loginFailureReason(int $status, ?string $raw, string $curlError): string
+    {
+        if ($raw === null || $status === 0) {
+            return 'Shiprocket could not be reached' . ($curlError !== '' ? ' (' . $curlError . ')' : '') . '. Try again in a minute.';
+        }
+
+        $decoded = json_decode($raw, true);
+        $message = is_array($decoded) && isset($decoded['message']) ? trim((string) $decoded['message']) : '';
+        $said = $message !== '' ? ' Shiprocket said: "' . $message . '".' : '';
+
+        if (!str_contains($this->email, '@')) {
+            return 'SHIPROCKET_EMAIL "' . $this->email . '" is not a full email address.' . $said;
+        }
+
+        return match (true) {
+            $status === 403 => 'Shiprocket refused this login (403). Use the API user from Shiprocket → Settings → API '
+                . '→ Create an API User — not your normal dashboard login — in SHIPROCKET_EMAIL / SHIPROCKET_PASSWORD.' . $said,
+            $status === 400, $status === 401, $status === 422 => 'Wrong email or password for ' . $this->maskedEmail()
+                . ' (' . $status . '). Check SHIPROCKET_EMAIL / SHIPROCKET_PASSWORD (the API user\'s).' . $said,
+            $status === 429 => 'Too many login attempts; Shiprocket asks to wait a few minutes.' . $said,
+            default => 'Shiprocket answered ' . $status . '.' . $said,
+        };
+    }
+
+    private function maskedEmail(): string
+    {
+        $at = strpos($this->email, '@');
+
+        return $at === false || $at < 2
+            ? $this->email
+            : substr($this->email, 0, 2) . str_repeat('*', max(1, $at - 2)) . substr($this->email, $at);
+    }
+
     /**
      * @param array<string, mixed> $body
      *
@@ -463,7 +508,7 @@ final class ShiprocketAdapter implements CourierAdapterInterface
      */
     private function request(string $method, string $path, array $body = [], bool $isRetry = false): array
     {
-        $handle = curl_init(self::API_BASE . $path);
+        $handle = curl_init(rtrim($this->apiBase, '/') . $path);
 
         $options = [
             CURLOPT_CUSTOMREQUEST => $method,
