@@ -72,7 +72,7 @@ final class SettingsService
         return [
             'payment_driver' => $this->settings->value('payment_driver', 'manual'),
             'delivery_driver' => $this->settings->value('delivery_driver', 'manual'),
-            'payment_driver_options' => self::PAYMENT_DRIVERS,
+            'payment_driver_options' => $this->paymentDriverOptions(),
             'delivery_driver_options' => self::DELIVERY_DRIVERS,
             'manual_payment_vpa' => $this->settings->value('manual_payment_vpa', ''),
             'manual_payment_payee_name' => $this->settings->value('manual_payment_payee_name', 'Anjeera Dry Fruits'),
@@ -161,6 +161,22 @@ final class SettingsService
     }
 
     /**
+     * The built-in `sandbox` gateway refuses to run outside a local/testing
+     * server, so it is not offered on a live site (choosing it there would
+     * break every payment). Razorpay's own test mode is used instead.
+     *
+     * @return array<int, string>
+     */
+    private function paymentDriverOptions(): array
+    {
+        $env = (string) $this->config->get('app.env', 'production');
+
+        return in_array($env, ['local', 'testing'], true)
+            ? self::PAYMENT_DRIVERS
+            : array_values(array_diff(self::PAYMENT_DRIVERS, ['sandbox']));
+    }
+
+    /**
      * Whether Razorpay keys are present, and whether they are test or live
      * keys. Never returns the keys themselves.
      *
@@ -185,7 +201,7 @@ final class SettingsService
      */
     public function setPaymentDriver(Request $request, string $driver): array
     {
-        if (!in_array($driver, self::PAYMENT_DRIVERS, true)) {
+        if (!in_array($driver, $this->paymentDriverOptions(), true)) {
             throw new HttpException(
                 'Unknown payment driver "' . $driver . '".',
                 422,

@@ -301,6 +301,12 @@ function CodCard({ order, onChanged }) {
   );
 }
 
+const PAYMENT_DRIVER_LABELS = {
+  razorpay: 'Razorpay (online UPI)',
+  manual: 'Manual UPI QR (staff confirm)',
+  sandbox: 'Sandbox (local testing only)',
+};
+
 /** The driver toggle + manual QR/logo settings, collapsed by default so the queue stays the focus. */
 function SettingsPanel() {
   const [loading, setLoading] = useState(true);
@@ -433,7 +439,7 @@ function SettingsPanel() {
           >
             {(settings.payment_driver_options || []).map((opt) => (
               <option key={opt} value={opt}>
-                {opt}
+                {PAYMENT_DRIVER_LABELS[opt] || opt}
               </option>
             ))}
           </select>
@@ -453,6 +459,12 @@ function SettingsPanel() {
         </label>
       </div>
 
+      {form.payment_driver === 'manual' && !settings.manual_payment_qr_url && !form.manual_payment_vpa && (
+        <div className="settings-note settings-note--warn">
+          Manual UPI is selected but there is no QR code or UPI ID below, so customers see nothing to pay with.
+          Upload a QR code / enter a UPI ID, or choose “Razorpay (online UPI)”.
+        </div>
+      )}
       {(() => {
         const rz = settings.razorpay || {};
         if (!rz.configured) {
@@ -465,7 +477,7 @@ function SettingsPanel() {
         return (
           <div className={`settings-note${rz.mode === 'test' || !rz.webhook_configured ? ' settings-note--warn' : ''}`}>
             Razorpay keys are set — <b>{rz.mode === 'live' ? 'LIVE mode (real payments)' : 'TEST mode (no real money)'}</b>.
-            {form.payment_driver !== 'razorpay' && ' Choose “razorpay” above and save to start taking payments through it.'}
+            {form.payment_driver !== 'razorpay' && ' Choose “Razorpay (online UPI)” above and save to start taking payments through it.'}
             {!rz.webhook_configured && (
               <> Webhook secret not set: add <code>RAZORPAY_WEBHOOK_SECRET</code> so payments are still confirmed when a customer closes the payment screen early.</>
             )}
