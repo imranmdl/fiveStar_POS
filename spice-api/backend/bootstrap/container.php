@@ -154,6 +154,7 @@ $container->bind(CourierAdapterInterface::class, static function (Container $c):
             $settings,
             $logger,
             (int) $config->get('delivery.timeout_seconds', 25),
+            (string) $config->get('delivery.shiprocket.base_url', 'https://apiv2.shiprocket.in/v1/external'),
         ),
         'sandbox' => new SandboxCourierAdapter(
             (string) $config->get('delivery.sandbox.secret', ''),
