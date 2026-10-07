@@ -6,7 +6,6 @@ import { useCart } from '../../hooks/useCart';
 import { packLabel, rupees, tintFor } from '../../lib/store';
 import { ProductMedia } from '../../components/customer/ProductCard';
 import { PriceDetails } from './Cart';
-import PhoneEmailButton, { usePhoneEmail } from '../../components/PhoneEmailButton';
 import AddressForm from '../../components/customer/AddressForm';
 import PaymentPanel from '../../components/customer/PaymentPanel';
 
@@ -24,11 +23,10 @@ function AddressChoice({ address, selected, onSelect }) {
   );
 }
 
-function OtpStep({ order, otp, onResend, onVerify, onVerifyPhone, resending }) {
+function OtpStep({ order, otp, onResend, onVerify, resending }) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const phoneEmailClient = usePhoneEmail();
   const notSent = otp && otp.delivery === 'not_sent' && !otp.debug_otp;
   const sendFailed = otp && otp.delivery === 'failed';
 
@@ -53,11 +51,7 @@ function OtpStep({ order, otp, onResend, onVerify, onVerifyPhone, resending }) {
   return (
     <div className="sf-panel sf-center">
       <h1 className="sf-h1">Confirm your order</h1>
-      {phoneEmailClient ? (
-        <p>
-          Order <b>{order.order_number}</b>. Verify the delivery mobile number {otp && otp.sent_to ? <b>{otp.sent_to}</b> : null} to confirm it.
-        </p>
-      ) : notSent ? (
+      {notSent ? (
         <p>
           Order <b>{order.order_number}</b>. We couldn&apos;t text you a code — this shop hasn&apos;t switched on text
           messages yet. Please contact the shop for your code, or try again later.
@@ -71,23 +65,16 @@ function OtpStep({ order, otp, onResend, onVerify, onVerifyPhone, resending }) {
       )}
       {error && <div className="sf-error">{error}</div>}
 
-      {phoneEmailClient && (
-        <PhoneEmailButton clientId={phoneEmailClient} onVerified={(url) => run(() => onVerifyPhone(url))} disabled={busy} />
-      )}
-
-      {!(phoneEmailClient && notSent) && (
-        <form className="sf-otp" onSubmit={handleSubmit}>
-          {phoneEmailClient && <p className="sf-small">Or enter the code we texted to {sentTo}.</p>}
-          <label className="sf-field">
-            Verification code
-            <input inputMode="numeric" maxLength={6} autoComplete="one-time-code" required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
-          </label>
-          <button type="submit" className="sf-btn sf-btn--red sf-btn--lg" disabled={busy}>{busy ? 'Verifying…' : 'CONFIRM AND CONTINUE'}</button>
-          <button type="button" className="sf-btn sf-btn--ghost" onClick={onResend} disabled={resending}>
-            {resending ? 'Sending…' : 'Resend the code'}
-          </button>
-        </form>
-      )}
+      <form className="sf-otp" onSubmit={handleSubmit}>
+        <label className="sf-field">
+          Verification code
+          <input inputMode="numeric" maxLength={6} autoComplete="one-time-code" required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
+        </label>
+        <button type="submit" className="sf-btn sf-btn--red sf-btn--lg" disabled={busy}>{busy ? 'Verifying…' : 'CONFIRM AND CONTINUE'}</button>
+        <button type="button" className="sf-btn sf-btn--ghost" onClick={onResend} disabled={resending}>
+          {resending ? 'Sending…' : 'Resend the code'}
+        </button>
+      </form>
     </div>
   );
 }
@@ -228,16 +215,6 @@ export default function Checkout() {
     }
   }
 
-  async function handleVerifyPhone(userJsonUrl) {
-    await api.post(`/checkout/orders/${order.uuid}/verify-phone`, { user_json_url: userJsonUrl });
-
-    if (order.payment_method === 'cod') {
-      await chooseCod();
-    } else {
-      await startPayment();
-    }
-  }
-
   async function handleResendOtp() {
     setResending(true);
     try {
@@ -323,7 +300,7 @@ export default function Checkout() {
   }
 
   if (phase === 'otp') {
-    return <OtpStep order={order} otp={otp} onResend={handleResendOtp} onVerify={handleVerifyOtp} onVerifyPhone={handleVerifyPhone} resending={resending} />;
+    return <OtpStep order={order} otp={otp} onResend={handleResendOtp} onVerify={handleVerifyOtp} resending={resending} />;
   }
 
   if (phase === 'cod-wait') {

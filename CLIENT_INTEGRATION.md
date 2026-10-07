@@ -121,10 +121,6 @@ The single most important sequence in the API. Every step is required.
 
 3. POST /api/v1/checkout/orders/{uuid}/verify-otp
        Required before payment. An unverified order cannot be confirmed.
-   or POST /api/v1/checkout/orders/{uuid}/verify-phone  { user_json_url }
-       Same result, verified with the phone.email button (browser only).
-       The number phone.email verified must equal the order's delivery
-       mobile (422 otherwise). See GET /auth/methods.
 
 4. POST /api/v1/checkout/orders/{uuid}/payment
        → UPI intent URL, QR payload, and the amount.
@@ -231,7 +227,7 @@ refunded). `status=<one status>` still works. Each row has `items_preview`
 (first three lines with `image_url`), `courier_name` / `tracking_number` /
 `tracking_url`, `total_savings`, and what the customer must do next:
 
-- `needs_verification` — confirm the delivery mobile (verify-otp / verify-phone).
+- `needs_verification` — confirm the delivery mobile (verify-otp).
 - `can_pay` — UPI payment still due and the window is open; call
   `POST /checkout/orders/{uuid}/payment` to get a fresh intent/QR.
 - `payment_window_closed` — unpaid and expired; it will be cancelled.

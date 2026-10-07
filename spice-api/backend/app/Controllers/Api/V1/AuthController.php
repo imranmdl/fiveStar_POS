@@ -129,28 +129,11 @@ final class AuthController extends BaseController
     /**
      * GET /api/v1/auth/methods
      *
-     * Which mobile-verification methods the shop offers: the phone.email button (with its client id) and the SMS code, and whether SMS codes are really delivered.
+     * Whether mobile OTP verification is switched on, and whether SMS codes are really delivered (MSG91 / SMS provider configured).
      */
     public function methods(Request $request): Response
     {
         return Response::success($this->auth->verificationMethods());
-    }
-
-    /**
-     * POST /api/v1/auth/login/phone-email
-     *
-     * Sign in with a number verified by the phone.email button. Send the user_json_url it returns; the server reads the verified number from phone.email. Creates a customer account when the number is new; an optional `referral_code` (from a share link) is recorded for that new account.
-     */
-    public function loginWithPhoneEmail(Request $request): Response
-    {
-        $data = Validator::make($request->all(), [
-            'user_json_url' => 'required|string|max:300',
-            'referral_code' => 'nullable|string|max:40',
-        ]);
-
-        $result = $this->auth->loginWithPhoneEmail($data['user_json_url'], $request, $data['referral_code'] ?? null);
-
-        return Response::success($result, $result['new_account'] ? 'Account created and signed in' : 'Signed in successfully');
     }
 
     /**

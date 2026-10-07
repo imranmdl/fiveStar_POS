@@ -107,7 +107,6 @@ return static function (Router $router): void {
         $router->post('/auth/otp/request', [AuthController::class, 'requestOtp'], ['throttle:5,600']);
         $router->post('/auth/login', [AuthController::class, 'login'], ['throttle:10,600']);
         $router->post('/auth/login/otp', [AuthController::class, 'loginWithOtp'], ['throttle:10,600']);
-        $router->post('/auth/login/phone-email', [AuthController::class, 'loginWithPhoneEmail'], ['throttle:10,600']);
         $router->get('/auth/methods', [AuthController::class, 'methods']);
         $router->post('/auth/token/refresh', [AuthController::class, 'refresh'], ['throttle:30,600']);
         $router->post('/auth/password/forgot', [AuthController::class, 'forgotPassword'], ['throttle:5,900']);
@@ -243,7 +242,6 @@ return static function (Router $router): void {
         $router->get('/checkout/review', [CheckoutController::class, 'review'], ['auth']);
         $router->post('/checkout/place', [CheckoutController::class, 'place'], ['auth', 'throttle:20,600']);
         $router->post('/checkout/orders/{uuid}/verify-otp', [CheckoutController::class, 'verifyOtp'], ['auth', 'throttle:10,600']);
-        $router->post('/checkout/orders/{uuid}/verify-phone', [CheckoutController::class, 'verifyPhone'], ['auth', 'throttle:10,600']);
         $router->post('/checkout/orders/{uuid}/resend-otp', [CheckoutController::class, 'resendOtp'], ['auth', 'throttle:5,600']);
         $router->post('/checkout/orders/{uuid}/payment', [CheckoutController::class, 'startPayment'], ['auth', 'throttle:20,600']);
         $router->post('/checkout/orders/{uuid}/cod', [CheckoutController::class, 'chooseCod'], ['auth', 'throttle:20,600']);

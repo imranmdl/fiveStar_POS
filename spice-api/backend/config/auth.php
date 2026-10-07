@@ -26,21 +26,6 @@ return [
             && Env::get('APP_ENV', 'production') === 'local',
     ],
 
-    // phone.email "Sign in with Phone": verifies the number on phone.email's
-    // side; this server fetches the result from json_host and trusts nothing
-    // the browser sends. Set PHONE_EMAIL_CLIENT_ID to '' to switch it off.
-    'phone_email' => [
-        'client_id' => Env::get('PHONE_EMAIL_CLIENT_ID', '17034275435197403254'),
-        // Only phone.email's own host is ever fetched. A local test stack may
-        // point at a stand-in server (host and plain http), never production.
-        'json_host' => Env::get('APP_ENV', 'production') === 'local'
-            ? Env::get('PHONE_EMAIL_JSON_HOST', 'user.phone.email')
-            : 'user.phone.email',
-        'allow_http' => Env::get('APP_ENV', 'production') === 'local'
-            && Env::bool('PHONE_EMAIL_ALLOW_HTTP', false),
-        'timeout_seconds' => Env::int('PHONE_EMAIL_TIMEOUT_SECONDS', 8),
-    ],
-
     'password' => [
         'bcrypt_cost' => Env::int('BCRYPT_COST', 12),
     ],

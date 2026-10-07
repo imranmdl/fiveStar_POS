@@ -90,19 +90,6 @@ final class CheckoutController extends BaseController
         );
     }
 
-    /** POST /api/v1/checkout/orders/{uuid}/verify-phone  (BR-003 via phone.email) */
-    public function verifyPhone(Request $request): Response
-    {
-        $data = Validator::make($request->all(), [
-            'user_json_url' => 'required|string|max:300',
-        ]);
-
-        return Response::success(
-            $this->checkout->verifyPhone($request, (string) $request->routeParam('uuid'), $data['user_json_url']),
-            'Order verified'
-        );
-    }
-
     /** POST /api/v1/checkout/orders/{uuid}/resend-otp */
     public function resendOtp(Request $request): Response
     {

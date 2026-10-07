@@ -77,7 +77,6 @@ final class CheckoutService
         private readonly Database $db,
         private readonly Config $config,
         private readonly Logger $logger,
-        private readonly PhoneEmailService $phoneEmail,
     ) {
     }
 
@@ -437,47 +436,6 @@ final class CheckoutService
         );
 
         return $this->markVerified($request, $order, $userId, 'Order verified by OTP', 'otp');
-    }
-
-    /**
-     * BR-003 by phone.email instead of an SMS code: the customer verifies the
-     * order's mobile number with the phone.email button and the client sends
-     * the resulting user_json_url. The number phone.email confirms must be
-     * the one the order ships to.
-     *
-     * @return array<string, mixed>
-     */
-    public function verifyPhone(Request $request, string $orderUuid, string $userJsonUrl): array
-    {
-        $userId = (int) $request->authUserId();
-        $order = $this->requireOwnedOrder($orderUuid, $userId);
-
-        if ((int) $order['otp_verified'] === 1) {
-            return ['order' => $this->presentPlacement($order), 'already_verified' => true];
-        }
-
-        $this->assertVerifiable($order);
-
-        $verified = $this->phoneEmail->consume(
-            $userJsonUrl,
-            PhoneEmailService::PURPOSE_ORDER_CONFIRMATION,
-            $userId,
-            (int) $order['id']
-        );
-
-        if ($verified['mobile'] !== (string) $order['ship_mobile']) {
-            throw new HttpException(
-                sprintf(
-                    'You verified %s, but this order is for %s. Verify the mobile number on the delivery address.',
-                    Str::maskMobile($verified['mobile']),
-                    Str::maskMobile((string) $order['ship_mobile'])
-                ),
-                422,
-                ['mobile' => ['The verified number must match the delivery mobile number.']]
-            );
-        }
-
-        return $this->markVerified($request, $order, $userId, 'Order verified by phone', 'phone_email');
     }
 
     /** @param array<string, mixed> $order */
