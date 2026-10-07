@@ -33,6 +33,20 @@ final class Logger
 
     public function exception(\Throwable $exception, array $context = []): void
     {
+        // Also one line to the server's error output (stderr in the container,
+        // i.e. Railway → Logs), so an error can be found by its request id
+        // without opening the log files on the volume.
+        error_log(sprintf(
+            '[spice-commerce] ERROR request_id=%s %s %s — %s: %s at %s:%d',
+            (string) ($context['request_id'] ?? '-'),
+            (string) ($context['method'] ?? ''),
+            (string) ($context['path'] ?? ''),
+            $exception::class,
+            str_replace(["\r", "\n"], ' ', $exception->getMessage()),
+            $exception->getFile(),
+            $exception->getLine()
+        ));
+
         $this->write('ERROR', $exception->getMessage(), $context + [
             'exception' => $exception::class,
             'file' => $exception->getFile() . ':' . $exception->getLine(),
