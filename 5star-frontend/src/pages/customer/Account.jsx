@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, storeTokens, isSignedIn, mergeGuestCart } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
-import PhoneEmailButton, { loadVerificationMethods, usePhoneEmail } from '../../components/PhoneEmailButton';
+import { loadVerificationMethods } from '../../lib/verification';
 import MyAccount from './MyAccount';
 import { forgetReferralCode, rememberedReferralCode } from './ReferralLink';
 import './Account.css';
@@ -33,7 +33,6 @@ export default function Account() {
   const [resending, setResending] = useState(false);
   const [pendingMobile, setPendingMobile] = useState(null);
   const [pendingReference, setPendingReference] = useState(null);
-  const phoneEmailClient = usePhoneEmail();
   const [otpEnabled, setOtpEnabled] = useState(true);
 
   useEffect(() => {
@@ -121,35 +120,6 @@ export default function Account() {
     }
   }
 
-  // phone.email verified a number: the server reads it from phone.email and
-  // signs that number in, creating the account if it is new.
-  async function handlePhoneVerified(userJsonUrl) {
-    setBusy(true);
-    setError(null);
-
-    try {
-      const referral = (registerData.referral_code || '').trim().toUpperCase();
-      const response = await api.post('/auth/login/phone-email', {
-        user_json_url: userJsonUrl,
-        ...(referral ? { referral_code: referral } : {}),
-      });
-      if (response.data.new_account) forgetReferralCode();
-      storeTokens(response.data.tokens);
-      await mergeGuestCart();
-      navigate(next, { replace: true });
-    } catch (err) {
-      setError(err);
-      setBusy(false);
-    }
-  }
-
-  const phoneButton = phoneEmailClient ? (
-    <>
-      <PhoneEmailButton clientId={phoneEmailClient} onVerified={handlePhoneVerified} disabled={busy} />
-      <div className="pe-divider">or</div>
-    </>
-  ) : null;
-
   async function handleResend() {
     setResending(true);
     setError(null);
@@ -219,14 +189,6 @@ export default function Account() {
             {tab === 'register' && registerData.referral_code && (
               <div className="account-info">Referral code <b>{registerData.referral_code}</b> will be applied — you get wallet credit after your first order.</div>
             )}
-            {phoneButton && (
-              <p className="text-muted account-phone-hint">
-                {tab === 'signin'
-                  ? 'Verify your mobile number to sign in — no password needed. New here? This creates your account.'
-                  : 'Quickest: verify your mobile number and your account is created — no password needed.'}
-              </p>
-            )}
-            {phoneButton}
 
             {tab === 'signin' ? (
               <form onSubmit={handleSignIn}>
@@ -326,7 +288,7 @@ export default function Account() {
             {otpNotSent ? (
               <p className="text-muted">
                 We couldn&apos;t text a code to {pendingMobile} — this shop hasn&apos;t switched on text messages yet.
-                {phoneEmailClient ? ' Verify your number with the button below instead.' : ' Please contact the shop.'}
+                {' '}Please contact the shop for your code, or try again later.
               </p>
             ) : otpFailed ? (
               <div className="account-error">We couldn&apos;t send the code to {pendingMobile} just now. Tap &quot;Resend code&quot; below to try again.</div>
@@ -345,14 +307,6 @@ export default function Account() {
               </div>
             )}
 
-            {phoneEmailClient && (
-              <>
-                <PhoneEmailButton clientId={phoneEmailClient} onVerified={handlePhoneVerified} disabled={busy} />
-                {!otpNotSent && <div className="pe-divider">or enter the code</div>}
-              </>
-            )}
-
-            {!(otpNotSent && phoneEmailClient) && (
             <form onSubmit={handleVerify}>
               <label htmlFor="otp">Verification code</label>
               <input
@@ -372,7 +326,6 @@ export default function Account() {
                 {resending ? 'Sending…' : 'Resend code'}
               </button>
             </form>
-            )}
           </>
         )}
       </div>

@@ -6,17 +6,15 @@ import { useAuth } from '../../hooks/useAuth';
 import { ProductMedia } from '../../components/customer/ProductCard';
 import { StatusBadge, formatDate } from '../../components/customer/OrderCard';
 import PaymentPanel from '../../components/customer/PaymentPanel';
-import PhoneEmailButton, { usePhoneEmail } from '../../components/PhoneEmailButton';
 
 const OFF_PATH = ['cancelled', 'returned', 'refunded'];
 
 const PAYMENT_TONE = { paid: 'good', refunded: 'muted', partially_refunded: 'muted', failed: 'warn', pending: 'warn', processing: 'info' };
 
 // ---------------------------------------------------------------------------
-// "Confirm your order" — verify the delivery mobile by phone.email or SMS.
+// "Confirm your order" — verify the delivery mobile with an SMS code.
 // ---------------------------------------------------------------------------
 function VerifyOrder({ order, onVerified }) {
-  const phoneEmailClient = usePhoneEmail();
   const [challenge, setChallenge] = useState(null);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -55,22 +53,12 @@ function VerifyOrder({ order, onVerified }) {
         Confirm the delivery mobile number for this order so we can process it.
       </p>
       {error && <div className="sf-error">{error}</div>}
-      {phoneEmailClient && (
-        <PhoneEmailButton
-          clientId={phoneEmailClient}
-          disabled={busy}
-          onVerified={(url) => run(async () => {
-            await api.post(`/checkout/orders/${order.uuid}/verify-phone`, { user_json_url: url });
-            await onVerified();
-          })}
-        />
-      )}
       {!challenge ? (
         <button type="button" className="sf-btn sf-btn--outline sf-btn--sm" onClick={sendCode} disabled={busy}>
-          {busy ? 'Sending…' : 'TEXT ME A CODE INSTEAD'}
+          {busy ? 'Sending…' : 'TEXT ME A CODE'}
         </button>
       ) : notSent ? (
-        <div className="sf-note">We couldn’t text you a code — text messages aren’t switched on for this shop yet.{phoneEmailClient ? ' Use the phone button above.' : ' Please contact the shop.'}</div>
+        <div className="sf-note">We couldn’t text you a code — text messages aren’t switched on for this shop yet. Please contact the shop for your code, or try again later.</div>
       ) : challenge.delivery === 'failed' ? (
         <div className="sf-error">
           We couldn’t send the code just now.{' '}

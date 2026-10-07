@@ -30,7 +30,6 @@ final class AuthService
         private readonly WelcomeBonusService $welcomeBonus,
         private readonly Database $db,
         private readonly Config $config,
-        private readonly PhoneEmailService $phoneEmail,
         private readonly SettingRepository $settings,
     ) {
     }
@@ -253,73 +252,16 @@ final class AuthService
     public function verificationMethods(): array
     {
         $otpOn = $this->accountOtpRequired();
-        $phoneOn = $otpOn && $this->phoneEmail->isEnabled();
 
         return [
             // false = the shop has switched mobile OTP off (Admin → Dashboard):
             // no OTP sign-in, no number check at sign-up or checkout.
             'otp_enabled' => $otpOn,
-            'phone_email' => [
-                'enabled' => $phoneOn,
-                'client_id' => $phoneOn ? $this->phoneEmail->clientId() : null,
-            ],
             'sms_otp' => [
                 'enabled' => $otpOn,
                 'delivered_by_sms' => in_array((string) $this->config->get('notifications.sms.driver', 'log'), ['http', 'msg91'], true),
             ],
         ];
-    }
-
-    /**
-     * Sign in (or sign up) with a number verified by phone.email. The client
-     * sends only the user_json_url from the phone.email button; the number is
-     * read from phone.email by PhoneEmailService. A number with no account
-     * gets a new, already-verified customer account — the same result as
-     * register() followed by verifyRegistration(), in one step.
-     *
-     * @return array<string, mixed>
-     */
-    public function loginWithPhoneEmail(string $userJsonUrl, Request $request, ?string $referralCode = null): array
-    {
-        $this->assertOtpSignInOn();
-
-        $verified = $this->phoneEmail->consume($userJsonUrl, PhoneEmailService::PURPOSE_LOGIN);
-        $mobile = $verified['mobile'];
-        $user = $this->users->findByMobile($mobile);
-        $created = false;
-
-        if ($user === null) {
-            $user = $this->createVerifiedCustomer($verified, $request, $referralCode);
-            $created = true;
-        }
-
-        $this->assertUsable($user);
-
-        // Staff accounts keep their password (and any second step) — a phone
-        // check run by an outside service is not enough to open the admin side.
-        if (($user['role_code'] ?? 'customer') !== 'customer') {
-            throw new ForbiddenException('Staff accounts sign in with their password.');
-        }
-
-        if ($user['mobile_verified_date'] === null) {
-            $this->users->markMobileVerified((int) $user['id']);
-            $this->audit->log(
-                entityName: 'users',
-                entityId: (int) $user['id'],
-                action: 'mobile_verified',
-                newValues: ['method' => 'phone_email'],
-                request: $request
-            );
-            // Same first-verification hook as verifyRegistration().
-            $this->welcomeBonus->creditIfEligible((int) $user['id'], $request);
-            $user = (array) $this->users->findById((int) $user['id']);
-        }
-
-        $this->phoneEmail->attachUser($userJsonUrl, (int) $user['id']);
-        $result = $this->completeLogin($user, $request, 'phone_email');
-        $result['new_account'] = $created;
-
-        return $result;
     }
 
     /**
@@ -695,75 +637,6 @@ final class AuthService
         if (in_array($user['status'], ['suspended', 'blocked'], true)) {
             throw new ForbiddenException('This account is ' . $user['status'] . '. Please contact support.');
         }
-    }
-
-    /**
-     * @param array{mobile:string, first_name:string, last_name:string} $verified
-     *
-     * @return array<string, mixed>
-     */
-    private function createVerifiedCustomer(array $verified, Request $request, ?string $referralCode = null): array
-    {
-        // A referral code from a share link. Unlike register(), an unknown
-        // code does not stop the sign-up — the customer has already proved
-        // their number and should not be bounced over a mistyped code.
-        $referrer = null;
-        $referralCode = $referralCode === null ? '' : strtoupper(trim($referralCode));
-
-        if ($referralCode !== '') {
-            $referrer = $this->users->findByReferralCode($referralCode);
-        }
-
-        $customerRoleId = (int) $this->db->scalar(
-            "SELECT id FROM roles WHERE code = 'customer' AND is_deleted = 0 LIMIT 1"
-        );
-
-        if ($customerRoleId === 0) {
-            throw new HttpException('Customer role is not configured. Run the database seed.', 500);
-        }
-
-        $name = trim($verified['first_name'] . ' ' . $verified['last_name']);
-        $name = $name === '' ? 'Customer ' . substr($verified['mobile'], -4) : mb_substr($name, 0, 120);
-
-        $userId = $this->db->transaction(function () use ($verified, $name, $customerRoleId, $referrer): int {
-            return $this->users->create([
-                'role_id' => $customerRoleId,
-                'full_name' => $name,
-                'mobile' => $verified['mobile'],
-                'email' => null,
-                // No password yet — the customer can set one later with
-                // "forgot password". A random hash keeps password login shut.
-                'password_hash' => $this->hashPassword(bin2hex(random_bytes(24))),
-                'status' => 'pending_verification',
-                'referral_code' => $this->generateReferralCode($name),
-                'referred_by_user_id' => $referrer === null ? null : (int) $referrer['id'],
-                'is_active' => 1,
-            ]);
-        });
-
-        $this->audit->log(
-            entityName: 'users',
-            entityId: $userId,
-            action: 'register',
-            newValues: [
-                'full_name' => $name,
-                'mobile' => Str::maskMobile($verified['mobile']),
-                'referred_by_user_id' => $referrer === null ? null : (int) $referrer['id'],
-            ],
-            request: $request,
-            notes: 'Customer created by phone.email sign-in'
-        );
-
-        if ($referrer !== null) {
-            $this->referrals->recordSignup(
-                refereeUserId: $userId,
-                referrerUserId: (int) $referrer['id'],
-                codeUsed: $referralCode,
-                request: $request,
-            );
-        }
-
-        return (array) $this->users->findById($userId);
     }
 
     private function accountOtpRequired(): bool

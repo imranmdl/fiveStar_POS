@@ -91,14 +91,6 @@ delivers it. Only OTP texts go through MSG91 — order-update texts are logged,
 not sent. Delivery results are in `/data/storage/logs/sms-*.log`.
 Razorpay / Shiprocket keys only if you switch those drivers on.
 
-Phone verification without an SMS provider — **phone.email** ("Sign in with
-Phone"). It is on by default with the shop's client id; customers verify
-their number in a phone.email pop-up on the sign-in page and on the
-order-confirmation step, and the server reads the verified number from
-`user.phone.email` (the container needs outbound HTTPS to it). Set
-`PHONE_EMAIL_CLIENT_ID` to change the id, or to an empty value to switch the
-button off. It works in browsers; the Android app keeps using SMS codes.
-
 AI product descriptions (optional) — Admin → Products → edit → **Write
 descriptions with AI** drafts the short and full description from the
 product's details using the Claude API. Set `ANTHROPIC_API_KEY` (from

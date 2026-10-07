@@ -111,48 +111,19 @@ Passwordless login. Same shape as `/auth/register/verify` but with
 Which ways of verifying a mobile number the shop offers. Public.
 
 ```json
-{ "phone_email": { "enabled": true, "client_id": "17034275435197403254" },
-  "sms_otp":     { "enabled": true, "delivered_by_sms": false } }
+{ "otp_enabled": true,
+  "sms_otp": { "enabled": true, "delivered_by_sms": true } }
 ```
 
-`delivered_by_sms: false` means SMS codes are not actually texted (no SMS
-provider configured) — offer phone.email instead.
+`delivered_by_sms: true` means codes are texted through MSG91
+(`SMS_DRIVER=msg91`). `false` means no SMS provider is configured: codes are
+not texted, so the customer must get the code from the shop.
 
 `otp_enabled: false` means the shop has switched mobile OTP off
 (`PATCH /admin/settings/otp`): `POST /auth/register` then returns `tokens`
 straight away (account active, number unverified, `verification: null`), OTP
-and phone sign-in return 403, and `POST /checkout/place` returns
+sign-in returns 403, and `POST /checkout/place` returns
 `next_step` `start_payment` / `await_cod_approval` with `otp: null`.
-
-## POST /auth/login/phone-email
-
-Sign in with a number verified by the phone.email "Sign in with Phone"
-button. Customers only — staff accounts get 403 and sign in with password.
-
-```json
-{ "user_json_url": "https://user.phone.email/user_xxxxxxxx.json", "referral_code": "RAV8T699K" }
-```
-
-`referral_code` is optional (from a friend's share link `/r/CODE`). It is
-recorded only when this sign-in creates a new account; an unknown code is
-ignored rather than blocking the sign-up.
-
-The client sends only the `user_json_url` the button passed to
-`phoneEmailListener`. The server fetches it from `user.phone.email` itself
-(https only, that host only, no redirects) and reads the verified country
-code and number; nothing the client says about the number is trusted. Each
-URL works once (409 on reuse). Only +91 numbers are accepted (422).
-
-A number with no account gets a new, verified customer account (name from
-phone.email, no password — "forgot password" sets one). Response is the same
-as `/auth/login/otp` plus `new_account: true|false`.
-
-Errors: 422 bad URL or non-Indian number, 409 URL already used, 410 the
-verification expired on phone.email, 502 phone.email unreachable, 503
-phone.email switched off (`PHONE_EMAIL_CLIENT_ID` empty).
-
-The phone.email button works in browsers (it opens a pop-up). Inside the
-Android/iOS app the pop-up cannot report back, so the apps use the SMS code.
 
 ## POST /auth/token/refresh
 

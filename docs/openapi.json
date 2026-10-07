@@ -18262,57 +18262,6 @@
                 }
             }
         },
-        "/api/v1/auth/login/phone-email": {
-            "post": {
-                "operationId": "authControllerLoginWithPhoneEmail",
-                "tags": [
-                    "Auth"
-                ],
-                "summary": "Sign in with a number verified by the phone.email button. Send the user_json_url it returns; the server reads the verified number from phone.email. Creates a customer account when the number is new; an optional `referral_code` (from a share link) is recorded for that new account.",
-                "description": "Rate limited to 10 requests per 600 seconds.",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "user_json_url": {
-                                        "maxLength": 300,
-                                        "type": "string"
-                                    },
-                                    "referral_code": {
-                                        "maxLength": 40,
-                                        "type": "string"
-                                    }
-                                },
-                                "required": [
-                                    "user_json_url"
-                                ]
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Success",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/SuccessEnvelope"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationError"
-                    },
-                    "429": {
-                        "$ref": "#/components/responses/RateLimited"
-                    }
-                }
-            }
-        },
         "/api/v1/auth/logout": {
             "post": {
                 "operationId": "authControllerLogout",
@@ -18464,7 +18413,7 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Which mobile-verification methods the shop offers: the phone.email button (with its client id) and the SMS code, and whether SMS codes are really delivered.",
+                "summary": "Whether mobile OTP verification is switched on, and whether SMS codes are really delivered (MSG91 / SMS provider configured).",
                 "responses": {
                     "200": {
                         "description": "Success",
@@ -20292,76 +20241,6 @@
                                 },
                                 "required": [
                                     "otp"
-                                ]
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Success",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/SuccessEnvelope"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationError"
-                    },
-                    "401": {
-                        "$ref": "#/components/responses/Unauthenticated"
-                    },
-                    "404": {
-                        "$ref": "#/components/responses/NotFound"
-                    },
-                    "429": {
-                        "$ref": "#/components/responses/RateLimited"
-                    }
-                }
-            }
-        },
-        "/api/v1/checkout/orders/{uuid}/verify-phone": {
-            "post": {
-                "operationId": "checkoutControllerVerifyPhone",
-                "tags": [
-                    "Checkout"
-                ],
-                "summary": "(BR-003 via phone.email)",
-                "description": "Rate limited to 10 requests per 600 seconds.",
-                "parameters": [
-                    {
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "format": "uuid"
-                        },
-                        "description": "Resource identifier. The platform never exposes numeric ids."
-                    }
-                ],
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "user_json_url": {
-                                        "maxLength": 300,
-                                        "type": "string"
-                                    }
-                                },
-                                "required": [
-                                    "user_json_url"
                                 ]
                             }
                         }
