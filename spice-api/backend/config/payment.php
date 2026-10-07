@@ -37,6 +37,10 @@ return [
         // it BR-005 cannot be enforced: there is no way to tell a genuine
         // payment notification from a forged one.
         'webhook_secret' => Env::get('RAZORPAY_WEBHOOK_SECRET', ''),
+        // Only a local test stack may point at a stand-in server.
+        'base_url' => Env::get('APP_ENV', 'production') === 'local'
+            ? Env::get('RAZORPAY_BASE_URL', 'https://api.razorpay.com/v1')
+            : 'https://api.razorpay.com/v1',
     ],
 
     'sandbox' => [

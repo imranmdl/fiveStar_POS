@@ -168,6 +168,11 @@ final class PaymentService
 
         return [
             'payment' => $intent->toArray(),
+            // Filled into the payment screen so the customer doesn't retype them.
+            'prefill' => [
+                'name' => (string) ($order['ship_name'] ?? ''),
+                'contact' => (string) ($order['ship_mobile'] ?? ''),
+            ],
             'payment_uuid' => (string) ($this->payments->findById($paymentId)['uuid'] ?? ''),
             'order' => [
                 'uuid' => $order['uuid'],

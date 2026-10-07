@@ -453,6 +453,26 @@ function SettingsPanel() {
         </label>
       </div>
 
+      {(() => {
+        const rz = settings.razorpay || {};
+        if (!rz.configured) {
+          return form.payment_driver === 'razorpay' ? (
+            <div className="settings-note settings-note--warn">
+              Razorpay keys are not set on the server. Add <code>RAZORPAY_KEY_ID</code> and <code>RAZORPAY_KEY_SECRET</code> in Railway → Variables, then choose razorpay here.
+            </div>
+          ) : null;
+        }
+        return (
+          <div className={`settings-note${rz.mode === 'test' || !rz.webhook_configured ? ' settings-note--warn' : ''}`}>
+            Razorpay keys are set — <b>{rz.mode === 'live' ? 'LIVE mode (real payments)' : 'TEST mode (no real money)'}</b>.
+            {form.payment_driver !== 'razorpay' && ' Choose “razorpay” above and save to start taking payments through it.'}
+            {!rz.webhook_configured && (
+              <> Webhook secret not set: add <code>RAZORPAY_WEBHOOK_SECRET</code> so payments are still confirmed when a customer closes the payment screen early.</>
+            )}
+          </div>
+        );
+      })()}
+
       <label className="settings-check">
         <input
           type="checkbox"
