@@ -454,6 +454,8 @@ final class PaymentService
                 'signature_verified' => 1,
                 'captured_date' => date('Y-m-d H:i:s'),
                 'gateway_payment_id' => $verification->gatewayPaymentId,
+                // What the customer actually paid with (upi, card, netbanking…).
+                'method' => $verification->method ?? (string) ($payment['method'] ?? 'upi'),
                 'upi_vpa' => $verification->upiVpa,
                 'upi_transaction_id' => $verification->upiTransactionId,
                 'gateway_response' => json_encode($verification->raw),

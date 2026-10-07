@@ -108,7 +108,7 @@ export default function PaymentPanel({ order, payment, onPaid, heading = true })
 
       {isRazorpay && (
         <>
-          <p className="sf-small">Pay with GPay, PhonePe, Paytm, BHIM or any UPI app.</p>
+          <p className="sf-small">Pay with GPay, PhonePe, Paytm, BHIM or any UPI app — or another online method.</p>
           {isTestKey && <div className="sf-note">Test mode — no real money is taken.</div>}
           {rzpError && <div className="sf-error">{rzpError}</div>}
           <button
