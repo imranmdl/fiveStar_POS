@@ -70,10 +70,10 @@ final class SettingsService
         $logoPath = $this->settings->value('store_logo_path');
 
         return [
-            'payment_driver' => $this->settings->value('payment_driver', 'manual'),
-            'delivery_driver' => $this->settings->value('delivery_driver', 'manual'),
+            'payment_driver' => $this->effectiveDriver('payment_driver', $this->paymentDriverOptions()),
+            'delivery_driver' => $this->effectiveDriver('delivery_driver', $this->deliveryDriverOptions()),
             'payment_driver_options' => $this->paymentDriverOptions(),
-            'delivery_driver_options' => self::DELIVERY_DRIVERS,
+            'delivery_driver_options' => $this->deliveryDriverOptions(),
             'manual_payment_vpa' => $this->settings->value('manual_payment_vpa', ''),
             'manual_payment_payee_name' => $this->settings->value('manual_payment_payee_name', 'Anjeera Dry Fruits'),
             'manual_payment_qr_url' => $qrPath !== null ? $this->uploads->publicUrl($qrPath) : null,
@@ -176,6 +176,38 @@ final class SettingsService
             : array_values(array_diff(self::PAYMENT_DRIVERS, ['sandbox']));
     }
 
+    /** @return array<int, string> */
+    private function deliveryDriverOptions(): array
+    {
+        $env = (string) $this->config->get('app.env', 'production');
+
+        return in_array($env, ['local', 'testing'], true)
+            ? self::DELIVERY_DRIVERS
+            : array_values(array_diff(self::DELIVERY_DRIVERS, ['sandbox']));
+    }
+
+    /**
+     * The stored driver, or — when it is one this server cannot run (a
+     * leftover "sandbox" on a live site) — the one actually used instead
+     * (see bootstrap/container.php).
+     *
+     * @param array<int, string> $allowed
+     */
+    private function effectiveDriver(string $key, array $allowed): string
+    {
+        $stored = (string) $this->settings->value($key, 'manual');
+
+        if (in_array($stored, $allowed, true)) {
+            return $stored;
+        }
+
+        if ($key === 'payment_driver' && $this->razorpayStatus()['configured']) {
+            return 'razorpay';
+        }
+
+        return 'manual';
+    }
+
     /**
      * Whether Razorpay keys are present, and whether they are test or live
      * keys. Never returns the keys themselves.
@@ -224,7 +256,7 @@ final class SettingsService
 
     public function setDeliveryDriver(Request $request, string $driver): array
     {
-        if (!in_array($driver, self::DELIVERY_DRIVERS, true)) {
+        if (!in_array($driver, $this->deliveryDriverOptions(), true)) {
             throw new HttpException(
                 'Unknown delivery driver "' . $driver . '".',
                 422,

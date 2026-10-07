@@ -84,6 +84,16 @@ $container->bind(PaymentGatewayInterface::class, static function (Container $c) 
     $settings = $c->get(SettingRepository::class);
 
     $driver = $settings->value('payment_driver') ?? (string) $config->get('payment.driver', 'sandbox');
+    $isTestServer = in_array((string) $config->get('app.env', 'production'), ['local', 'testing'], true);
+
+    // A "sandbox" setting left over on a live server would make every
+    // checkout fail (SandboxGateway refuses to run there). Use a real gateway
+    // instead: Razorpay when its keys are set, otherwise manual UPI.
+    if ($driver === 'sandbox' && !$isTestServer) {
+        $driver = ((string) $config->get('payment.razorpay.key_id', '') !== ''
+            && (string) $config->get('payment.razorpay.key_secret', '') !== '') ? 'razorpay' : 'manual';
+        $logger->warning('payment_driver "sandbox" is not allowed on a live server; using ' . $driver, [], 'payment');
+    }
 
     return match ($driver) {
         'razorpay' => new RazorpayGateway(
@@ -144,6 +154,12 @@ $container->bind(CourierAdapterInterface::class, static function (Container $c):
     $settings = $c->get(SettingRepository::class);
 
     $driver = $settings->value('delivery_driver') ?? (string) $config->get('delivery.driver', 'sandbox');
+
+    // Same guard as payments: the sandbox courier cannot run on a live server.
+    if ($driver === 'sandbox' && !in_array((string) $config->get('app.env', 'production'), ['local', 'testing'], true)) {
+        $driver = 'manual';
+        $logger->warning('delivery_driver "sandbox" is not allowed on a live server; using manual', [], 'delivery');
+    }
 
     return match ($driver) {
         'shiprocket' => new ShiprocketAdapter(
