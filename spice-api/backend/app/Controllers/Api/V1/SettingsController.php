@@ -144,6 +144,24 @@ final class SettingsController extends BaseController
         );
     }
 
+    /**
+     * GET /api/v1/admin/pos/shop — the shop details and UPI ID the till
+     * shows and prints (cashier access; no secrets in it).
+     */
+    public function shopForTill(Request $request): Response
+    {
+        return Response::success($this->settings->shopDetails(), 'Shop details');
+    }
+
+    /** PATCH /api/v1/admin/settings/shop — shop details printed on receipts. */
+    public function updateShop(Request $request): Response
+    {
+        return Response::success(
+            $this->settings->updateShopDetails($request, $request->all()),
+            'Shop details saved'
+        );
+    }
+
     /** POST /api/v1/admin/settings/manual/qr-image */
     public function setManualQrImage(Request $request): Response
     {

@@ -491,6 +491,7 @@ return static function (Router $router): void {
         $router->get('/admin/pos/cashiers/{uuid}/history', [PosCashierController::class, 'history'], $administrator);
         $router->get('/admin/pos/customers', [PosSaleController::class, 'findCustomer'], $cashier);
         $router->post('/admin/pos/customers', [PosSaleController::class, 'createCustomer'], $cashier);
+        $router->get('/admin/pos/shop', [SettingsController::class, 'shopForTill'], $cashier);
         $router->get('/admin/pos/sales', [PosSaleController::class, 'index'], $cashier);
         $router->get('/admin/pos/sales/{uuid}', [PosSaleController::class, 'show'], $cashier);
         $router->post('/admin/pos/sales', [PosSaleController::class, 'store'], $cashier);
@@ -611,6 +612,7 @@ return static function (Router $router): void {
         $router->patch('/admin/settings/price-change-mode', [SettingsController::class, 'setPriceChangeMode'], $administrator);
         $router->patch('/admin/settings/pos-due-reminder', [SettingsController::class, 'setPosDueReminderConfig'], $administrator);
         $router->patch('/admin/settings/manual', [SettingsController::class, 'updateManual'], $administrator);
+        $router->patch('/admin/settings/shop', [SettingsController::class, 'updateShop'], $administrator);
         $router->post(
             '/admin/settings/manual/qr-image',
             [SettingsController::class, 'setManualQrImage'],
