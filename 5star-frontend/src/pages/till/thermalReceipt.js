@@ -15,7 +15,7 @@
  */
 
 export const PAPER_SIZES = {
-  80: { label: '80 mm', pageMm: 80, contentMm: 72, fontPx: 12 },
+  80: { label: '80 mm', pageMm: 80, contentMm: 72, fontPx: 12.5 },
   58: { label: '58 mm', pageMm: 58, contentMm: 48, fontPx: 10.5 },
 };
 
@@ -72,95 +72,169 @@ function dateTime(value) {
 
 const METHOD_LABELS = { cash: 'Cash', upi: 'UPI', card: 'Card', other: 'Other' };
 
-function row(label, value, cls = '') {
-  return `<div class="r ${cls}"><span>${label}</span><span>${value}</span></div>`;
+/** The shop's name as printed: "5 Star …" is written out as "Five Star …". */
+export function receiptStoreName(name) {
+  const raw = String(name || '').trim() || 'Five Star Spices & Dry Fruits';
+  return raw.replace(/^5\s*(?:-|\s)?\s*star/i, 'Five Star');
 }
 
-/** The receipt body (no <html> wrapper). */
-export function receiptMarkup(sale, { logoUrl } = {}) {
-  const storeName = sale.store_name || '5 Star Spices & Dry Fruits';
+function row(label, value, cls = '') {
+  return `<div class="r ${cls}"><span class="l">${label}</span><span class="v">${value}</span></div>`;
+}
+
+/** GST included in the bill, grouped by rate, from the saved line figures. */
+function gstSummary(items) {
+  const byRate = new Map();
+  items.forEach((item) => {
+    const rate = num(item.gst_rate);
+    const tax = num(item.tax_amount);
+    const entry = byRate.get(rate) || { taxable: 0, tax: 0 };
+    entry.taxable += num(item.line_total) - tax;
+    entry.tax += tax;
+    byRate.set(rate, entry);
+  });
+  return [...byRate.entries()].sort((a, b) => a[0] - b[0]).map(([rate, e]) => {
+    const tax = Math.round(e.tax * 100) / 100;
+    // Counter sales are within the state: GST is shown as equal CGST + SGST.
+    const cgst = Math.round((tax / 2) * 100) / 100;
+    return { rate, taxable: e.taxable, cgst, sgst: Math.round((tax - cgst) * 100) / 100 };
+  });
+}
+
+/**
+ * The receipt body (no <html> wrapper).
+ * `reprint` marks a copy printed again from Sales history.
+ */
+export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new Date() } = {}) {
+  const storeName = receiptStoreName(sale.store_name);
+  const brand = storeName.match(/^(Five Star)\s+(.+)$/i);
   const cityLine = [sale.store_city, sale.store_state].filter(Boolean).join(', ')
     + (sale.store_pincode ? ` - ${sale.store_pincode}` : '');
   const addressLines = [sale.store_address_line1, sale.store_address_line2, cityLine.trim()].filter(Boolean);
 
   const items = Array.isArray(sale.items) ? sale.items : [];
   const totalQty = items.reduce((sum, i) => sum + num(i.quantity), 0);
+  const [datePart, timePart] = (() => {
+    const t = dateTime(sale.created_date);
+    const i = t.indexOf(' ');
+    return i > 0 ? [t.slice(0, i), t.slice(i + 1)] : [t, ''];
+  })();
 
-  const lines = items.map((item) => {
+  const lines = items.map((item, index) => {
     const lineDiscount = num(item.discount_amount);
     return `
       <div class="item">
-        <div class="item-name">${esc(item.product_name)}${item.variant_name ? ` <span class="muted">(${esc(item.variant_name)})</span>` : ''}</div>
-        <div class="cols">
+        <div class="item-name"><span class="sn">${index + 1}.</span>${esc(item.product_name)}${item.variant_name ? ` <span class="var">${esc(item.variant_name)}</span>` : ''}</div>
+        <div class="grid nums">
           <span class="c-qty">${qty(item.quantity)}</span>
           <span class="c-rate">${amt(item.unit_price)}</span>
           <span class="c-amt">${amt(item.line_total)}</span>
         </div>
-        ${lineDiscount > 0 ? `<div class="muted small">  Item discount -${amt(lineDiscount)}</div>` : ''}
+        ${lineDiscount > 0 ? `<div class="disc">Discount on item &minus;${amt(lineDiscount)}</div>` : ''}
       </div>`;
   }).join('');
 
+  const gst = gstSummary(items);
+  const gstRows = gst.map((g) => `
+        <div class="grid4 nums"><span>${qty(g.rate)}%</span><span>${amt(g.taxable)}</span><span>${amt(g.cgst)}</span><span>${amt(g.sgst)}</span></div>`).join('');
+
   const walletApplied = num(sale.wallet_applied);
   const grandTotal = num(sale.grand_total);
+  const discount = num(sale.discount_amount);
   const method = METHOD_LABELS[sale.payment_method] || esc(sale.payment_method || '');
+  const isCredit = Number(sale.is_credit_sale) === 1;
+  const isSplit = walletApplied > 0 && grandTotal - walletApplied > 0.004;
 
-  let payment = row('Payment', esc(method));
+  let payment = row('Payment mode', `<b>${isSplit ? 'Split payment' : esc(walletApplied >= grandTotal - 0.004 && walletApplied > 0 ? 'Wallet' : method)}</b>`);
   if (walletApplied > 0) {
-    payment += row('From wallet', `-${amt(walletApplied)}`);
-    payment += row('Amount due', amt(grandTotal - walletApplied));
+    payment += row('&nbsp;&nbsp;Wallet', amt(walletApplied));
+    if (isSplit) payment += row(`&nbsp;&nbsp;${esc(method)}`, amt(grandTotal - walletApplied));
   }
-  if (Number(sale.is_credit_sale) === 1) {
+  if (isCredit) {
     // amount_paid already includes any wallet credit, as on the till screen.
-    payment += row('Paid so far', amt(sale.amount_paid));
+    payment += row('Amount paid', amt(sale.amount_paid));
     payment += row('Balance due', amt(grandTotal - num(sale.amount_paid)), 'b');
   } else if (sale.payment_method === 'cash' && sale.amount_tendered != null) {
     payment += row('Cash received', amt(sale.amount_tendered));
-    payment += row('Change', amt(sale.change_due), 'b');
+    payment += row('Change returned', amt(sale.change_due), 'b');
   } else {
-    payment += row(`Paid (${esc(method)})`, amt(grandTotal - walletApplied));
+    payment += row('Amount paid', amt(grandTotal));
   }
+
+  const pDate = dateTime(printedAt.toISOString());
 
   return `
     <div class="receipt">
-      <div class="center">
+      <header class="center">
         ${logoUrl ? `<img class="logo" src="${esc(logoUrl)}" alt="">` : ''}
-        <div class="store">${esc(storeName)}</div>
-        ${addressLines.map((l) => `<div class="small">${esc(l)}</div>`).join('')}
-        ${sale.store_phone ? `<div class="small">Ph: ${esc(sale.store_phone)}</div>` : ''}
-        ${sale.store_gstin ? `<div class="small">GSTIN: ${esc(sale.store_gstin)}</div>` : ''}
+        ${brand
+          ? `<div class="brand">${esc(brand[1].toUpperCase())}</div><div class="tagline">${esc(brand[2].toUpperCase())}</div>`
+          : `<div class="brand">${esc(storeName.toUpperCase())}</div>`}
+        <div class="addr">
+          ${addressLines.map((l) => `<div>${esc(l)}</div>`).join('')}
+          ${sale.store_phone ? `<div>Tel: ${esc(sale.store_phone)}</div>` : ''}
+          ${sale.store_gstin ? `<div>GSTIN: ${esc(sale.store_gstin)}</div>` : ''}
+        </div>
+      </header>
+
+      <div class="band">${reprint ? 'DUPLICATE RECEIPT' : 'SALES RECEIPT'}</div>
+
+      <section class="meta">
+        ${row('Receipt No', `<b>${esc(sale.sale_number)}</b>`)}
+        ${row('Date', datePart)}
+        ${row('Time', timePart)}
+        ${sale.cashier_name ? row('Cashier', esc(sale.cashier_name)) : ''}
+        ${sale.shop_label ? row('Counter', esc(sale.shop_label)) : ''}
+        ${sale.customer_name ? row('Customer', esc(sale.customer_name)) : ''}
+        ${sale.customer_mobile ? row('Mobile', esc(sale.customer_mobile)) : ''}
+      </section>
+
+      <div class="rule solid"></div>
+      <div class="thead">
+        <div>ITEM</div>
+        <div class="grid"><span class="c-qty">QTY</span><span class="c-rate">RATE</span><span class="c-amt">AMOUNT</span></div>
       </div>
-      <div class="rule"></div>
-      <div class="center b">RECEIPT</div>
-      ${row('Bill No', esc(sale.sale_number))}
-      ${row('Date', dateTime(sale.created_date))}
-      ${sale.cashier_name ? row('Cashier', esc(sale.cashier_name)) : ''}
-      ${sale.shop_label ? row('Counter', esc(sale.shop_label)) : ''}
-      ${sale.customer_name ? row('Customer', esc(sale.customer_name)) : ''}
-      ${sale.customer_mobile ? row('Mobile', esc(sale.customer_mobile)) : ''}
-      <div class="rule"></div>
-      <div class="cols head"><span class="c-qty">Qty</span><span class="c-rate">Rate</span><span class="c-amt">Amount</span></div>
-      <div class="rule thin"></div>
+      <div class="rule solid"></div>
       ${lines}
       <div class="rule"></div>
-      ${row(`Items: ${items.length}`, `Qty: ${qty(totalQty)}`, 'small')}
-      ${row('Subtotal', amt(sale.subtotal))}
-      ${num(sale.discount_amount) > 0 ? row('Discount', `-${amt(sale.discount_amount)}`) : ''}
-      ${row('GST (included)', amt(sale.tax_amount))}
+
+      <section class="totals nums">
+        ${row(`Items ${items.length} &middot; Qty ${qty(totalQty)}`, '', 'small')}
+        ${row('Subtotal', amt(sale.subtotal))}
+        ${discount > 0 ? row('Discount', `&minus;${amt(discount)}`) : ''}
+        ${row('GST (included)', amt(sale.tax_amount))}
+      </section>
+
+      <div class="grand"><span>GRAND TOTAL</span><span class="nums">&#8377;${amt(grandTotal)}</span></div>
+
+      <section class="pay nums">${payment}</section>
+
+      ${gst.length ? `
       <div class="rule"></div>
-      ${row('TOTAL', `&#8377; ${amt(grandTotal)}`, 'grand')}
-      <div class="rule"></div>
-      ${payment}
-      ${sale.status === 'voided' ? '<div class="rule"></div><div class="center b">*** VOIDED ***</div>' : ''}
-      <div class="rule"></div>
-      <div class="center thanks">Thank you! Visit again.</div>
-      <div class="center small">Prices include GST</div>
+      <section class="gst">
+        <div class="sub">GST SUMMARY (included in prices)</div>
+        <div class="grid4 head"><span>Rate</span><span>Taxable</span><span>CGST</span><span>SGST</span></div>
+        ${gstRows}
+      </section>` : ''}
+
+      ${discount > 0 ? `<div class="saved">You saved &#8377;${amt(discount)} on this bill</div>` : ''}
+      ${sale.status === 'voided' ? '<div class="band">*** VOIDED ***</div>' : ''}
+
+      <div class="rule solid"></div>
+      <footer class="center">
+        <div class="thanks">Thank you for shopping with us!</div>
+        <div>We look forward to serving you again.</div>
+        <div class="fine">${esc(storeName)}</div>
+        ${reprint ? `<div class="fine">Reprinted ${pDate}</div>` : ''}
+      </footer>
     </div>`;
 }
 
-export function receiptDocument(sale, paper, { logoUrl, heightMm } = {}) {
+export function receiptDocument(sale, paper, { logoUrl, heightMm, reprint = false } = {}) {
   const p = PAPER_SIZES[paper] || PAPER_SIZES[80];
   const sideMm = (p.pageMm - p.contentMm) / 2;
   const pageSize = heightMm ? `${p.pageMm}mm ${Math.ceil(heightMm)}mm` : `${p.pageMm}mm 297mm`;
+  const narrow = paper === 58;
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(sale.sale_number)}</title>
 <style>
@@ -169,31 +243,67 @@ export function receiptDocument(sale, paper, { logoUrl, heightMm } = {}) {
   html, body { margin: 0; padding: 0; background: #fff; color: #000; }
   body { width: ${p.pageMm}mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .receipt {
-    width: ${p.contentMm}mm; margin: 0 ${sideMm}mm; padding: 2mm 0 4mm;
-    font-family: "Courier New", Consolas, monospace; font-size: ${p.fontPx}px; line-height: 1.3;
+    width: ${p.contentMm}mm; margin: 0 ${sideMm}mm; padding: 1.5mm 0 3mm;
+    font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+    font-size: ${p.fontPx}px; line-height: 1.32; font-weight: 500;
   }
+  .nums, .grid, .grid4, .r .v { font-variant-numeric: tabular-nums; }
   .center { text-align: center; }
-  .b { font-weight: 700; }
-  .small { font-size: 0.88em; }
-  .muted { color: #000; font-weight: 400; }
-  .logo { width: ${paper === 58 ? 16 : 20}mm; height: auto; display: block; margin: 0 auto 1mm; filter: grayscale(1) contrast(1.4); }
-  .store { font-size: 1.3em; font-weight: 700; margin-bottom: 0.5mm; }
-  .rule { border-top: 1px dashed #000; margin: 1.2mm 0; }
-  .rule.thin { margin: 0.6mm 0; }
-  .r { display: flex; justify-content: space-between; gap: 2mm; }
-  .r > span:first-child { flex: 0 1 auto; }
-  .r > span:last-child { text-align: right; word-break: break-word; }
-  .r.b { font-weight: 700; }
-  .r.grand { font-size: 1.25em; font-weight: 700; }
-  .item { margin-bottom: 0.8mm; break-inside: avoid; }
+  b, .b { font-weight: 700; }
+  .small { font-size: 0.9em; }
+
+  .logo { width: ${narrow ? 15 : 19}mm; height: auto; display: block; margin: 0 auto 1mm; filter: grayscale(1) contrast(1.3); }
+  .brand { font-size: ${narrow ? 1.55 : 1.75}em; font-weight: 800; letter-spacing: 0.06em; line-height: 1.1; }
+  .tagline { font-size: 0.86em; font-weight: 700; letter-spacing: ${narrow ? 0.08 : 0.16}em; margin-top: 0.4mm; }
+  .addr { font-size: 0.9em; margin-top: 1.2mm; line-height: 1.3; }
+
+  .band {
+    background: #000; color: #fff; text-align: center; font-weight: 800;
+    letter-spacing: 0.12em; padding: 0.9mm 0; margin: 2mm 0 1.6mm; font-size: 0.95em;
+  }
+
+  .rule { border-top: 1px dashed #000; margin: 1.4mm 0; }
+  .rule.solid { border-top: 1.5px solid #000; }
+
+  .r { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; }
+  .r .l { flex: 0 1 auto; }
+  .r .v { flex: 0 0 auto; text-align: right; max-width: 65%; word-break: break-word; }
+  .r.b { font-weight: 800; }
+  .meta .r { line-height: 1.38; }
+
+  .thead { font-weight: 800; font-size: 0.9em; letter-spacing: 0.04em; }
+  .grid { display: grid; grid-template-columns: ${narrow ? '20% 36% 44%' : '22% 36% 42%'}; }
+  .c-qty { text-align: left; padding-left: ${narrow ? 0 : 3.5}mm; }
+  .c-rate, .c-amt { text-align: right; }
+  .item { padding: 0.9mm 0; break-inside: avoid; }
+  .item + .item { border-top: 1px dotted #000; }
   .item-name { font-weight: 700; word-break: break-word; }
-  .cols { display: flex; }
-  .cols.head { font-weight: 700; }
-  .c-qty { flex: 0 0 22%; }
-  .c-rate { flex: 0 0 36%; text-align: right; }
-  .c-amt { flex: 1 1 auto; text-align: right; }
-  .thanks { font-weight: 700; margin-top: 1mm; }
-</style></head><body>${receiptMarkup(sale, { logoUrl })}</body></html>`;
+  .sn { display: inline-block; min-width: ${narrow ? 3 : 3.5}mm; }
+  .var { font-weight: 500; }
+  .item .grid .c-amt { font-weight: 700; }
+  .disc { font-size: 0.88em; padding-left: ${narrow ? 0 : 3.5}mm; }
+
+  .totals .r { padding: 0.2mm 0; }
+  .grand {
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 2px solid #000; border-bottom: 2px solid #000;
+    margin: 1.6mm 0; padding: 1.2mm 0;
+    font-size: ${narrow ? 1.2 : 1.35}em; font-weight: 800;
+  }
+  .pay .r { padding: 0.2mm 0; }
+
+  .gst { font-size: 0.82em; }
+  .gst .sub { font-weight: 800; margin-bottom: 0.6mm; }
+  .grid4 { display: grid; grid-template-columns: 16% 30% 27% 27%; }
+  .grid4 span:not(:first-child) { text-align: right; }
+  .grid4.head { font-weight: 700; border-bottom: 1px solid #000; padding-bottom: 0.3mm; margin-bottom: 0.3mm; }
+
+  .saved { text-align: center; font-weight: 800; border: 1.5px dashed #000; padding: 0.9mm 0; margin: 2mm 0 0; }
+
+  footer { line-height: 1.38; }
+  .thanks { font-weight: 800; font-size: 1.08em; margin-bottom: 0.3mm; }
+  .fine { font-size: 0.82em; margin-top: 0.6mm; }
+</style></head><body>${receiptMarkup(sale, { logoUrl, reprint })}</body></html>`;
 }
 
 function waitForImages(doc) {
@@ -209,7 +319,7 @@ function waitForImages(doc) {
  * iframe, measures it, sets the page to paper width × receipt length, and
  * opens the print dialog for just that receipt.
  */
-export async function printThermalReceipt(sale, paper = getReceiptPaper()) {
+export async function printThermalReceipt(sale, paper = getReceiptPaper(), { reprint = false } = {}) {
   const logoUrl = `${window.location.origin}/brand/logo-192.png`;
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
@@ -226,13 +336,13 @@ export async function printThermalReceipt(sale, paper = getReceiptPaper()) {
 
   try {
     // First pass at a tall page to measure the receipt's real length.
-    let doc = write(receiptDocument(sale, paper, { logoUrl }));
+    let doc = write(receiptDocument(sale, paper, { logoUrl, reprint }));
     await waitForImages(doc);
     const px = doc.querySelector('.receipt').getBoundingClientRect().height;
     const heightMm = px * 25.4 / 96 + 2;
 
     // Second pass with the page cut to exactly that length.
-    doc = write(receiptDocument(sale, paper, { logoUrl, heightMm }));
+    doc = write(receiptDocument(sale, paper, { logoUrl, heightMm, reprint }));
     await waitForImages(doc);
 
     await new Promise((resolve) => {

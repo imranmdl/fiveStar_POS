@@ -105,7 +105,7 @@ export default function SaleDetail({ uuid, onBack, notify }) {
 
       {sale && (
         <>
-          <Receipt sale={sale} />
+          <Receipt sale={sale} reprint />
 
           {sale.status === 'completed' && (
             <div className="till-sale-detail__actions till-no-print">

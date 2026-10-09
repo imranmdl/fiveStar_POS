@@ -2,8 +2,12 @@ import { useState } from 'react';
 import { formatMoney } from '../../lib/api';
 import { PAPER_SIZES, getReceiptPaper, setReceiptPaper, printThermalReceipt } from './thermalReceipt';
 
-/** Ported from renderReceipt() in admin/assets/page-till.js. Used both right after completing a sale and when viewing one from Sales history. */
-export default function Receipt({ sale }) {
+/**
+ * Ported from renderReceipt() in admin/assets/page-till.js. Used both right after
+ * completing a sale and when viewing one from Sales history (`reprint`: the
+ * printed copy is marked "Duplicate receipt").
+ */
+export default function Receipt({ sale, reprint = false }) {
   // is_credit_sale arrives as 0/1; a bare 0 would render as a stray "0".
   const isCredit = Number(sale.is_credit_sale) === 1;
   const [paper, setPaper] = useState(getReceiptPaper);
@@ -18,7 +22,7 @@ export default function Receipt({ sale }) {
   async function handlePrint() {
     setPrinting(true);
     try {
-      await printThermalReceipt(sale, paper);
+      await printThermalReceipt(sale, paper, { reprint });
     } finally {
       setPrinting(false);
     }
@@ -35,7 +39,7 @@ export default function Receipt({ sale }) {
             ))}
           </select>
           <button type="button" className="till-btn till-btn--sm" onClick={handlePrint} disabled={printing}>
-            {printing ? 'Printing…' : 'Print receipt'}
+            {printing ? 'Printing…' : reprint ? 'Reprint receipt' : 'Print receipt'}
           </button>
         </div>
       </div>
