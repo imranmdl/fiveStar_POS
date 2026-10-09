@@ -588,7 +588,7 @@ const SHOP_FIELDS = [
 function ShopDetailsCard({ shop, onSaved }) {
   const initial = () => ({
     ...Object.fromEntries(SHOP_FIELDS.map(([key, field]) => [key, (shop && shop[field]) || ''])),
-    receipt: { cashier: true, counter: true, customer: true, ...((shop && shop.receipt) || {}) },
+    receipt: { cashier: true, counter: true, customer: true, upi_qr: true, ...((shop && shop.receipt) || {}) },
   });
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
@@ -636,7 +636,7 @@ function ShopDetailsCard({ shop, onSaved }) {
         ))}
       </div>
       <div className="settings-label" style={{ marginTop: 12 }}>Print on the receipt (only when the sale has it)</div>
-      {[['cashier', 'Cashier name'], ['counter', 'Counter / shop label'], ['customer', 'Customer name and mobile']].map(([k, label]) => (
+      {[['cashier', 'Cashier name'], ['counter', 'Counter / shop label'], ['customer', 'Customer name and mobile'], ['upi_qr', 'UPI QR code (Scan & Pay when money is due; on paid bills marked PAID)']].map(([k, label]) => (
         <label className="settings-check" key={k}>
           <input
             type="checkbox"

@@ -24,14 +24,16 @@ export const UPI_MAX_AMOUNT = 100000;
  * @param {{ vpa: string, payeeName?: string, amount: number|string, note?: string }} p
  */
 export function buildUpiUri({ vpa, payeeName, amount, note }) {
-  const value = Math.round(Number(amount) * 100) / 100;
   if (!isValidVpa(vpa)) return null;
-  if (!Number.isFinite(value) || value < 1 || value > UPI_MAX_AMOUNT) return null;
+  // amount === null: the shop's plain QR with no amount (the payer types it).
+  const fixed = amount !== null && amount !== undefined;
+  const value = fixed ? Math.round(Number(amount) * 100) / 100 : null;
+  if (fixed && (!Number.isFinite(value) || value < 1 || value > UPI_MAX_AMOUNT)) return null;
 
   const params = [
     ['pa', vpa],
     ['pn', String(payeeName || '').trim().slice(0, 50) || vpa],
-    ['am', value.toFixed(2)],
+    ...(fixed ? [['am', value.toFixed(2)]] : []),
     ['cu', 'INR'],
   ];
   if (note) params.push(['tn', String(note).slice(0, 50)]);

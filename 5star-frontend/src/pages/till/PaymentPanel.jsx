@@ -1,26 +1,7 @@
-import { useEffect, useState } from 'react';
-import { api, formatMoney } from '../../lib/api';
+import { formatMoney } from '../../lib/api';
 import { buildUpiUri, qrSvg } from '../../lib/upiQr';
 import { remainderDue, round2, roundToRupee } from './tillMath';
-
-let shopPromise = null;
-
-/** The shop's UPI ID / name for the on-screen QR (fetched once per page). */
-function useShop() {
-  const [shop, setShop] = useState(null);
-  useEffect(() => {
-    let live = true;
-    if (!shopPromise) {
-      shopPromise = api.get('/admin/pos/shop').then((r) => r.data).catch(() => {
-        shopPromise = null;
-        return null;
-      });
-    }
-    shopPromise.then((data) => { if (live) setShop(data); });
-    return () => { live = false; };
-  }, []);
-  return shop;
-}
+import { useShop } from './useShop';
 
 /**
  * "Scan & Pay ₹X" on the till screen when UPI is chosen. It only shows the
@@ -75,6 +56,8 @@ export default function PaymentPanel({
   onDeliveryChange,
   hasDueContact,
   onCompleteSale,
+  onPrintBill,
+  printingBill,
   busy,
   disabled,
 }) {
@@ -186,6 +169,12 @@ export default function PaymentPanel({
             <option value="pending">Not delivered yet</option>
           </select>
         </label>
+
+        {onPrintBill && (
+          <button type="button" className="till-btn till-btn--block till-btn--print-bill" disabled={busy || disabled || printingBill} onClick={onPrintBill}>
+            {printingBill ? 'Printing…' : 'Print bill & UPI QR (before payment)'}
+          </button>
+        )}
 
         <button type="button" className="till-btn till-btn--primary till-btn--block till-btn--lg" disabled={busy || disabled} onClick={onCompleteSale}>
           {busy ? 'Saving…' : 'Complete sale'}

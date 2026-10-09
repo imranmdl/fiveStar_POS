@@ -107,7 +107,10 @@ function gstSummary(items) {
  * The receipt body (no <html> wrapper).
  * `reprint` marks a copy printed again from Sales history.
  */
-export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new Date(), paper = 80 } = {}) {
+export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new Date(), paper = 80, mode = 'receipt' } = {}) {
+  // mode 'bill': printed from the Sell screen BEFORE payment — nothing is
+  // recorded yet; it shows what to pay and a QR for that amount.
+  const isBill = mode === 'bill';
   // `shop` comes from Admin → Payments → Settings → Shop details (address
   // and phone fall back to the till's warehouse). Older responses without it
   // still print from the sale's own store_* fields.
@@ -131,7 +134,7 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
     return i > 0 ? [t.slice(0, i), t.slice(i + 1)] : [t, ''];
   })();
 
-  const show = { cashier: true, counter: true, customer: true, ...(shop.receipt || {}) };
+  const show = { cashier: true, counter: true, customer: true, upi_qr: true, ...(shop.receipt || {}) };
 
   // MRP vs the price charged, per line and for the bill. All display-only:
   // the bill's own figures (subtotal, discount, GST, total) are printed as
@@ -173,7 +176,13 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
     payment += row('&nbsp;&nbsp;Wallet', amt(walletApplied));
     if (isSplit) payment += row(`&nbsp;&nbsp;${esc(method)}`, amt(grandTotal - walletApplied));
   }
-  if (isCredit) {
+  if (isBill) {
+    payment = '';
+    if (walletApplied > 0) {
+      payment += row('Wallet credit', `&minus;${amt(walletApplied)}`);
+    }
+    payment += row('AMOUNT PAYABLE', amt(grandTotal - walletApplied), 'b');
+  } else if (isCredit) {
     // amount_paid already includes any wallet credit, as on the till screen.
     payment += row('Amount paid', amt(sale.amount_paid));
     payment += row('Balance due', amt(grandTotal - num(sale.amount_paid)), 'b');
@@ -186,27 +195,40 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
 
   const pDate = dateTime(printedAt.toISOString());
 
-  // UPI QR only for money still owed on this bill (a part-paid / credit
-  // sale). A bill already settled by cash, UPI, card or wallet gets no QR, so
-  // nobody is asked to pay twice. The amount is the bill's own balance.
-  const balanceDue = isCredit && sale.status !== 'voided'
-    ? Math.round((grandTotal - num(sale.amount_paid)) * 100) / 100
-    : 0;
+  // UPI QR (Admin → Shop details → "Print UPI QR", on by default):
+  //  - bill before payment: "Scan & Pay" the amount payable;
+  //  - receipt with money still owed: "Scan & Pay" exactly that balance;
+  //  - receipt already paid: marked PAID, with the shop's plain QR (no
+  //    amount), so nobody is asked to pay this bill twice.
+  // Showing or scanning a QR never records a payment.
+  const payable = Math.round((grandTotal - walletApplied) * 100) / 100;
+  const balanceDue = isBill
+    ? payable
+    : (isCredit && sale.status !== 'voided' ? Math.round((grandTotal - num(sale.amount_paid)) * 100) / 100 : 0);
+  const upi = show.upi_qr !== false && shop.upi ? shop.upi : null;
+  const qrSize = paper === 58 ? 30 : 36;
+  const reference = isBill ? 'Five Star Spices bill' : `Bill ${sale.sale_number}`;
   let qrBlock = '';
   if (balanceDue > 0.004) {
-    const uri = shop.upi
-      ? buildUpiUri({ vpa: shop.upi.vpa, payeeName: shop.upi.payee_name, amount: balanceDue, note: `Bill ${sale.sale_number}` })
-      : null;
+    const uri = upi ? buildUpiUri({ vpa: upi.vpa, payeeName: upi.payee_name, amount: balanceDue, note: reference }) : null;
     qrBlock = uri
       ? `<div class="rule solid"></div>
       <section class="upi center">
         <div class="upi-title">Scan &amp; Pay &#8377;${amt(balanceDue)}</div>
-        <div class="upi-qr">${qrSvg(uri, { sizeMm: paper === 58 ? 30 : 36 })}</div>
-        <div class="upi-id">UPI ID: <b>${esc(shop.upi.vpa)}</b></div>
+        <div class="upi-qr">${qrSvg(uri, { sizeMm: qrSize })}</div>
+        <div class="upi-id">UPI ID: <b>${esc(upi.vpa)}</b></div>
         <div class="fine">GPay &middot; PhonePe &middot; Paytm &middot; BHIM &middot; any UPI app</div>
-        <div class="fine">Balance due on bill ${esc(sale.sale_number)}</div>
+        ${isBill ? '' : `<div class="fine">Balance due on bill ${esc(sale.sale_number)}</div>`}
       </section>`
-      : `<div class="rule solid"></div><div class="center b">Balance due &#8377;${amt(balanceDue)} &mdash; please pay at the counter.</div>`;
+      : `<div class="rule solid"></div><div class="center b">${isBill ? 'Amount payable' : 'Balance due'} &#8377;${amt(balanceDue)} &mdash; please pay at the counter.</div>`;
+  } else if (!isBill && upi && sale.status !== 'voided') {
+    const uri = buildUpiUri({ vpa: upi.vpa, payeeName: upi.payee_name, amount: null });
+    qrBlock = uri ? `<div class="rule solid"></div>
+      <section class="upi center">
+        <div class="paid-mark">&#10003; PAID &mdash; nothing more to pay</div>
+        <div class="upi-qr">${qrSvg(uri, { sizeMm: paper === 58 ? 24 : 28 })}</div>
+        <div class="upi-id">Pay us by UPI next time: <b>${esc(upi.vpa)}</b></div>
+      </section>` : '';
   }
 
   return `
@@ -224,10 +246,10 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
         </div>
       </header>
 
-      <div class="band">${reprint ? 'DUPLICATE RECEIPT' : 'SALES RECEIPT'}</div>
+      <div class="band">${isBill ? 'BILL &mdash; PAYMENT DUE' : reprint ? 'DUPLICATE RECEIPT' : 'SALES RECEIPT'}</div>
 
       <section class="meta">
-        ${row('Receipt No', `<b>${esc(sale.sale_number)}</b>`)}
+        ${isBill ? row('Status', '<b>Not yet paid</b>') : row('Receipt No', `<b>${esc(sale.sale_number)}</b>`)}
         ${row('Date', datePart)}
         ${row('Time', timePart)}
         ${show.cashier && sale.cashier_name ? row('Cashier', esc(sale.cashier_name)) : ''}
@@ -254,7 +276,7 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
         ${row('GST (included)', amt(sale.tax_amount))}
       </section>
 
-      <div class="grand"><span>GRAND TOTAL</span><span class="nums">&#8377;${amt(grandTotal)}</span></div>
+      <div class="grand"><span>${isBill ? 'TOTAL' : 'GRAND TOTAL'}</span><span class="nums">&#8377;${amt(grandTotal)}</span></div>
 
       <section class="pay nums">${payment}</section>
 
@@ -269,9 +291,9 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
       ${qrBlock}
 
       ${priceSaving + discount > 0.004 ? `<div class="saved">
-        <div class="saved-big">YOU SAVED &#8377;${amt(priceSaving + discount)}</div>
+        <div class="saved-big">${isBill ? 'YOU SAVE' : 'YOU SAVED'} &#8377;${amt(priceSaving + discount)}</div>
         <div class="saved-split">${[priceSaving > 0 ? `MRP savings &#8377;${amt(priceSaving)}` : '', discount > 0 ? `Discount &#8377;${amt(discount)}` : ''].filter(Boolean).join(' + ')}</div>
-        ${mrpTotal > 0 ? `<div class="saved-split">MRP &#8377;${amt(mrpTotal)} &rarr; you paid &#8377;${amt(grandTotal)}</div>` : ''}
+        ${mrpTotal > 0 ? `<div class="saved-split">MRP &#8377;${amt(mrpTotal)} &rarr; you ${isBill ? 'pay' : 'paid'} &#8377;${amt(grandTotal)}</div>` : ''}
       </div>` : ''}
       ${sale.status === 'voided' ? '<div class="band">*** VOIDED ***</div>' : ''}
 
@@ -282,11 +304,12 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
         <div class="fine">${esc(storeName)}</div>
         ${website ? `<div class="web">${esc(website)}</div>` : ''}
         ${reprint ? `<div class="fine">Reprinted ${pDate}</div>` : ''}
+        ${isBill ? '<div class="fine">Your receipt is printed after payment.</div>' : ''}
       </footer>
     </div>`;
 }
 
-export function receiptDocument(sale, paper, { logoUrl, heightMm, reprint = false } = {}) {
+export function receiptDocument(sale, paper, { logoUrl, heightMm, reprint = false, mode = 'receipt' } = {}) {
   const p = PAPER_SIZES[paper] || PAPER_SIZES[80];
   const sideMm = (p.pageMm - p.contentMm) / 2;
   const pageSize = heightMm ? `${p.pageMm}mm ${Math.ceil(heightMm)}mm` : `${p.pageMm}mm 297mm`;
@@ -367,7 +390,8 @@ export function receiptDocument(sale, paper, { logoUrl, heightMm, reprint = fals
   .upi-qr svg { display: block; margin: 0 auto; }
   .upi-id { margin-top: 1mm; word-break: break-all; }
   .web { font-weight: 700; margin-top: 0.6mm; }
-</style></head><body>${receiptMarkup(sale, { logoUrl, reprint, paper })}</body></html>`;
+  .paid-mark { font-weight: 800; font-size: 1.1em; border: 2px solid #000; padding: 0.8mm 0; margin-bottom: 1.2mm; }
+</style></head><body>${receiptMarkup(sale, { logoUrl, reprint, paper, mode })}</body></html>`;
 }
 
 function waitForImages(doc) {
@@ -383,7 +407,7 @@ function waitForImages(doc) {
  * iframe, measures it, sets the page to paper width × receipt length, and
  * opens the print dialog for just that receipt.
  */
-export async function printThermalReceipt(sale, paper = getReceiptPaper(), { reprint = false } = {}) {
+export async function printThermalReceipt(sale, paper = getReceiptPaper(), { reprint = false, mode = 'receipt' } = {}) {
   const logoUrl = `${window.location.origin}/brand/logo-192.png`;
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
@@ -400,13 +424,13 @@ export async function printThermalReceipt(sale, paper = getReceiptPaper(), { rep
 
   try {
     // First pass at a tall page to measure the receipt's real length.
-    let doc = write(receiptDocument(sale, paper, { logoUrl, reprint }));
+    let doc = write(receiptDocument(sale, paper, { logoUrl, reprint, mode }));
     await waitForImages(doc);
     const px = doc.querySelector('.receipt').getBoundingClientRect().height;
     const heightMm = px * 25.4 / 96 + 2;
 
     // Second pass with the page cut to exactly that length.
-    doc = write(receiptDocument(sale, paper, { logoUrl, heightMm, reprint }));
+    doc = write(receiptDocument(sale, paper, { logoUrl, heightMm, reprint, mode }));
     await waitForImages(doc);
 
     await new Promise((resolve) => {

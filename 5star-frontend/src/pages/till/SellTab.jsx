@@ -7,7 +7,9 @@ import CartTable from './CartTable';
 import PaymentPanel from './PaymentPanel';
 import OfferPicker from './OfferPicker';
 import Receipt from './Receipt';
-import { computeTotals, remainderDue, round2, roundToRupee } from './tillMath';
+import { computeTotals, lineNet, lineTax, remainderDue, round2, roundToRupee } from './tillMath';
+import { getReceiptPaper, printThermalReceipt } from './thermalReceipt';
+import { useShop } from './useShop';
 import { ErrorBanner } from './TillShared';
 
 /**
@@ -17,7 +19,9 @@ import { ErrorBanner } from './TillShared';
  * panel. All three scan sources feed the same addVariantToCart(), so the
  * cart updates identically no matter which one was used.
  */
-export default function SellTab({ defaultWarehouseUuid, shopLabel, onShopLabelChange, notify }) {
+export default function SellTab({ cashierName = '', defaultWarehouseUuid, shopLabel, onShopLabelChange, notify }) {
+  const shop = useShop();
+  const [printingBill, setPrintingBill] = useState(false);
   const [cart, setCart] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [walletApplied, setWalletApplied] = useState(0);
@@ -135,6 +139,8 @@ export default function SellTab({ defaultWarehouseUuid, shopLabel, onShopLabelCh
           gst_rate: variant.gst_rate ?? 0,
           quantity: String(1 + extraQuantity),
           unit_price: String(variant.selling_price ?? '0'),
+          // Display only (bill printed before payment); never sent with the sale.
+          mrp: variant.mrp ?? null,
           discount_amount: String(discountAmount),
           applied_offer_code: appliedOfferCode,
         },
@@ -289,6 +295,47 @@ export default function SellTab({ defaultWarehouseUuid, shopLabel, onShopLabelCh
     }
   }
 
+  /**
+   * Prints the bill BEFORE payment with "Scan & Pay ₹X" for the amount due.
+   * Nothing is saved: the sale is recorded only by Complete sale, after the
+   * cashier sees the money arrive. Figures are the same ones on screen.
+   */
+  async function printBill() {
+    if (cart.length === 0) return;
+    setPrintingBill(true);
+    try {
+      const bill = {
+        sale_number: '',
+        created_date: new Date().toISOString(),
+        cashier_name: cashierName,
+        shop_label: shopLabel.trim(),
+        customer_name: selectedCustomer ? (selectedCustomer.full_name || '') : walkInName,
+        customer_mobile: selectedCustomer ? (selectedCustomer.mobile || '') : walkInMobile,
+        payment_method: paymentMethod,
+        items: cart.map((l) => ({
+          product_name: l.product_name,
+          variant_name: l.variant_name,
+          quantity: l.quantity,
+          unit_price: l.unit_price,
+          mrp: l.mrp,
+          discount_amount: l.discount_amount || 0,
+          gst_rate: l.gst_rate,
+          tax_amount: round2(lineTax(l)),
+          line_total: round2(lineNet(l)),
+        })),
+        subtotal: round2(totals.subtotal),
+        discount_amount: round2(totals.discount),
+        tax_amount: round2(totals.tax),
+        grand_total: round2(totals.grandTotal),
+        wallet_applied: walletApplied,
+        shop,
+      };
+      await printThermalReceipt(bill, getReceiptPaper(), { mode: 'bill' });
+    } finally {
+      setPrintingBill(false);
+    }
+  }
+
   return (
     <div className="till-sell">
       <label className="till-field">
@@ -347,6 +394,8 @@ export default function SellTab({ defaultWarehouseUuid, shopLabel, onShopLabelCh
         onDeliveryChange={setDelivery}
         hasDueContact={hasDueContact}
         onCompleteSale={completeSale}
+        onPrintBill={printBill}
+        printingBill={printingBill}
         busy={saving}
         disabled={cart.length === 0}
       />

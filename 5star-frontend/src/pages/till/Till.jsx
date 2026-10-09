@@ -177,6 +177,7 @@ export default function Till() {
             ? <SalesHistory user={user} notify={notify} />
             : (
               <SellTab
+                cashierName={user.full_name || user.name || ''}
                 defaultWarehouseUuid={defaultWarehouseUuid}
                 shopLabel={shopLabel}
                 onShopLabelChange={handleShopLabelChange}

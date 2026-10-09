@@ -786,6 +786,8 @@
 .till-upi-qr__id { margin-top: var(--space-2); font-size: 14px; word-break: break-all; }
 .till-upi-qr__hint { margin-top: var(--space-1); font-size: 12px; color: var(--ink-500); }
 
+.till-btn--print-bill { margin-bottom: var(--space-2); }
+
 /* ---------- Print ---------- */
 
 .till-receipt__print { display: flex; align-items: center; gap: var(--space-2); }

@@ -65,6 +65,7 @@ final class SettingsService
         'receipt_show_cashier',
         'receipt_show_counter',
         'receipt_show_customer',
+        'receipt_show_upi_qr',
     ];
 
     /** What the till receipt prints when the sale has it (all on by default). */
@@ -72,6 +73,7 @@ final class SettingsService
         'receipt_show_cashier' => 'cashier',
         'receipt_show_counter' => 'counter',
         'receipt_show_customer' => 'customer',
+        'receipt_show_upi_qr' => 'upi_qr',
     ];
 
     /**
