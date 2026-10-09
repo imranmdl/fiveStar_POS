@@ -23,6 +23,39 @@ function shortDate(value) {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
+/**
+ * Size / colour pickers to draw: dimensions every variant carries, so each
+ * full choice points at exactly one variant. Products whose variants only
+ * have names fall back to one chip per variant.
+ */
+function pickerDimensions(product) {
+  const variants = product.variants || [];
+  return (product.option_dimensions || []).filter(
+    (d) => variants.length > 0 && variants.every((v) => v.options && v.options[d.code]),
+  );
+}
+
+function variantForChoice(variants, dims, choice) {
+  if (dims.some((d) => !choice[d.code])) return null;
+  return variants.find((v) => dims.every((d) => v.options[d.code] === choice[d.code])) || null;
+}
+
+/** Whether `value` for `code` still leads to a real variant, given the other picks. */
+function valueAvailable(variants, dims, choice, code, value) {
+  return variants.some((v) => v.options && v.options[code] === value
+    && dims.every((d) => d.code === code || !choice[d.code] || v.options[d.code] === choice[d.code]));
+}
+
+/** Dimensions with a single value (e.g. one colour) are picked automatically. */
+function autoChoice(dims, variants) {
+  const picked = {};
+  dims.forEach((d) => {
+    const values = [...new Set(variants.map((v) => v.options[d.code]))];
+    if (values.length === 1) [picked[d.code]] = values;
+  });
+  return picked;
+}
+
 function ReviewItem({ review }) {
   return (
     <div className="sf-review">
@@ -93,6 +126,8 @@ export default function Product() {
   const [offers, setOffers] = useState([]);
   const [selected, setSelected] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [choice, setChoice] = useState({});
+  const [chooseError, setChooseError] = useState('');
   const [imageIndex, setImageIndex] = useState(0);
   const [reviews, setReviews] = useState({ status: 'loading', items: [], summary: null });
 
@@ -109,7 +144,13 @@ export default function Product() {
         const p = response.data.product;
         setProduct(p);
         const variants = p.variants || [];
-        setSelected((variants.find((v) => v.is_default) || variants[0] || {}).uuid || null);
+        // Clothing, footwear and anything with size / colour options: the
+        // shopper picks — nothing is chosen for them. Other products keep the
+        // default pack pre-selected.
+        const mustChoose = Boolean(p.requires_choice) && variants.length > 1;
+        setSelected(mustChoose ? null : ((variants.find((v) => v.is_default) || variants[0] || {}).uuid || null));
+        setChoice(mustChoose ? autoChoice(pickerDimensions(p), variants) : {});
+        setChooseError('');
         setStatus('ready');
         document.title = `${p.name} · 5 Star`;
         rememberViewed(p);
@@ -164,9 +205,18 @@ export default function Product() {
   }
 
   const variants = product.variants || [];
-  const variant = variants.find((v) => v.uuid === selected) || variants[0] || null;
-  const price = Number(variant?.effective_price || 0);
-  const mrp = Number(variant?.mrp || 0);
+  const mustChoose = Boolean(product.requires_choice) && variants.length > 1;
+  const dims = mustChoose ? pickerDimensions(product) : [];
+  // The variant actually chosen. With size / colour pickers it is the one
+  // matching every picked value; otherwise the chip clicked. A product that
+  // needs a choice has none until the shopper makes it.
+  const variant = dims.length > 0
+    ? variantForChoice(variants, dims, choice)
+    : (variants.find((v) => v.uuid === selected) || (mustChoose ? null : variants[0]) || null);
+  const cheapest = [...variants].sort((a, b) => Number(a.effective_price) - Number(b.effective_price))[0] || null;
+  const shown = variant || cheapest;
+  const price = Number(shown?.effective_price || 0);
+  const mrp = Number(shown?.mrp || 0);
   const off = discountPercent(mrp, price);
   const maxQty = Number(variant?.max_order_quantity || 20);
   const tint = tintFor(product.slug);
@@ -177,7 +227,7 @@ export default function Product() {
 
   const specs = [
     product.brand && ['Brand', product.brand],
-    variant && ['Net quantity', variantLabel(variant)],
+    variant && [product.requires_choice || product.has_size_options ? 'Selected' : 'Net quantity', variantLabel(variant)],
     origin && ['Origin', origin],
     ...(product.attributes || []).map((a) => [a.attribute_name, a.attribute_value]),
     shelfLife(product.shelf_life_days) && ['Shelf life', shelfLife(product.shelf_life_days)],
@@ -190,16 +240,28 @@ export default function Product() {
     product.flags?.is_organic && 'Certified organic',
     product.flags?.is_vegetarian && '100% vegetarian',
     origin && `Sourced from ${origin}`,
-    perHundredGrams(variant),
+    !product.requires_choice && !product.has_size_options && perHundredGrams(variant),
   ].filter(Boolean);
 
   const related = (product.similar_products && product.similar_products.length > 0
     ? product.similar_products
     : product.other_products || []).slice(0, 6).map(cardFromListItem);
 
+  function missingChoiceMessage() {
+    const missing = dims.filter((d) => !choice[d.code]).map((d) => d.name.toLowerCase());
+    if (missing.length > 0) return `Please select a ${missing.join(' and ')}.`;
+    if (dims.length > 0) return 'That combination is not available. Please choose another.';
+    return product.has_size_options ? 'Please select a size.' : 'Please select an option.';
+  }
+
   async function addToCart() {
-    if (!variant) return false;
-    return add(variant.uuid, quantity, product.name);
+    if (!variant) {
+      setChooseError(missingChoiceMessage());
+      document.getElementById('sf-choose')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
+    }
+    setChooseError('');
+    return add(variant.uuid, quantity, variant.option_label ? `${product.name} (${variant.option_label})` : product.name);
   }
 
   async function buyNow() {
@@ -230,7 +292,7 @@ export default function Product() {
             )}
             <ProductMedia image={mainImage} tint={tint} label={`Product photo · ${product.name}`} alt={product.name} className="sf-media--main" />
           </div>
-          {variant && (
+          {variants.length > 0 && (
             <div className="sf-pdp__buy">
               <button type="button" className="sf-btn sf-btn--yellow sf-btn--xl" disabled={busy} onClick={addToCart}>ADD TO CART</button>
               <button type="button" className="sf-btn sf-btn--red sf-btn--xl" disabled={busy} onClick={buyNow}>BUY NOW</button>
@@ -259,11 +321,11 @@ export default function Product() {
             </div>
           </div>
 
-          {variant ? (
+          {shown ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {off > 0 && <span className="sf-good" style={{ font: '700 14px var(--sf-text)' }}>Special price</span>}
               <div className="sf-pdp__price">
-                <b>{rupees(price)}</b>
+                <b>{!variant && mustChoose && variants.some((v) => Number(v.effective_price) !== price) ? `From ${rupees(price)}` : rupees(price)}</b>
                 {off > 0 && <s>{rupees(mrp)}</s>}
                 {off > 0 && <em>{off}% off</em>}
               </div>
@@ -291,10 +353,59 @@ export default function Product() {
             </div>
           )}
 
-          {variants.length > 0 && (
-            <div className="sf-pdp__row">
-              <span className="sf-pdp__label">{product.has_size_options ? 'Size' : 'Pack size'}</span>
-              <div className="sf-variants" role="radiogroup" aria-label="Pack size">
+          {dims.length > 0 && (
+            <div id="sf-choose" className={`sf-choose${chooseError ? ' sf-choose--error' : ''}`}>
+              {dims.map((d) => (
+                <div className="sf-pdp__row" key={d.code}>
+                  <span className="sf-pdp__label">
+                    {d.name}
+                    {choice[d.code] ? <span className="sf-choose__picked">: {choice[d.code]}</span> : null}
+                  </span>
+                  <div className="sf-variants" role="radiogroup" aria-label={d.name}>
+                    {d.values.map((value) => {
+                      const on = choice[d.code] === value;
+                      const possible = valueAvailable(variants, dims, choice, d.code, value);
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          aria-disabled={!possible}
+                          title={possible ? undefined : 'Not available with your other choice'}
+                          className={`sf-variant sf-variant--opt${on ? ' is-on' : ''}${possible ? '' : ' is-off'}`}
+                          onClick={() => {
+                            const next = { ...choice, [d.code]: on ? undefined : value };
+                            // Picking a value that rules out the other choice clears that one.
+                            dims.forEach((other) => {
+                              if (other.code !== d.code && next[other.code]
+                                && !valueAvailable(variants, dims, { ...next, [other.code]: undefined }, other.code, next[other.code])) {
+                                next[other.code] = undefined;
+                              }
+                            });
+                            setChoice(next);
+                            setChooseError('');
+                            const match = variantForChoice(variants, dims, next);
+                            if (match) setQuantity((q) => Math.min(q, Number(match.max_order_quantity || 20)));
+                          }}
+                        >
+                          <b>{value}</b>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              {chooseError && <div className="sf-choose__error" role="alert">{chooseError}</div>}
+            </div>
+          )}
+
+          {dims.length === 0 && variants.length > 0 && (
+            <div id="sf-choose" className={`sf-pdp__row${chooseError ? ' sf-choose--error' : ''}`}>
+              <span className="sf-pdp__label">
+                {product.has_size_options ? 'Size' : mustChoose ? 'Option' : 'Pack size'}
+              </span>
+              <div className="sf-variants" role="radiogroup" aria-label={product.has_size_options ? 'Size' : 'Pack size'}>
                 {variants.map((v) => (
                   <button
                     key={v.uuid}
@@ -304,6 +415,7 @@ export default function Product() {
                     className={`sf-variant${v.uuid === selected ? ' is-on' : ''}`}
                     onClick={() => {
                       setSelected(v.uuid);
+                      setChooseError('');
                       setQuantity((q) => Math.min(q, Number(v.max_order_quantity || 20)));
                     }}
                   >
@@ -312,6 +424,7 @@ export default function Product() {
                   </button>
                 ))}
               </div>
+              {chooseError && <div className="sf-choose__error" role="alert">{chooseError}</div>}
             </div>
           )}
 

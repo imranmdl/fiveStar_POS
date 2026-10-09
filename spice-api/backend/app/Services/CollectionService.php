@@ -421,6 +421,7 @@ final class CollectionService
                 'primary_image' => $product['primary_image'] ?? null,
                 'weight_grams' => $product['weight_grams'] ?? null,
                 'has_size_options' => $product['has_size_options'] ?? false,
+                'requires_choice' => $product['requires_choice'] ?? false,
                 'category' => $product['category'] ?? null,
                 'headline' => $item['headline'],
             ];

@@ -75,7 +75,9 @@ export function CartProvider({ children, refreshKey }) {
   /**
    * Adds a product from a list card, which only knows the product. The card
    * shows the smallest pack and its price, so that is the pack added; it is
-   * looked up once and remembered.
+   * looked up once and remembered. A product that needs a size / colour
+   * choice is never added here: it returns 'choose' so the caller can open
+   * the product page.
    */
   const addProduct = useCallback(
     async (slug, label) => {
@@ -84,6 +86,11 @@ export function CartProvider({ children, refreshKey }) {
         try {
           const response = await api.get(`/products/${encodeURIComponent(slug)}`);
           const variants = response.data.product.variants || [];
+          // Never pick a size / colour for the shopper: send them to choose.
+          if (response.data.product.requires_choice && variants.length > 1) {
+            showToast('Please choose a size first.');
+            return 'choose';
+          }
           const chosen = [...variants].sort(
             (a, b) => Number(a.effective_price) - Number(b.effective_price),
           )[0];

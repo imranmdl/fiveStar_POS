@@ -70,7 +70,7 @@ function DeliveryBar({ cart, onPincode, pincodeBusy }) {
 function CartLine({ item, offer, busy, onQuantity }) {
   const max = Number(item.variant.max_order_quantity || 500);
   const href = `/product/${item.product.slug}`;
-  const size = packLabel(item.variant.weight_grams) || item.variant.name;
+  const size = item.variant.label || (Number(item.variant.weight_grams) > 1 && packLabel(item.variant.weight_grams)) || item.variant.name;
   const off = Number(item.discount_percentage) || discountPercent(item.line_mrp, item.line_total);
 
   return (

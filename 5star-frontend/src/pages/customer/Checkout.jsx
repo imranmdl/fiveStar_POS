@@ -93,7 +93,7 @@ function OrderSummary({ items }) {
           <ProductMedia tint={tintFor(item.product.slug)} />
           <div className="sf-mini-line__text">
             <b>{item.product.name}</b>
-            <span>{packLabel(item.variant.weight_grams) || item.variant.name} × {item.quantity}</span>
+            <span>{item.variant.label || (Number(item.variant.weight_grams) > 1 && packLabel(item.variant.weight_grams)) || item.variant.name} × {item.quantity}</span>
           </div>
           <span>{rupees(item.line_total)}</span>
         </div>

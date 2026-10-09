@@ -91,8 +91,13 @@ final class ProductService
 
         $result = $this->products->search($filters, $params);
         $sizedIds = $this->variantOptions->productIdsWithSizeOptions(array_column($result['items'], 'id'));
+        $choiceIds = $this->variantOptions->productIdsRequiringChoice(array_column($result['items'], 'id'));
         $result['items'] = array_map(
-            fn (array $row): array => $this->presentListItem($row, in_array((int) $row['id'], $sizedIds, true)),
+            fn (array $row): array => $this->presentListItem(
+                $row,
+                in_array((int) $row['id'], $sizedIds, true),
+                in_array((int) $row['id'], $choiceIds, true)
+            ),
             $result['items']
         );
 
@@ -119,11 +124,15 @@ final class ProductService
 
         $presented = $this->presentDetail($product);
 
-        $sizedIds = $this->variantOptions->productIdsWithSizeOptions(
-            array_merge(array_column($grouped['same'], 'id'), array_column($grouped['different'], 'id'))
-        );
+        $relatedIds = array_merge(array_column($grouped['same'], 'id'), array_column($grouped['different'], 'id'));
+        $sizedIds = $this->variantOptions->productIdsWithSizeOptions($relatedIds);
+        $choiceIds = $this->variantOptions->productIdsRequiringChoice($relatedIds);
 
-        $presentGrouped = fn (array $row): array => $this->presentListItem($row, in_array((int) $row['id'], $sizedIds, true));
+        $presentGrouped = fn (array $row): array => $this->presentListItem(
+            $row,
+            in_array((int) $row['id'], $sizedIds, true),
+            in_array((int) $row['id'], $choiceIds, true)
+        );
 
         $presented['similar_products'] = array_map($presentGrouped, array_slice($grouped['same'], 0, 8));
         $presented['other_products'] = array_map($presentGrouped, array_slice($grouped['different'], 0, 8));
@@ -1058,22 +1067,6 @@ final class ProductService
         return ['same' => $same, 'different' => $different];
     }
 
-    /**
-     * A variant's "size" dimension value, if it has one (e.g. "M" for a
-     * clothing pack, null for an ordinary weight-only pack). Distinct from
-     * `weight_grams`, which every variant still carries for shipping.
-     */
-    private function sizeLabelFor(int $variantId): ?string
-    {
-        foreach ($this->variantOptions->forVariant($variantId) as $option) {
-            if ($option['option_type_code'] === 'size') {
-                return $option['option_value'];
-            }
-        }
-
-        return null;
-    }
-
     /** @param array<string, mixed> $product */
     private function categoryIdFor(array $product): int
     {
@@ -1090,7 +1083,7 @@ final class ProductService
      *
      * @return array<string, mixed>
      */
-    private function presentListItem(array $row, bool $hasSizeOptions = false): array
+    private function presentListItem(array $row, bool $hasSizeOptions = false, bool $requiresChoice = false): array
     {
         return [
             'uuid' => $row['uuid'],
@@ -1116,6 +1109,9 @@ final class ProductService
                 'max' => (int) $row['max_weight_grams'],
             ],
             'has_size_options' => $hasSizeOptions,
+            // The shopper must pick a size / colour on the product page; a
+            // card must not add a variant on their behalf.
+            'requires_choice' => $requiresChoice,
             'rating' => [
                 'average' => (float) $row['rating_average'],
                 'count' => (int) $row['rating_count'],
@@ -1160,6 +1156,11 @@ final class ProductService
             'fssai_license_no' => $row['fssai_license_no'] ?? null,
         ];
 
+        $variantOptions = $this->variantOptions->forVariants(array_map(
+            static fn (array $variant): int => (int) $variant['id'],
+            $row['variants'] ?? []
+        ));
+
         $detail['variants'] = array_map(fn (array $variant): array => [
             'uuid' => $variant['uuid'],
             'sku' => $variant['sku'],
@@ -1169,7 +1170,16 @@ final class ProductService
             'weight_grams' => (int) $variant['weight_grams'],
             'shipping_weight_grams' => (int) $variant['shipping_weight_grams'],
             'pack_type' => $variant['pack_type'],
-            'size_label' => $this->sizeLabelFor((int) $variant['id']),
+            'size_label' => $variantOptions[(int) $variant['id']]['size']['value'] ?? null,
+            // Every dimension this variant carries, e.g. {size: "M", color: "Red"}.
+            'options' => array_map(
+                static fn (array $o): string => $o['value'],
+                $variantOptions[(int) $variant['id']] ?? []
+            ),
+            // "M / Red" — how the choice reads in the cart and on the order.
+            'option_label' => ($variantOptions[(int) $variant['id']] ?? []) === []
+                ? null
+                : implode(' / ', array_map(static fn (array $o): string => $o['value'], $variantOptions[(int) $variant['id']])),
             'mrp' => (float) $variant['mrp'],
             'selling_price' => (float) $variant['selling_price'],
             'effective_price' => (float) $variant['effective_price'],
@@ -1184,6 +1194,37 @@ final class ProductService
             $detail['variants'],
             static fn (bool $carry, array $variant): bool => $carry || $variant['size_label'] !== null,
             false
+        );
+
+        // The pickers to draw — one per dimension (Size, Colour) with its
+        // values in display order — and whether a choice is required before
+        // this product can be added to the cart.
+        $dimensions = [];
+
+        foreach ($variantOptions as $options) {
+            foreach ($options as $code => $option) {
+                if (!in_array($code, ['size', 'color'], true)) {
+                    continue;
+                }
+
+                $dimensions[$code] ??= ['code' => $code, 'name' => $option['type'], 'order' => $option['type_order'], 'values' => []];
+                $dimensions[$code]['values'][$option['value']] = $option['value_order'];
+            }
+        }
+
+        uasort($dimensions, static fn (array $a, array $b): int => $a['order'] <=> $b['order']);
+
+        $detail['option_dimensions'] = array_values(array_map(static function (array $d): array {
+            asort($d['values']);
+
+            // Keys like "8" (shoe sizes) come back as ints; keep them strings.
+            return ['code' => $d['code'], 'name' => $d['name'], 'values' => array_map('strval', array_keys($d['values']))];
+        }, $dimensions));
+
+        $detail['requires_choice'] = in_array(
+            (int) $row['id'],
+            $this->variantOptions->productIdsRequiringChoice([(int) $row['id']]),
+            true
         );
 
         $detail['media'] = array_map(fn (array $media): array => [

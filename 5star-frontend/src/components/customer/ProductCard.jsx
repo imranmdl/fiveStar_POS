@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../../hooks/useCart';
 import { rupees } from '../../lib/store';
 import SafeImage from './SafeImage';
@@ -28,7 +28,22 @@ export function ProductMedia({ image, tint, label, className = '', children, sty
  */
 export function AddControl({ product, variant = 'outline-red', size = 'sm', label = 'ADD TO CART', block = false }) {
   const { lineForProduct, addProduct, setQuantity, busy } = useCart();
+  const navigate = useNavigate();
   const line = lineForProduct(product.uuid);
+
+  // Clothing, footwear and other sized items: the shopper picks the size /
+  // colour on the product page. A card never adds one on their behalf, and
+  // never shows a −/+ stepper that would not say which size it changes.
+  if (product.requiresChoice) {
+    return (
+      <Link
+        to={`/product/${product.slug}`}
+        className={`sf-btn sf-btn--${variant} sf-btn--${size}${block ? ' sf-btn--block' : ''}`}
+      >
+        {line ? 'IN CART · ADD ANOTHER' : 'SELECT SIZE'}
+      </Link>
+    );
+  }
 
   if (line) {
     return (
@@ -45,7 +60,9 @@ export function AddControl({ product, variant = 'outline-red', size = 'sm', labe
       type="button"
       className={`sf-btn sf-btn--${variant} sf-btn--${size}${block ? ' sf-btn--block' : ''}`}
       disabled={busy}
-      onClick={() => addProduct(product.slug, product.name)}
+      onClick={async () => {
+        if ((await addProduct(product.slug, product.name)) === 'choose') navigate(`/product/${product.slug}`);
+      }}
     >
       {label}
     </button>
