@@ -38,9 +38,13 @@ final class ManualPaymentController extends BaseController
     /** POST /api/v1/admin/payments/{uuid}/verify */
     public function verify(Request $request): Response
     {
+        // The UTR is required: it is what ties this confirmation to one real
+        // bank transfer, and what stops the same transfer paying two orders.
+        // ManualPaymentService normalises and checks its format.
         $data = Validator::make($request->all(), [
             'confirmed_amount' => 'required|numeric',
-            'utr_or_reference' => 'nullable|string|max:120',
+            'utr_or_reference' => 'required|string|max:60',
+            'paid_at' => 'nullable|date',
         ]);
 
         return Response::success(
@@ -48,7 +52,8 @@ final class ManualPaymentController extends BaseController
                 $request,
                 (string) $request->routeParam('uuid'),
                 (string) $data['confirmed_amount'],
-                (string) ($data['utr_or_reference'] ?? '')
+                (string) $data['utr_or_reference'],
+                isset($data['paid_at']) && $data['paid_at'] !== '' ? (string) $data['paid_at'] : null,
             ),
             'Payment verified and order confirmed'
         );

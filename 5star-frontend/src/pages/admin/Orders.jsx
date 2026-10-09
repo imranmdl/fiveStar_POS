@@ -17,6 +17,7 @@ import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { api, formatMoney, ApiError } from '../../lib/api';
 import { StatusBadge, EmptyState, LoadingState, ErrorState } from '../../components/admin/shared';
 import { toast } from '../../components/admin/toast';
+import ManualPaymentForm, { orderPaymentLabel } from '../../components/admin/ManualPaymentForm';
 import './Orders.css';
 
 function reportError(error, fallback) {
@@ -166,7 +167,7 @@ function OnlineOrdersList({ isAdmin, view, onViewChange, status, payment, page, 
                       <td>
                         {paid
                           ? <StatusBadge status="paid" label="Paid" />
-                          : <StatusBadge status={order.payment_status} label={order.payment_status} />}
+                          : <StatusBadge status={order.payment_status} label={orderPaymentLabel(order.payment_status)} />}
                       </td>
                       <td style={{ textAlign: 'right' }}>{money(order.grand_total)}</td>
                       <td style={{ textAlign: 'right' }}>
@@ -297,62 +298,55 @@ function CourierChooser({ uuid, onBooked, onCancel }) {
   );
 }
 
-/** The payment-not-yet-verified form: amount + UTR, or reject. Shown only while a manual/COD payment is pending confirmation. */
+/** The payment-not-yet-verified form: amount + UTR, or reject. Shown only while a manual UPI payment is waiting for staff. */
 function PendingPaymentForm({ order, pending, onResolved }) {
-  const [amount, setAmount] = useState(pending.amount);
-  const [utr, setUtr] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setBusy(true);
-    try {
-      await api.post(`/admin/payments/${encodeURIComponent(pending.uuid)}/verify`, {
-        confirmed_amount: amount,
-        utr_or_reference: utr,
-      });
-      toast('Payment marked as done. The order is confirmed.');
-      onResolved();
-    } catch (error) {
-      setBusy(false);
-      reportError(error);
-    }
-  }
-
-  async function handleReject() {
-    const reason = window.prompt('Why was the payment not received? (kept in the audit log)');
-    if (!reason) return;
-    setBusy(true);
-    try {
-      await api.post(`/admin/payments/${encodeURIComponent(pending.uuid)}/reject`, { reason });
-      toast('Payment marked as not received. The customer can retry.');
-      onResolved();
-    } catch (error) {
-      setBusy(false);
-      reportError(error);
-    }
-  }
-
   return (
     <div>
       <p className="orders-hint">
-        Payment status: <strong>{order.payment_status}</strong>. Check that the ₹{pending.amount} has actually
-        reached your account before marking it done.
+        Payment: <strong>{orderPaymentLabel(order.payment_status)}</strong>. Check that ₹{pending.amount} has actually
+        reached your account, then enter the UTR of that transfer.
       </p>
-      <form className="orders-form-row" onSubmit={handleSubmit}>
-        <label className="orders-field">
-          <span>Amount received (₹)</span>
-          <input value={amount} onChange={(e) => setAmount(e.target.value)} required inputMode="decimal" />
-        </label>
-        <label className="orders-field">
-          <span>UPI reference / UTR</span>
-          <input value={utr} onChange={(e) => setUtr(e.target.value)} required />
-        </label>
-        <div className="orders-action-row">
-          <button className="admin-btn admin-btn--primary" type="submit" disabled={busy}>Payment done</button>
-          <button className="admin-btn" type="button" disabled={busy} onClick={handleReject}>Payment not received</button>
-        </div>
-      </form>
+      <ManualPaymentForm
+        compact
+        payment={{
+          uuid: pending.uuid,
+          amount: pending.amount,
+          order_number: order.order_number,
+          order_status: order.status,
+          order_expired: Boolean(pending.order_expired),
+        }}
+        onDone={onResolved}
+      />
+    </div>
+  );
+}
+
+/** Every payment attempt on the order, with the saved UTR — what was confirmed, when, and how. */
+function PaymentRecords({ payments }) {
+  if (!payments || payments.length === 0) return null;
+  const STATUS = { created: 'Waiting', pending: 'Waiting', captured: 'Paid', authorized: 'Authorised', failed: 'Not received', cancelled: 'Closed', refunded: 'Refunded', partially_refunded: 'Partly refunded' };
+  return (
+    <div className="orders-card">
+      <div className="orders-card__header">Payments</div>
+      <div style={{ overflowX: 'auto' }}>
+        <table className="mp-records">
+          <thead>
+            <tr><th>#</th><th>Via</th><th>Status</th><th>Amount</th><th>UTR / reference</th><th>Paid on</th></tr>
+          </thead>
+          <tbody>
+            {payments.map((p) => (
+              <tr key={p.uuid}>
+                <td>{p.attempt}</td>
+                <td>{p.gateway === 'manual' ? 'UPI QR (staff checked)' : p.gateway}{p.method ? ` · ${String(p.method).toUpperCase()}` : ''}</td>
+                <td>{STATUS[p.status] || p.status}{p.failure_reason ? <div className="orders-subtext">{p.failure_reason}</div> : null}</td>
+                <td>{money(p.amount)}</td>
+                <td className="mp-utr">{p.upi_transaction_id || '—'}</td>
+                <td>{p.paid_date ? fmtDate(p.paid_date) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -502,7 +496,7 @@ function OrderDetail({ uuid, onBack }) {
                 <div>
                   <StatusBadge status={order.status} label={statusLabel(order.status)} />
                   {' '}
-                  <StatusBadge status={order.payment_status} label={order.payment_status} />
+                  <StatusBadge status={order.payment_status} label={orderPaymentLabel(order.payment_status)} />
                   {order.invoice_number && <span className="orders-subtext"> Invoice {order.invoice_number}</span>}
                 </div>
               </div>
@@ -518,6 +512,8 @@ function OrderDetail({ uuid, onBack }) {
                 <OrderActions uuid={uuid} order={order} detail={detail} onChanged={load} />
               </div>
             </div>
+
+            <PaymentRecords payments={detail.payments} />
 
             <div className="orders-detail-grid">
               <div>

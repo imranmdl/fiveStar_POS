@@ -163,6 +163,7 @@ final class ManualGateway implements PaymentGatewayInterface
         Money $amount,
         string $utrOrReference,
         int $adminUserId,
+        ?string $paidAt = null,
     ): PaymentVerification {
         $paymentId = 'manual_pay_' . substr(hash('sha256', $gatewayOrderId . '|' . $adminUserId . '|' . microtime()), 0, 24);
 
@@ -183,7 +184,10 @@ final class ManualGateway implements PaymentGatewayInterface
             raw: [
                 'manual' => true,
                 'verified_by_admin_user_id' => $adminUserId,
+                'verified_at' => date('Y-m-d H:i:s'),
                 'utr_or_reference' => $utrOrReference,
+                // When the customer paid, as read off the bank statement (optional).
+                'customer_paid_at' => $paidAt,
             ],
         );
     }

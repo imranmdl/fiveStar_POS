@@ -54,14 +54,20 @@ final class PaymentRepository extends BaseRepository
      */
     public function pendingManualVerification(int $limit = 100, int $offset = 0): array
     {
+        // An order already settled by another attempt (e.g. the customer
+        // retried through Razorpay) has nothing left to confirm, so its stale
+        // manual attempt is not shown as waiting.
         return $this->db->select(
             sprintf(
-                "SELECT p.*, o.order_number, o.uuid AS order_uuid, o.ship_name, o.ship_mobile
+                "SELECT p.*, o.order_number, o.uuid AS order_uuid, o.ship_name, o.ship_mobile,
+                        o.status AS order_status, o.payment_status AS order_payment_status,
+                        o.cancellation_reason AS order_cancellation_reason
                    FROM `payments` p
                    JOIN `orders` o ON o.id = p.order_id
                   WHERE p.`gateway` = 'manual'
                     AND p.`status` IN ('created', 'pending')
                     AND p.`is_deleted` = 0
+                    AND o.`payment_status` NOT IN ('paid', 'partially_refunded', 'refunded')
                   ORDER BY p.`created_date` ASC
                   LIMIT %d OFFSET %d",
                 max(1, $limit),
@@ -73,8 +79,46 @@ final class PaymentRepository extends BaseRepository
     public function countPendingManualVerification(): int
     {
         return (int) $this->db->scalar(
-            "SELECT COUNT(*) FROM `payments`
-              WHERE `gateway` = 'manual' AND `status` IN ('created', 'pending') AND `is_deleted` = 0"
+            "SELECT COUNT(*) FROM `payments` p
+               JOIN `orders` o ON o.id = p.order_id
+              WHERE p.`gateway` = 'manual' AND p.`status` IN ('created', 'pending') AND p.`is_deleted` = 0
+                AND o.`payment_status` NOT IN ('paid', 'partially_refunded', 'refunded')"
+        );
+    }
+
+    /**
+     * Re-reads one payment attempt under a row lock, so two confirmations of
+     * the same attempt (double click, two staff at once) are serialised and
+     * the second one sees the first one's result.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function lockById(int $id): ?array
+    {
+        return $this->db->selectOne(
+            'SELECT * FROM `payments` WHERE `id` = :id AND `is_deleted` = 0 FOR UPDATE',
+            ['id' => $id]
+        );
+    }
+
+    /**
+     * A successful payment already recorded against this UTR / UPI reference,
+     * on any order. One bank transfer can only pay for one order.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findSettledByUtr(string $utr, int $excludePaymentId): ?array
+    {
+        return $this->db->selectOne(
+            "SELECT p.`id`, p.`uuid`, p.`captured_date`, o.`order_number`
+               FROM `payments` p
+               JOIN `orders` o ON o.id = p.order_id
+              WHERE p.`upi_transaction_id` = :utr
+                AND p.`id` <> :exclude_id
+                AND p.`status` IN ('authorized', 'captured', 'refunded', 'partially_refunded')
+                AND p.`is_deleted` = 0
+              LIMIT 1",
+            ['utr' => $utr, 'exclude_id' => $excludePaymentId]
         );
     }
 

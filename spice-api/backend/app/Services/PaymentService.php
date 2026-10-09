@@ -43,6 +43,15 @@ use App\Services\Payments\PaymentVerification;
  */
 final class PaymentService
 {
+    /** Written by expireUnpaidOrders(); also how a late-paid order is recognised. */
+    public const EXPIRY_CANCELLATION_REASON = 'Payment was not completed within the allowed window.';
+
+    /**
+     * How long an order with a manual UPI payment awaiting staff review is
+     * kept open past its payment window (setting: manual_payment_review_hours).
+     */
+    public const MANUAL_REVIEW_HOURS = 72;
+
     public function __construct(
         private readonly PaymentGatewayInterface $gateway,
         private readonly OrderRepository $orders,
@@ -245,9 +254,13 @@ final class PaymentService
      *
      * @return array<string, mixed>
      */
-    public function applyAdminVerification(array $order, PaymentVerification $verification, Request $request): array
-    {
-        $this->applyVerification($order, $verification, $request, 'admin_manual');
+    public function applyAdminVerification(
+        array $order,
+        PaymentVerification $verification,
+        Request $request,
+        ?int $paymentId = null,
+    ): array {
+        $this->applyVerification($order, $verification, $request, 'admin_manual', $paymentId);
 
         $fresh = (array) $this->orders->findById((int) $order['id']);
 
@@ -381,8 +394,9 @@ final class PaymentService
         PaymentVerification $verification,
         Request $request,
         string $source,
+        ?int $paymentId = null,
     ): void {
-        $this->db->transaction(function () use ($order, $verification, $request, $source): void {
+        $this->db->transaction(function () use ($order, $verification, $request, $source, $paymentId): void {
             // Re-read under a lock. A webhook and a browser callback for the
             // same payment routinely arrive within milliseconds of each other.
             $locked = $this->orders->lockForUpdate((int) $order['id']);
@@ -391,7 +405,14 @@ final class PaymentService
                 throw new NotFoundException('That order no longer exists.');
             }
 
-            $payment = $this->recordPaymentAttempt($locked, $verification, $request);
+            // A staff decision on a manual UPI payment names the exact attempt
+            // row it is about. That row must be the one updated — looking it up
+            // by the *active* gateway instead would miss it whenever the store
+            // has since switched to Razorpay, and a duplicate "razorpay" row
+            // would be captured while the real manual attempt stayed pending.
+            $payment = $paymentId !== null
+                ? $this->lockAdminAttempt($paymentId, $locked, $verification)
+                : $this->recordPaymentAttempt($locked, $verification, $request);
 
             if (!$verification->isSuccessful()) {
                 $this->markPaymentFailed($locked, $verification, $payment);
@@ -400,8 +421,21 @@ final class PaymentService
             }
 
             if (PaymentStatus::isSettled((string) $locked['payment_status'])) {
+                if ($paymentId !== null) {
+                    // A staff confirmation must never report success without
+                    // recording anything.
+                    throw new HttpException(sprintf(
+                        'Order %s is already paid, so there is nothing to confirm.',
+                        $locked['order_number']
+                    ), 409);
+                }
+
                 // Already confirmed by whichever signal arrived first.
                 return;
+            }
+
+            if ($paymentId !== null) {
+                $locked = $this->reopenForLatePayment($locked, $source);
             }
 
             $expected = Money::fromDecimal((string) $locked['amount_payable']);
@@ -458,6 +492,9 @@ final class PaymentService
                 'method' => $verification->method ?? (string) ($payment['method'] ?? 'upi'),
                 'upi_vpa' => $verification->upiVpa,
                 'upi_transaction_id' => $verification->upiTransactionId,
+                // When the customer paid, if staff entered it from the bank
+                // statement; otherwise the moment the payment was confirmed.
+                'authorized_date' => $verification->raw['customer_paid_at'] ?? date('Y-m-d H:i:s'),
                 'gateway_response' => json_encode($verification->raw),
             ], null);
 
@@ -467,7 +504,9 @@ final class PaymentService
                 toStatus: (string) $locked['status'],
                 title: 'Payment received',
                 paymentStatus: PaymentStatus::PAID,
-                note: sprintf('%s received by UPI.', $expected->format()),
+                note: $verification->upiTransactionId !== null
+                    ? sprintf('%s received by UPI (UTR %s).', $expected->format(), $verification->upiTransactionId)
+                    : sprintf('%s received by UPI.', $expected->format()),
                 changedByRole: $source,
             );
 
@@ -539,6 +578,131 @@ final class PaymentService
      *
      * @return array<string, mixed>
      */
+    /**
+     * The attempt row a staff decision is about, locked, checked to belong to
+     * this order and still be open, and — for a confirmation — checked that
+     * its UTR has not already paid for something else.
+     *
+     * @param array<string, mixed> $order
+     *
+     * @return array<string, mixed>
+     */
+    private function lockAdminAttempt(int $paymentId, array $order, PaymentVerification $verification): array
+    {
+        $payment = $this->payments->lockById($paymentId);
+
+        if ($payment === null || (int) $payment['order_id'] !== (int) $order['id']) {
+            throw new NotFoundException('That payment attempt does not belong to this order.');
+        }
+
+        if (!in_array($payment['status'], ['created', 'pending'], true)) {
+            throw new HttpException(sprintf(
+                'This payment for order %s has already been %s.',
+                $order['order_number'],
+                $payment['status'] === 'captured' ? 'confirmed' : $payment['status']
+            ), 409);
+        }
+
+        if ($verification->isSuccessful() && $verification->upiTransactionId !== null) {
+            $used = $this->payments->findSettledByUtr($verification->upiTransactionId, $paymentId);
+
+            if ($used !== null) {
+                throw new HttpException(
+                    sprintf(
+                        'UTR %s was already used to confirm order %s. One bank transfer can only pay for one order — check the reference.',
+                        $verification->upiTransactionId,
+                        $used['order_number']
+                    ),
+                    409,
+                    ['utr_or_reference' => ['This UTR has already been used for order ' . $used['order_number'] . '.']]
+                );
+            }
+        }
+
+        return $payment;
+    }
+
+    /**
+     * Staff have confirmed a manual payment for an order the system already
+     * closed because nobody had verified it inside the payment window.
+     *
+     * The money reached the shop, so the order is put back to "awaiting
+     * payment" and then confirmed by the normal path below. That is only safe
+     * when the expiry gave nothing back: an order whose coupon or wallet
+     * credit was released on expiry cannot be silently revived, so staff are
+     * told to refund or re-place it instead. Customer or staff cancellations
+     * are never reopened.
+     *
+     * @param array<string, mixed> $order
+     *
+     * @return array<string, mixed>
+     */
+    private function reopenForLatePayment(array $order, string $source): array
+    {
+        if ($order['status'] === OrderStatus::CREATED) {
+            $this->transition(
+                (int) $order['id'],
+                OrderStatus::CREATED,
+                OrderStatus::AWAITING_PAYMENT,
+                'Payment started',
+                (string) $order['payment_status'],
+                null,
+                null,
+                $source
+            );
+
+            return array_merge($order, ['status' => OrderStatus::AWAITING_PAYMENT]);
+        }
+
+        if ($order['status'] !== OrderStatus::CANCELLED) {
+            return $order;
+        }
+
+        if ((string) $order['cancellation_reason'] !== self::EXPIRY_CANCELLATION_REASON) {
+            throw new HttpException(sprintf(
+                'Order %s was cancelled (%s), so it cannot be marked paid. If the customer did pay, refund them.',
+                $order['order_number'],
+                $order['cancellation_reason'] !== null && $order['cancellation_reason'] !== ''
+                    ? $order['cancellation_reason']
+                    : 'no reason given'
+            ), 409);
+        }
+
+        $releasedSomething = Money::fromDecimal((string) $order['wallet_applied'])->isPositive()
+            || $order['coupon_id'] !== null;
+
+        if ($releasedSomething) {
+            throw new HttpException(sprintf(
+                'Order %s was cancelled automatically when its payment window closed, and its coupon / wallet credit '
+                . 'was given back to the customer, so it cannot be reopened. Refund this payment or place the order again for the customer.',
+                $order['order_number']
+            ), 409);
+        }
+
+        $this->orders->update((int) $order['id'], [
+            'status' => OrderStatus::AWAITING_PAYMENT,
+            'cancelled_date' => null,
+            'cancellation_reason' => null,
+        ], null);
+
+        $this->orders->appendTimeline(
+            orderId: (int) $order['id'],
+            fromStatus: OrderStatus::CANCELLED,
+            toStatus: OrderStatus::AWAITING_PAYMENT,
+            title: 'Order reopened',
+            paymentStatus: (string) $order['payment_status'],
+            note: 'The payment window had closed before staff verified the UPI payment. Payment was verified, so the order was reopened.',
+            customerVisible: false,
+            changedByRole: $source,
+        );
+
+        return array_merge($order, [
+            'status' => OrderStatus::AWAITING_PAYMENT,
+            'cancelled_date' => null,
+            'cancellation_reason' => null,
+        ]);
+    }
+
     private function recordPaymentAttempt(array $order, PaymentVerification $verification, Request $request): array
     {
         if ($verification->gatewayPaymentId !== null) {
@@ -603,6 +767,12 @@ final class PaymentService
             'failed_date' => date('Y-m-d H:i:s'),
             'gateway_response' => json_encode($verification->raw),
         ], null);
+
+        // A failed or rejected attempt must never un-pay an order that another
+        // attempt already settled — only the attempt itself is closed.
+        if (PaymentStatus::isSettled((string) $order['payment_status'])) {
+            return;
+        }
 
         // The ORDER is not failed — only this attempt. The customer can retry
         // within the payment window, and marking the order dead would force
@@ -715,7 +885,10 @@ final class PaymentService
         $walletReturned = Money::zero();
         $couponsReleased = 0;
 
-        foreach ($this->orders->expiredUnpaidOrders($limit) as $order) {
+        $reviewHours = max(1, $this->settings->intValue('manual_payment_review_hours', self::MANUAL_REVIEW_HOURS));
+        $manualReviewSince = date('Y-m-d H:i:s', time() - $reviewHours * 3600);
+
+        foreach ($this->orders->expiredUnpaidOrders($limit, $manualReviewSince) as $order) {
             try {
                 $this->db->transaction(function () use ($order, $request, &$walletReturned, &$couponsReleased): void {
                     $locked = $this->orders->lockForUpdate((int) $order['id']);
@@ -731,7 +904,7 @@ final class PaymentService
                     $this->orders->update((int) $locked['id'], [
                         'status' => OrderStatus::CANCELLED,
                         'cancelled_date' => date('Y-m-d H:i:s'),
-                        'cancellation_reason' => 'Payment was not completed within the allowed window.',
+                        'cancellation_reason' => self::EXPIRY_CANCELLATION_REASON,
                     ], null);
 
                     $this->orders->appendTimeline(
