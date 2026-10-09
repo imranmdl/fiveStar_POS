@@ -134,7 +134,35 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
     return i > 0 ? [t.slice(0, i), t.slice(i + 1)] : [t, ''];
   })();
 
-  const show = { cashier: true, counter: true, customer: true, upi_qr: true, ...(shop.receipt || {}) };
+  const show = { cashier: true, counter: true, customer: true, upi_qr: true, offer: true, ...(shop.receipt || {}) };
+
+  // Optional offer box: the customer's own coupon, else the shop's chosen
+  // coupon or offer message (picked by the server; see ReceiptOfferService).
+  const offer = !isBill && show.offer !== false && sale.status !== 'voided' ? sale.offer : null;
+  let offerBlock = '';
+  if (offer && offer.kind === 'coupon') {
+    const validTo = offer.valid_to ? offer.valid_to.split('-').reverse().join('/') : '';
+    const conditions = [
+      offer.min_order_value ? `On orders above &#8377;${amt(offer.min_order_value)}` : '',
+      validTo ? `Valid till ${esc(validTo)}` : '',
+    ].filter(Boolean).join(' &middot; ');
+    offerBlock = `
+      <section class="offer center">
+        <div class="offer-kicker">${offer.personal ? 'A SPECIAL OFFER JUST FOR YOU' : 'SPECIAL OFFER'}</div>
+        <div class="offer-head">${esc(offer.headline)}</div>
+        ${offer.title ? `<div class="offer-title">${esc(offer.title)}</div>` : ''}
+        <div class="offer-use">Use code</div>
+        <div class="offer-code">${esc(offer.code)}</div>
+        ${conditions ? `<div class="fine">${conditions}</div>` : ''}
+        ${website ? `<div class="fine">Shop online at <b>${esc(website)}</b></div>` : ''}
+      </section>`;
+  } else if (offer && offer.kind === 'message') {
+    offerBlock = `
+      <section class="offer center">
+        <div class="offer-kicker">SPECIAL OFFER</div>
+        <div class="offer-msg">${esc(offer.message)}</div>
+      </section>`;
+  }
 
   // MRP vs the price charged, per line and for the bill. All display-only:
   // the bill's own figures (subtotal, discount, GST, total) are printed as
@@ -295,6 +323,7 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
         <div class="saved-split">${[priceSaving > 0 ? `MRP savings &#8377;${amt(priceSaving)}` : '', discount > 0 ? `Discount &#8377;${amt(discount)}` : ''].filter(Boolean).join(' + ')}</div>
         ${mrpTotal > 0 ? `<div class="saved-split">MRP &#8377;${amt(mrpTotal)} &rarr; you ${isBill ? 'pay' : 'paid'} &#8377;${amt(grandTotal)}</div>` : ''}
       </div>` : ''}
+      ${offerBlock}
       ${sale.status === 'voided' ? '<div class="band">*** VOIDED ***</div>' : ''}
 
       <div class="rule solid"></div>
@@ -390,6 +419,14 @@ export function receiptDocument(sale, paper, { logoUrl, heightMm, reprint = fals
   .upi-qr svg { display: block; margin: 0 auto; }
   .upi-id { margin-top: 1mm; word-break: break-all; }
   .web { font-weight: 700; margin-top: 0.6mm; }
+  .offer { border: 2px dashed #000; padding: 1.4mm 1mm; margin: 2.2mm 0 0; }
+  .offer-kicker { font-weight: 800; font-size: 0.82em; letter-spacing: 0.1em; }
+  .offer-head { font-weight: 800; font-size: ${narrow ? 1.3 : 1.5}em; line-height: 1.15; margin: 0.6mm 0; }
+  .offer-title { font-weight: 600; }
+  .offer-use { font-size: 0.86em; margin-top: 0.8mm; }
+  .offer-code { display: inline-block; background: #000; color: #fff; font-weight: 800; letter-spacing: 0.12em;
+    font-size: ${narrow ? 1.15 : 1.3}em; padding: 0.6mm 2.5mm; margin: 0.4mm 0 0.8mm; }
+  .offer-msg { font-weight: 700; font-size: 1.05em; margin-top: 0.6mm; white-space: pre-line; }
   .paid-mark { font-weight: 800; font-size: 1.1em; border: 2px solid #000; padding: 0.8mm 0; margin-bottom: 1.2mm; }
 </style></head><body>${receiptMarkup(sale, { logoUrl, reprint, paper, mode })}</body></html>`;
 }

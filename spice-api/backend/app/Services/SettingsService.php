@@ -66,6 +66,9 @@ final class SettingsService
         'receipt_show_counter',
         'receipt_show_customer',
         'receipt_show_upi_qr',
+        'receipt_show_offer',
+        'receipt_offer_coupon_code',
+        'receipt_offer_text',
     ];
 
     /** What the till receipt prints when the sale has it (all on by default). */
@@ -74,6 +77,7 @@ final class SettingsService
         'receipt_show_counter' => 'counter',
         'receipt_show_customer' => 'customer',
         'receipt_show_upi_qr' => 'upi_qr',
+        'receipt_show_offer' => 'offer',
     ];
 
     /**
@@ -312,6 +316,9 @@ final class SettingsService
                 array_values(self::RECEIPT_TOGGLES),
                 array_map(fn (string $key): bool => $this->settings->boolValue($key, true), array_keys(self::RECEIPT_TOGGLES))
             ),
+            // Offer box on receipts (see ReceiptOfferService).
+            'offer_coupon_code' => $get('receipt_offer_coupon_code'),
+            'offer_text' => $get('receipt_offer_text'),
             // Lets the admin page warn about a saved but unusable UPI ID.
             'upi_id_invalid' => $vpa !== '' && !self::isValidVpa($vpa),
         ];
@@ -368,6 +375,26 @@ final class SettingsService
             }
 
             $clean[$key] = $key === 'seller_gstin' ? strtoupper($value) : $value;
+        }
+
+        if (array_key_exists('receipt_offer_coupon_code', $data) && $data['receipt_offer_coupon_code'] !== null) {
+            $code = strtoupper(trim((string) $data['receipt_offer_coupon_code']));
+
+            if ($code !== '' && preg_match('/^[A-Z0-9_-]{2,30}$/', $code) !== 1) {
+                $errors['receipt_offer_coupon_code'][] = 'Pick one of your coupon codes.';
+            } else {
+                $clean['receipt_offer_coupon_code'] = $code;
+            }
+        }
+
+        if (array_key_exists('receipt_offer_text', $data) && $data['receipt_offer_text'] !== null) {
+            $text = trim(preg_replace('/\s+/', ' ', (string) $data['receipt_offer_text']) ?? '');
+
+            if (mb_strlen($text) > 200) {
+                $errors['receipt_offer_text'][] = 'Keep the offer message under 200 characters.';
+            } else {
+                $clean['receipt_offer_text'] = $text;
+            }
         }
 
         foreach (self::RECEIPT_TOGGLES as $key => $short) {

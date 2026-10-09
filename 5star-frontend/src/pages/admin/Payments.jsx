@@ -588,8 +588,19 @@ const SHOP_FIELDS = [
 function ShopDetailsCard({ shop, onSaved }) {
   const initial = () => ({
     ...Object.fromEntries(SHOP_FIELDS.map(([key, field]) => [key, (shop && shop[field]) || ''])),
-    receipt: { cashier: true, counter: true, customer: true, upi_qr: true, ...((shop && shop.receipt) || {}) },
+    receipt: { cashier: true, counter: true, customer: true, upi_qr: true, offer: true, ...((shop && shop.receipt) || {}) },
+    receipt_offer_coupon_code: (shop && shop.offer_coupon_code) || '',
+    receipt_offer_text: (shop && shop.offer_text) || '',
   });
+  const [coupons, setCoupons] = useState([]);
+
+  useEffect(() => {
+    let live = true;
+    api.get('/admin/coupons', { status: 'active', per_page: 100 })
+      .then((r) => { if (live) setCoupons((r.data || []).filter((c) => c.audience === 'all')); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -636,7 +647,7 @@ function ShopDetailsCard({ shop, onSaved }) {
         ))}
       </div>
       <div className="settings-label" style={{ marginTop: 12 }}>Print on the receipt (only when the sale has it)</div>
-      {[['cashier', 'Cashier name'], ['counter', 'Counter / shop label'], ['customer', 'Customer name and mobile'], ['upi_qr', 'UPI QR code (Scan & Pay when money is due; on paid bills marked PAID)']].map(([k, label]) => (
+      {[['cashier', 'Cashier name'], ['counter', 'Counter / shop label'], ['customer', 'Customer name and mobile'], ['upi_qr', 'UPI QR code (Scan & Pay when money is due; on paid bills marked PAID)'], ['offer', 'Offer / coupon for the customer']].map(([k, label]) => (
         <label className="settings-check" key={k}>
           <input
             type="checkbox"
@@ -646,6 +657,44 @@ function ShopDetailsCard({ shop, onSaved }) {
           <span>{label}</span>
         </label>
       ))}
+      {form.receipt.offer && (
+        <>
+          <div className="settings-label" style={{ marginTop: 12 }}>Offer printed on receipts</div>
+          <p className="small-muted">
+            A registered customer who has their own coupon (Offers → Coupons, audience &ldquo;Specific customer&rdquo;)
+            gets that one. Everyone else gets the coupon chosen here, or the message if no coupon is chosen.
+            Coupons are used online as usual — printing one doesn&apos;t use it up.
+          </p>
+          <div className="settings-grid">
+            <label className="settings-field">
+              <span>Coupon for everyone</span>
+              <select
+                value={form.receipt_offer_coupon_code}
+                onChange={(event) => setForm((f) => ({ ...f, receipt_offer_coupon_code: event.target.value }))}
+              >
+                <option value="">— None —</option>
+                {form.receipt_offer_coupon_code && !coupons.some((c) => c.code === form.receipt_offer_coupon_code) && (
+                  <option value={form.receipt_offer_coupon_code}>{form.receipt_offer_coupon_code} (not active now)</option>
+                )}
+                {coupons.map((c) => (
+                  <option key={c.code} value={c.code}>{c.code}{c.title ? ` — ${c.title}` : ''}</option>
+                ))}
+              </select>
+              {fieldErrors.receipt_offer_coupon_code && <span className="settings-error">{[].concat(fieldErrors.receipt_offer_coupon_code)[0]}</span>}
+            </label>
+            <label className="settings-field">
+              <span>Or an offer message</span>
+              <input
+                maxLength={200}
+                placeholder="e.g. Buy 2 spice packs, get 1 free this Diwali!"
+                value={form.receipt_offer_text}
+                onChange={(event) => setForm((f) => ({ ...f, receipt_offer_text: event.target.value }))}
+              />
+              {fieldErrors.receipt_offer_text && <span className="settings-error">{[].concat(fieldErrors.receipt_offer_text)[0]}</span>}
+            </label>
+          </div>
+        </>
+      )}
       <div className="payment-card__actions">
         <button type="button" className="admin-btn admin-btn--primary" onClick={save} disabled={saving}>
           {saving ? 'Saving…' : 'Save shop details'}

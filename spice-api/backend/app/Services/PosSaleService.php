@@ -50,6 +50,7 @@ final class PosSaleService
         private readonly PosSalePaymentRepository $duePayments,
         private readonly LoyaltyService $loyalty,
         private readonly SettingsService $shopSettings,
+        private readonly ReceiptOfferService $receiptOffers,
     ) {
     }
 
@@ -621,6 +622,8 @@ final class PosSaleService
         $sale['items'] = $this->items->forSale((int) $sale['id']);
         // Shop name, address, contact and UPI ID for the printed receipt.
         $sale['shop'] = $this->shopSettings->shopDetails($sale);
+        // Optional offer box (customer's own coupon, else the shop's pick).
+        $sale['offer'] = $this->receiptOffers->forCustomer($sale['customer_id'] !== null ? (int) $sale['customer_id'] : null);
         $sale['due_payments'] = $sale['is_credit_sale'] ? $this->duePayments->forSale((int) $sale['id']) : [];
         $sale['refunds'] = array_map(function (array $refund): array {
             $refund['items'] = $this->refundItems->forRefund((int) $refund['id']);
