@@ -360,6 +360,13 @@
 .sf-variant.is-on { border: 2px solid var(--sf-red); padding: 0 13px; }
 .sf-variant b { font: 700 14px var(--sf-text); }
 .sf-variant span { font: 500 12px var(--sf-text); color: var(--sf-muted); }
+.sf-variant--opt { min-width: 56px; height: 44px; }
+.sf-variant.is-off { color: var(--sf-muted); border-style: dashed; background: #fafafa; }
+.sf-variant.is-off b { text-decoration: line-through; font-weight: 500; }
+.sf-choose { display: flex; flex-direction: column; gap: 14px; border-radius: 6px; }
+.sf-choose__picked { font-weight: 400; color: var(--sf-muted); }
+.sf-choose--error .sf-variant:not(.is-on):not(.is-off) { border-color: var(--sf-red); }
+.sf-choose__error { color: var(--sf-red); font: 600 14px var(--sf-text); flex-basis: 100%; }
 .sf-pin { display: flex; max-width: 300px; height: 40px; border-bottom: 2px solid var(--sf-red); }
 .sf-pin input { flex: 1; min-width: 0; border: none; outline: none; font: 600 15px var(--sf-text); color: var(--sf-ink); background: transparent; }
 .sf-pin button { border: none; background: none; color: var(--sf-red); font: 800 13px var(--sf-text); padding: 0 4px; }

@@ -13,6 +13,7 @@ use App\Helpers\Money;
 use App\Helpers\Str;
 use App\Repositories\CartItemRepository;
 use App\Repositories\CartRepository;
+use App\Repositories\ProductVariantOptionRepository;
 use App\Repositories\ProductVariantRepository;
 use App\Repositories\SettingRepository;
 use App\Services\Pricing\CartLine;
@@ -59,6 +60,7 @@ final class CartService
         private readonly AuditService $audit,
         private readonly Database $db,
         private readonly Config $config,
+        private readonly ProductVariantOptionRepository $variantOptions,
     ) {
     }
 
@@ -614,8 +616,10 @@ final class CartService
         $purchasableRows = [];
         $lines = [];
 
+        $optionsByVariant = $this->variantOptions->forVariants(array_column($rawLines, 'variant_id'));
+
         foreach ($rawLines as $line) {
-            $presented = $this->presentLine($line);
+            $presented = $this->presentLine($line, $optionsByVariant[(int) $line['variant_id']] ?? []);
 
             if ((int) $line['is_saved_for_later'] === 1) {
                 $saved[] = $presented;
@@ -841,10 +845,11 @@ final class CartService
 
     /**
      * @param array<string, mixed> $line
+     * @param array<string, array<string, mixed>> $options
      *
      * @return array<string, mixed>
      */
-    private function presentLine(array $line): array
+    private function presentLine(array $line, array $options = []): array
     {
         $unitPrice = Money::fromDecimal((string) $line['unit_price_snapshot']);
         $unitMrp = Money::fromDecimal((string) $line['unit_mrp_snapshot']);
@@ -866,6 +871,11 @@ final class CartService
                 'pack_type' => $line['pack_type'],
                 'weight_grams' => (int) $line['weight_grams'],
                 'max_order_quantity' => (int) $line['max_order_quantity'],
+                // Size / colour as chosen ("M / Red"), when the pack has them.
+                'options' => array_map(static fn (array $o): string => $o['value'], $options),
+                'label' => $options === []
+                    ? null
+                    : implode(' / ', array_map(static fn (array $o): string => $o['value'], $options)),
             ],
             'unit_mrp' => $unitMrp->toDecimal(),
             'unit_price' => $unitPrice->toDecimal(),

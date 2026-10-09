@@ -109,6 +109,7 @@ final class OfferService
         // an offer's product listing is a filtered view of the catalog, not
         // a different kind of thing.
         $sizedIds = $this->variantOptions->productIdsWithSizeOptions(array_column($result['items'], 'id'));
+        $choiceIds = $this->variantOptions->productIdsRequiringChoice(array_column($result['items'], 'id'));
 
         $result['items'] = array_map(fn (array $row): array => [
             'uuid' => $row['uuid'],
@@ -133,6 +134,7 @@ final class OfferService
                 'max' => (int) $row['max_weight_grams'],
             ],
             'has_size_options' => in_array((int) $row['id'], $sizedIds, true),
+            'requires_choice' => in_array((int) $row['id'], $choiceIds, true),
             'rating' => [
                 'average' => (float) $row['rating_average'],
                 'count' => (int) $row['rating_count'],

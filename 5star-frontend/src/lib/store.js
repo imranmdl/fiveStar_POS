@@ -36,10 +36,15 @@ export function packLabel(grams) {
   return `${g} g`;
 }
 
-/** Label for a variant: its size label (clothing etc.) or its weight. */
+/** Label for a variant: its size / colour ("M / Red"), size label, or weight. */
 export function variantLabel(variant) {
   if (!variant) return '';
+  if (variant.option_label) return variant.option_label;
+  if (variant.label) return variant.label;
   if (variant.size_label) return variant.size_label;
+  // Clothing / footwear packs carry a 1 g placeholder weight; their name
+  // ("Small", "Free size") is the label, not "1 g".
+  if (Number(variant.weight_grams || 0) <= 1) return variant.variant_name || variant.name || '';
   return packLabel(variant.weight_grams) || variant.variant_name || variant.name || '';
 }
 
@@ -79,6 +84,8 @@ export function cardFromListItem(item) {
     off,
     size: item.has_size_options ? '' : packLabel(weight.min),
     multiple: Number(pricing.variant_count || 1) > 1,
+    // Size / colour must be picked on the product page (clothing, footwear…).
+    requiresChoice: Boolean(item.requires_choice),
     rating: Number(item.rating?.average || 0),
     reviews: Number(item.rating?.count || 0),
   };

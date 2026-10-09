@@ -106,4 +106,105 @@ final class ProductVariantOptionRepository extends BaseRepository
             ], $actorId);
         }
     }
+
+    /**
+     * Options for many variants at once, keyed by variant id:
+     * [variantId => [code => ['type' => 'Size', 'value' => 'M']]], dimensions
+     * in their display order.
+     *
+     * @param array<int, int> $variantIds
+     *
+     * @return array<int, array<string, array{type: string, value: string, type_order: int, value_order: int}>>
+     */
+    public function forVariants(array $variantIds): array
+    {
+        $variantIds = array_values(array_unique(array_map('intval', $variantIds)));
+
+        if ($variantIds === []) {
+            return [];
+        }
+
+        $bindings = [];
+        $placeholders = [];
+
+        foreach ($variantIds as $index => $id) {
+            $placeholders[] = ':v' . $index;
+            $bindings['v' . $index] = $id;
+        }
+
+        $rows = $this->db->select(
+            'SELECT pvo.`product_variant_id`, t.`code`, t.`name` AS `type_name`, t.`display_order` AS `type_order`,
+                    v.`value`, v.`display_order` AS `value_order`
+               FROM `product_variant_options` pvo
+               INNER JOIN `variant_option_types` t ON t.`id` = pvo.`option_type_id`
+               INNER JOIN `variant_option_values` v ON v.`id` = pvo.`option_value_id`
+              WHERE pvo.`product_variant_id` IN (' . implode(', ', $placeholders) . ') AND pvo.`is_deleted` = 0
+              ORDER BY t.`display_order` ASC, v.`display_order` ASC',
+            $bindings
+        );
+
+        $map = [];
+
+        foreach ($rows as $row) {
+            $map[(int) $row['product_variant_id']][(string) $row['code']] = [
+                'type' => (string) $row['type_name'],
+                'value' => (string) $row['value'],
+                'type_order' => (int) $row['type_order'],
+                'value_order' => (int) $row['value_order'],
+            ];
+        }
+
+        return $map;
+    }
+
+    /**
+     * Products a shopper must pick a variant for before buying, rather than
+     * having one added for them: more than one active variant, and either a
+     * size / colour on some variant, or a clothing / footwear category
+     * (item_type is set on the top-level category and inherited).
+     *
+     * @param array<int, int> $productIds
+     *
+     * @return array<int, int>
+     */
+    public function productIdsRequiringChoice(array $productIds): array
+    {
+        $productIds = array_values(array_unique(array_map('intval', $productIds)));
+
+        if ($productIds === []) {
+            return [];
+        }
+
+        $bindings = [];
+        $placeholders = [];
+
+        foreach ($productIds as $index => $id) {
+            $placeholders[] = ':p' . $index;
+            $bindings['p' . $index] = $id;
+        }
+
+        $rows = $this->db->select(
+            "SELECT p.`id`
+               FROM `products` p
+               LEFT JOIN `categories` c  ON c.`id`  = p.`category_id`
+               LEFT JOIN `categories` c1 ON c1.`id` = c.`parent_id`
+               LEFT JOIN `categories` c2 ON c2.`id` = c1.`parent_id`
+              WHERE p.`id` IN (" . implode(', ', $placeholders) . ")
+                AND (SELECT COUNT(*) FROM `product_variants` pv
+                      WHERE pv.`product_id` = p.`id` AND pv.`is_deleted` = 0 AND pv.`is_active` = 1) > 1
+                AND (
+                    COALESCE(c.`item_type`, c1.`item_type`, c2.`item_type`) IN ('clothing', 'footwear')
+                    OR EXISTS (
+                        SELECT 1 FROM `product_variant_options` pvo
+                          JOIN `product_variants` pv2 ON pv2.`id` = pvo.`product_variant_id`
+                          JOIN `variant_option_types` t ON t.`id` = pvo.`option_type_id`
+                         WHERE pv2.`product_id` = p.`id` AND pvo.`is_deleted` = 0
+                           AND t.`code` IN ('size', 'color')
+                    )
+                )",
+            $bindings
+        );
+
+        return array_map(static fn (array $row): int => (int) $row['id'], $rows);
+    }
 }
