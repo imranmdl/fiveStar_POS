@@ -40,6 +40,12 @@ final class ShiprocketAdapter implements CourierAdapterInterface
 
     private ?string $token = null;
 
+    /** @var array{name: string, pincode: string}|null */
+    private ?array $pickup = null;
+
+    /** @var array<string, array<int, array<string, mixed>>> */
+    private array $courierOptions = [];
+
     public function __construct(
         private readonly string $email,
         private readonly string $password,
@@ -64,21 +70,12 @@ final class ShiprocketAdapter implements CourierAdapterInterface
 
     public function quote(array $courier, ParcelSpec $parcel): ?CourierQuote
     {
-        $pickupPincode = (string) ($this->settings->value('pickup_pincode') ?? '');
-
-        if ($pickupPincode === '') {
-            return null;
-        }
-
         try {
-            $response = $this->request('GET', '/courier/serviceability/?' . http_build_query([
-                'pickup_postcode' => $pickupPincode,
-                'delivery_postcode' => $parcel->destinationPincode,
-                // BR-004 makes every order prepaid, so COD is never requested.
-                'cod' => 0,
-                'weight' => round($parcel->chargeableWeightGrams() / 1000, 3),
-                'declared_value' => $parcel->declaredValue->toDecimal(),
-            ]));
+            $options = $this->availableCouriers(
+                $parcel->destinationPincode,
+                round($parcel->chargeableWeightGrams() / 1000, 3),
+                (string) $parcel->declaredValue->toDecimal()
+            );
         } catch (\Throwable $exception) {
             // A rate lookup failing must not stop a parcel being booked. The
             // caller falls back to the negotiated rate card.
@@ -90,17 +87,9 @@ final class ShiprocketAdapter implements CourierAdapterInterface
             return null;
         }
 
-        $options = $response['data']['available_courier_companies'] ?? [];
+        $option = $this->matchCourier($courier, $options);
 
-        if (!is_array($options)) {
-            return null;
-        }
-
-        foreach ($options as $option) {
-            if ((string) ($option['courier_company_id'] ?? '') !== (string) ($courier['channel_code'] ?? '')) {
-                continue;
-            }
-
+        if ($option !== null) {
             // Shiprocket reports an estimate as days, or occasionally as hours.
             // Where it gives neither, assume five days rather than zero — a zero
             // SLA would score as instant delivery and win every "fastest"
@@ -130,7 +119,17 @@ final class ShiprocketAdapter implements CourierAdapterInterface
             );
         }
 
-        return null;
+        // Shiprocket answered and this courier is not on its list for the
+        // route, so it cannot be booked — say so rather than letting the
+        // static rate card make it look available (and get auto-selected).
+        return CourierQuote::ineligible(
+            (int) $courier['id'],
+            (string) $courier['code'],
+            (string) $courier['name'],
+            [$options === []
+                ? 'Shiprocket has no courier for this pincode'
+                : 'Not offered by your Shiprocket account for this pincode'],
+        );
     }
 
     public function book(array $courier, ParcelSpec $parcel, array $order): ShipmentBooking
@@ -150,7 +149,7 @@ final class ShiprocketAdapter implements CourierAdapterInterface
         $payload = [
             'order_id' => (string) $order['order_number'],
             'order_date' => date('Y-m-d H:i', strtotime((string) ($order['placed_date'] ?? 'now'))),
-            'pickup_location' => $this->pickupLocationName,
+            'pickup_location' => $this->pickup()['name'],
             'billing_customer_name' => (string) $order['ship_name'],
             'billing_last_name' => '',
             'billing_address' => (string) $order['ship_address_line1'],
@@ -189,11 +188,35 @@ final class ShiprocketAdapter implements CourierAdapterInterface
             );
         }
 
+        // Shiprocket's courier ids are per account, so the one to ask for is
+        // looked up live: the option on this route whose name matches the
+        // courier staff chose (Delhivery, Blue Dart…). Booking a courier
+        // Shiprocket does not offer here fails with the list of those it does.
+        $assignBody = ['shipment_id' => $shipmentId];
+
         try {
-            $assigned = $this->request('POST', '/courier/assign/awb', [
-                'shipment_id' => $shipmentId,
-                'courier_id' => $courier['channel_code'],
-            ]);
+            $options = $this->availableCouriers(
+                (string) $order['ship_pincode'],
+                round($parcel->chargeableWeightGrams() / 1000, 3),
+                (string) $order['grand_total']
+            );
+        } catch (\Throwable $exception) {
+            return ShipmentBooking::failed(
+                'The parcel was created in Shiprocket, but its courier list could not be read: ' . $exception->getMessage(),
+                $created
+            );
+        }
+
+        $match = $this->matchCourier($courier, $options);
+
+        if ($match === null) {
+            return ShipmentBooking::failed($this->notOfferedMessage($courier, (string) $order['ship_pincode'], $options), $created);
+        }
+
+        $assignBody['courier_id'] = (int) $match['courier_company_id'];
+
+        try {
+            $assigned = $this->request('POST', '/courier/assign/awb', $assignBody);
         } catch (\Throwable $exception) {
             return ShipmentBooking::failed(
                 'The parcel was created but no AWB could be assigned: ' . $exception->getMessage(),
@@ -204,10 +227,27 @@ final class ShiprocketAdapter implements CourierAdapterInterface
         $awbData = $assigned['response']['data'] ?? [];
         $awb = $awbData['awb_code'] ?? null;
 
-        if ($awb === null) {
+        if ($awb === null || $awb === '') {
+            // Shiprocket answers a refused assignment with HTTP 200 and the
+            // reason tucked inside the response (wallet balance, KYC,
+            // serviceability…). Show that reason, not a generic line.
+            $reason = $awbData['awb_assign_error']
+                ?? ($assigned['response']['message'] ?? null)
+                ?? ($assigned['message'] ?? null)
+                ?? null;
+
+            $this->logger->error('Shiprocket did not assign an AWB', [
+                'order_number' => $order['order_number'],
+                'shipment_id' => $shipmentId,
+                'courier_id' => $assignBody['courier_id'],
+                'response' => $assigned,
+            ], 'delivery');
+
             return ShipmentBooking::failed(
-                (string) ($assigned['message'] ?? 'The courier did not return an AWB.'),
-                $assigned
+                $reason !== null && $reason !== ''
+                    ? sprintf('Shiprocket did not assign %s: %s', (string) ($match['courier_name'] ?? $courier['name']), (string) $reason)
+                    : sprintf('Shiprocket did not assign an AWB for %s (no reason given). Check the order in the Shiprocket panel.', (string) ($match['courier_name'] ?? $courier['name'])),
+                ['create' => $created, 'awb' => $assigned]
             );
         }
 
@@ -413,6 +453,183 @@ final class ShiprocketAdapter implements CourierAdapterInterface
         };
     }
 
+    /**
+     * The Shiprocket pickup address parcels leave from: the one named in
+     * SHIPROCKET_PICKUP_LOCATION, or — when that name does not exist and the
+     * account has exactly one pickup address — that one, so a wrong or unset
+     * name ("Primary") doesn't stop every booking. Its pincode drives rates
+     * and serviceability. Falls back to the configured name and the
+     * pickup_pincode setting if the addresses can't be read.
+     *
+     * @return array{name: string, pincode: string}
+     */
+    private function pickup(): array
+    {
+        if ($this->pickup !== null) {
+            return $this->pickup;
+        }
+
+        $fallback = [
+            'name' => $this->pickupLocationName,
+            'pincode' => (string) ($this->settings->value('pickup_pincode') ?? ''),
+        ];
+
+        try {
+            $response = $this->request('GET', '/settings/company/pickup');
+            $addresses = $response['data']['shipping_address'] ?? ($response['data']['data'] ?? []);
+            $addresses = is_array($addresses) ? array_values(array_filter($addresses, 'is_array')) : [];
+
+            foreach ($addresses as $address) {
+                if (strcasecmp((string) ($address['pickup_location'] ?? ''), $this->pickupLocationName) === 0) {
+                    return $this->pickup = [
+                        'name' => (string) $address['pickup_location'],
+                        'pincode' => (string) ($address['pin_code'] ?? $fallback['pincode']),
+                    ];
+                }
+            }
+
+            if (count($addresses) === 1) {
+                $this->logger->warning('SHIPROCKET_PICKUP_LOCATION does not match; using the only pickup address on the account', [
+                    'configured' => $this->pickupLocationName,
+                    'using' => $addresses[0]['pickup_location'] ?? '',
+                ], 'delivery');
+
+                return $this->pickup = [
+                    'name' => (string) ($addresses[0]['pickup_location'] ?? $this->pickupLocationName),
+                    'pincode' => (string) ($addresses[0]['pin_code'] ?? $fallback['pincode']),
+                ];
+            }
+
+            $this->logger->warning('Shiprocket pickup location not found', [
+                'configured' => $this->pickupLocationName,
+                'available' => array_map(static fn (array $a): string => (string) ($a['pickup_location'] ?? ''), $addresses),
+            ], 'delivery');
+        } catch (\Throwable $exception) {
+            $this->logger->warning('Could not read Shiprocket pickup addresses; using configured values', [
+                'reason' => $exception->getMessage(),
+            ], 'delivery');
+        }
+
+        return $this->pickup = $fallback;
+    }
+
+    private function pickupPincode(): string
+    {
+        return $this->pickup()['pincode'];
+    }
+
+    /**
+     * Couriers Shiprocket offers on this account from the pickup address to
+     * $deliveryPincode, as Shiprocket lists them (id, name, rate, ETA).
+     * Cached per destination for the request, since quoting asks once per
+     * courier.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function availableCouriers(string $deliveryPincode, float $weightKg, string $declaredValue): array
+    {
+        $pickup = $this->pickupPincode();
+
+        if ($pickup === '') {
+            throw new \RuntimeException('No pickup pincode is known — check SHIPROCKET_PICKUP_LOCATION.');
+        }
+
+        $key = $pickup . '|' . $deliveryPincode . '|' . $weightKg;
+
+        if (isset($this->courierOptions[$key])) {
+            return $this->courierOptions[$key];
+        }
+
+        $response = $this->request('GET', '/courier/serviceability/?' . http_build_query([
+            'pickup_postcode' => $pickup,
+            'delivery_postcode' => $deliveryPincode,
+            // BR-004 makes every order prepaid, so COD is never requested.
+            'cod' => 0,
+            'weight' => max(0.05, $weightKg),
+            'declared_value' => $declaredValue,
+        ]));
+
+        $options = $response['data']['available_courier_companies'] ?? [];
+
+        return $this->courierOptions[$key] = is_array($options) ? array_values(array_filter($options, 'is_array')) : [];
+    }
+
+    /**
+     * The Shiprocket option for one of our couriers: an exact id match on
+     * channel_code if that is a real Shiprocket id, otherwise the cheapest
+     * option whose name carries the courier's brand ("Delhivery Surface",
+     * "Blue Dart Air" …).
+     *
+     * @param array<string, mixed>             $courier
+     * @param array<int, array<string, mixed>> $options
+     *
+     * @return array<string, mixed>|null
+     */
+    private function matchCourier(array $courier, array $options): ?array
+    {
+        $channel = (string) ($courier['channel_code'] ?? '');
+
+        foreach ($options as $option) {
+            if ($channel !== '' && (string) ($option['courier_company_id'] ?? '') === $channel) {
+                return $option;
+            }
+        }
+
+        $brand = self::brandKey((string) ($courier['name'] ?? $courier['code'] ?? ''));
+
+        if ($brand === '') {
+            return null;
+        }
+
+        $best = null;
+
+        foreach ($options as $option) {
+            if (!str_contains(self::brandKey((string) ($option['courier_name'] ?? '')), $brand)) {
+                continue;
+            }
+
+            if ($best === null || (float) ($option['rate'] ?? INF) < (float) ($best['rate'] ?? INF)) {
+                $best = $option;
+            }
+        }
+
+        return $best;
+    }
+
+    /** "Blue Dart" / "BLUEDART" / "Blue Dart Air" all reduce to "bluedart". */
+    private static function brandKey(string $name): string
+    {
+        return (string) preg_replace('/[^a-z]/', '', strtolower($name));
+    }
+
+    /**
+     * @param array<string, mixed>             $courier
+     * @param array<int, array<string, mixed>> $options
+     */
+    private function notOfferedMessage(array $courier, string $pincode, array $options): string
+    {
+        if ($options === []) {
+            return sprintf(
+                'Shiprocket has no courier for pincode %s from your pickup address (%s). Check the pincode, or book this order manually.',
+                $pincode,
+                $this->pickupPincode()
+            );
+        }
+
+        $names = [];
+
+        foreach ($options as $option) {
+            $names[] = sprintf('%s (₹%s)', (string) ($option['courier_name'] ?? '?'), (string) ($option['rate'] ?? '?'));
+        }
+
+        return sprintf(
+            '%s is not available on your Shiprocket account for pincode %s. Shiprocket offers: %s. Choose another courier.',
+            (string) $courier['name'],
+            $pincode,
+            implode(', ', array_slice(array_unique($names), 0, 8))
+        );
+    }
+
     private function authenticate(): string
     {
         if ($this->token !== null) {
@@ -587,7 +804,20 @@ final class ShiprocketAdapter implements CourierAdapterInterface
         }
 
         if ($status >= 400) {
-            $message = $decoded['message'] ?? 'The courier rejected the request.';
+            $message = (string) ($decoded['message'] ?? 'The courier rejected the request.');
+
+            // Validation failures list the bad fields under "errors".
+            if (isset($decoded['errors']) && is_array($decoded['errors'])) {
+                $details = [];
+                array_walk_recursive($decoded['errors'], static function ($v) use (&$details): void {
+                    $details[] = (string) $v;
+                });
+                $details = array_unique(array_filter($details));
+
+                if ($details !== []) {
+                    $message = rtrim($message, '. ') . ': ' . implode(' ', $details);
+                }
+            }
 
             $this->logger->error('Shiprocket returned an error', [
                 'path' => $path,

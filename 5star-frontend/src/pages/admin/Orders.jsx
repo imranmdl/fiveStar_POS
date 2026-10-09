@@ -21,8 +21,11 @@ import ManualPaymentForm, { orderPaymentLabel } from '../../components/admin/Man
 import './Orders.css';
 
 function reportError(error, fallback) {
-  const messages = error instanceof ApiError ? error.fieldMessages() : [];
-  const text = messages.length > 0 ? `${error.message} ${messages.join(' ')}` : (error.message || fallback || 'Something went wrong.');
+  // Field messages that only repeat the main message are dropped, so a
+  // courier error isn't printed twice.
+  const base = (error && error.message) || '';
+  const messages = (error instanceof ApiError ? error.fieldMessages() : []).filter((m) => m && !base.includes(m));
+  const text = messages.length > 0 ? `${base} ${messages.join(' ')}`.trim() : (base || fallback || 'Something went wrong.');
   toast(text, 'danger');
 }
 
