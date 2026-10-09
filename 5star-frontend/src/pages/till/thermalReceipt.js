@@ -131,19 +131,31 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
     return i > 0 ? [t.slice(0, i), t.slice(i + 1)] : [t, ''];
   })();
 
+  const show = { cashier: true, counter: true, customer: true, ...(shop.receipt || {}) };
+
+  // MRP vs the price charged, per line and for the bill. All display-only:
+  // the bill's own figures (subtotal, discount, GST, total) are printed as
+  // saved. A line without an MRP (or priced above it) counts at its price.
+  let mrpTotal = 0;
   const lines = items.map((item, index) => {
     const lineDiscount = num(item.discount_amount);
+    const price = num(item.unit_price);
+    const mrp = item.mrp != null && num(item.mrp) > 0 ? num(item.mrp) : null;
+    mrpTotal += Math.max(mrp ?? price, price) * num(item.quantity);
     return `
       <div class="item">
         <div class="item-name"><span class="sn">${index + 1}.</span>${esc(item.product_name)}${item.variant_name ? ` <span class="var">${esc(item.variant_name)}</span>` : ''}</div>
         <div class="grid nums">
           <span class="c-qty">${qty(item.quantity)}</span>
-          <span class="c-rate">${amt(item.unit_price)}</span>
+          <span class="c-mrp${mrp != null && mrp > price ? ' strike' : ''}">${mrp != null ? amt(mrp) : '&ndash;'}</span>
+          <span class="c-rate">${amt(price)}</span>
           <span class="c-amt">${amt(item.line_total)}</span>
         </div>
-        ${lineDiscount > 0 ? `<div class="disc">Discount on item &minus;${amt(lineDiscount)}</div>` : ''}
+        ${lineDiscount > 0 ? `<div class="disc">Item discount &minus;${amt(lineDiscount)}</div>` : ''}
       </div>`;
   }).join('');
+  mrpTotal = Math.round(mrpTotal * 100) / 100;
+  const priceSaving = Math.max(0, Math.round((mrpTotal - num(sale.subtotal)) * 100) / 100);
 
   const gst = gstSummary(items);
   const gstRows = gst.map((g) => `
@@ -218,16 +230,16 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
         ${row('Receipt No', `<b>${esc(sale.sale_number)}</b>`)}
         ${row('Date', datePart)}
         ${row('Time', timePart)}
-        ${sale.cashier_name ? row('Cashier', esc(sale.cashier_name)) : ''}
-        ${sale.shop_label ? row('Counter', esc(sale.shop_label)) : ''}
-        ${sale.customer_name ? row('Customer', esc(sale.customer_name)) : ''}
-        ${sale.customer_mobile ? row('Mobile', esc(sale.customer_mobile)) : ''}
+        ${show.cashier && sale.cashier_name ? row('Cashier', esc(sale.cashier_name)) : ''}
+        ${show.counter && sale.shop_label ? row('Counter', esc(sale.shop_label)) : ''}
+        ${show.customer && sale.customer_name ? row('Customer', esc(sale.customer_name)) : ''}
+        ${show.customer && sale.customer_mobile ? row('Mobile', esc(sale.customer_mobile)) : ''}
       </section>
 
       <div class="rule solid"></div>
       <div class="thead">
         <div>ITEM</div>
-        <div class="grid"><span class="c-qty">QTY</span><span class="c-rate">RATE</span><span class="c-amt">AMOUNT</span></div>
+        <div class="grid"><span class="c-qty">QTY</span><span class="c-mrp">MRP</span><span class="c-rate">PRICE</span><span class="c-amt">AMOUNT</span></div>
       </div>
       <div class="rule solid"></div>
       ${lines}
@@ -235,7 +247,9 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
 
       <section class="totals nums">
         ${row(`Items ${items.length} &middot; Qty ${qty(totalQty)}`, '', 'small')}
-        ${row('Subtotal', amt(sale.subtotal))}
+        ${priceSaving > 0 ? row('Total MRP', amt(mrpTotal)) : ''}
+        ${priceSaving > 0 ? row('Savings on MRP', `&minus;${amt(priceSaving)}`) : ''}
+        ${row(priceSaving > 0 ? 'Subtotal (our price)' : 'Subtotal', amt(sale.subtotal))}
         ${discount > 0 ? row('Discount', `&minus;${amt(discount)}`) : ''}
         ${row('GST (included)', amt(sale.tax_amount))}
       </section>
@@ -254,7 +268,11 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
 
       ${qrBlock}
 
-      ${discount > 0 ? `<div class="saved">You saved &#8377;${amt(discount)} on this bill</div>` : ''}
+      ${priceSaving + discount > 0.004 ? `<div class="saved">
+        <div class="saved-big">YOU SAVED &#8377;${amt(priceSaving + discount)}</div>
+        <div class="saved-split">${[priceSaving > 0 ? `MRP savings &#8377;${amt(priceSaving)}` : '', discount > 0 ? `Discount &#8377;${amt(discount)}` : ''].filter(Boolean).join(' + ')}</div>
+        ${mrpTotal > 0 ? `<div class="saved-split">MRP &#8377;${amt(mrpTotal)} &rarr; you paid &#8377;${amt(grandTotal)}</div>` : ''}
+      </div>` : ''}
       ${sale.status === 'voided' ? '<div class="band">*** VOIDED ***</div>' : ''}
 
       <div class="rule solid"></div>
@@ -310,9 +328,10 @@ export function receiptDocument(sale, paper, { logoUrl, heightMm, reprint = fals
   .meta .r { line-height: 1.38; }
 
   .thead { font-weight: 800; font-size: 0.9em; letter-spacing: 0.04em; }
-  .grid { display: grid; grid-template-columns: ${narrow ? '20% 36% 44%' : '22% 36% 42%'}; }
+  .grid { display: grid; grid-template-columns: ${narrow ? '13% 27% 27% 33%' : '15% 26% 26% 33%'}; }
   .c-qty { text-align: left; padding-left: ${narrow ? 0 : 3.5}mm; }
-  .c-rate, .c-amt { text-align: right; }
+  .c-mrp, .c-rate, .c-amt { text-align: right; }
+  .strike { text-decoration: line-through; }
   .item { padding: 0.9mm 0; break-inside: avoid; }
   .item + .item { border-top: 1px dotted #000; }
   .item-name { font-weight: 700; word-break: break-word; }
@@ -336,7 +355,9 @@ export function receiptDocument(sale, paper, { logoUrl, heightMm, reprint = fals
   .grid4 span:not(:first-child) { text-align: right; }
   .grid4.head { font-weight: 700; border-bottom: 1px solid #000; padding-bottom: 0.3mm; margin-bottom: 0.3mm; }
 
-  .saved { text-align: center; font-weight: 800; border: 1.5px dashed #000; padding: 0.9mm 0; margin: 2mm 0 0; }
+  .saved { text-align: center; border: 1.5px dashed #000; padding: 1mm 0.5mm; margin: 2mm 0 0; }
+  .saved-big { font-weight: 800; font-size: 1.1em; }
+  .saved-split { font-size: 0.86em; }
 
   footer { line-height: 1.38; }
   .thanks { font-weight: 800; font-size: 1.08em; margin-bottom: 0.3mm; }

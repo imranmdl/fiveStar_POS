@@ -136,6 +136,8 @@ final class PosSaleService
                 'variant_name' => $variant['variant_name'],
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
+                // Display only (printed receipt): the pack's MRP today.
+                'mrp' => isset($variant['mrp']) && $variant['mrp'] !== null ? (float) $variant['mrp'] : null,
                 'discount_amount' => $lineDiscount,
                 'applied_offer_code' => $line['applied_offer_code'] ?? null,
                 'gst_rate' => $gstRate,
@@ -353,6 +355,7 @@ final class PosSaleService
                     'variant_name' => $line['variant_name'],
                     'quantity' => number_format($line['quantity'], 3, '.', ''),
                     'unit_price' => number_format($line['unit_price'], 2, '.', ''),
+                    'mrp' => $line['mrp'] === null ? null : number_format($line['mrp'], 2, '.', ''),
                     'discount_amount' => number_format($line['discount_amount'], 2, '.', ''),
                     'applied_offer_code' => $line['applied_offer_code'],
                     'gst_rate' => number_format($line['gst_rate'], 2, '.', ''),

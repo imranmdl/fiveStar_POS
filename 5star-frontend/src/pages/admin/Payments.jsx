@@ -586,7 +586,10 @@ const SHOP_FIELDS = [
  * GSTIN). Blank address/phone fall back to the default warehouse's.
  */
 function ShopDetailsCard({ shop, onSaved }) {
-  const initial = () => Object.fromEntries(SHOP_FIELDS.map(([key, field]) => [key, (shop && shop[field]) || '']));
+  const initial = () => ({
+    ...Object.fromEntries(SHOP_FIELDS.map(([key, field]) => [key, (shop && shop[field]) || ''])),
+    receipt: { cashier: true, counter: true, customer: true, ...((shop && shop.receipt) || {}) },
+  });
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -632,6 +635,17 @@ function ShopDetailsCard({ shop, onSaved }) {
           </label>
         ))}
       </div>
+      <div className="settings-label" style={{ marginTop: 12 }}>Print on the receipt (only when the sale has it)</div>
+      {[['cashier', 'Cashier name'], ['counter', 'Counter / shop label'], ['customer', 'Customer name and mobile']].map(([k, label]) => (
+        <label className="settings-check" key={k}>
+          <input
+            type="checkbox"
+            checked={Boolean(form.receipt[k])}
+            onChange={(event) => setForm((f) => ({ ...f, receipt: { ...f.receipt, [k]: event.target.checked } }))}
+          />
+          <span>{label}</span>
+        </label>
+      ))}
       <div className="payment-card__actions">
         <button type="button" className="admin-btn admin-btn--primary" onClick={save} disabled={saving}>
           {saving ? 'Saving…' : 'Save shop details'}

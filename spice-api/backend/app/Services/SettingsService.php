@@ -62,6 +62,16 @@ final class SettingsService
         'store_email',
         'store_website',
         'seller_gstin',
+        'receipt_show_cashier',
+        'receipt_show_counter',
+        'receipt_show_customer',
+    ];
+
+    /** What the till receipt prints when the sale has it (all on by default). */
+    private const RECEIPT_TOGGLES = [
+        'receipt_show_cashier' => 'cashier',
+        'receipt_show_counter' => 'counter',
+        'receipt_show_customer' => 'customer',
     ];
 
     /**
@@ -294,6 +304,12 @@ final class SettingsService
             'upi' => $vpa !== '' && self::isValidVpa($vpa)
                 ? ['vpa' => $vpa, 'payee_name' => $payee !== '' ? $payee : $name]
                 : null,
+            // Optional lines on the printed receipt (each still prints only
+            // when the sale actually has it).
+            'receipt' => array_combine(
+                array_values(self::RECEIPT_TOGGLES),
+                array_map(fn (string $key): bool => $this->settings->boolValue($key, true), array_keys(self::RECEIPT_TOGGLES))
+            ),
             // Lets the admin page warn about a saved but unusable UPI ID.
             'upi_id_invalid' => $vpa !== '' && !self::isValidVpa($vpa),
         ];
@@ -350,6 +366,14 @@ final class SettingsService
             }
 
             $clean[$key] = $key === 'seller_gstin' ? strtoupper($value) : $value;
+        }
+
+        foreach (self::RECEIPT_TOGGLES as $key => $short) {
+            $sent = $data['receipt'][$short] ?? ($data[$key] ?? null);
+
+            if ($sent !== null) {
+                $clean[$key] = filter_var($sent, FILTER_VALIDATE_BOOLEAN) ? '1' : '0';
+            }
         }
 
         if ($errors !== []) {
