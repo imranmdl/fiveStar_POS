@@ -33,6 +33,8 @@ use App\Repositories\SettingRepository;
 final class ShiprocketAdapter implements CourierAdapterInterface
 {
     private const API_BASE = 'https://apiv2.shiprocket.in/v1/external';
+
+    private const USER_AGENT = 'FiveStarSpices-Store/1.0 (+https://fivestarspices.com)';
     private const TOKEN_SETTING = 'shiprocket_token';
     private const TOKEN_EXPIRY_SETTING = 'shiprocket_token_expires';
 
@@ -430,7 +432,10 @@ final class ShiprocketAdapter implements CourierAdapterInterface
         curl_setopt_array($handle, [
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json'],
+            // Shiprocket's firewall answers a bare 403 to requests that carry
+            // no User-Agent (PHP's curl sends none by default).
+            CURLOPT_USERAGENT => self::USER_AGENT,
             CURLOPT_POSTFIELDS => json_encode(['email' => $this->email, 'password' => $this->password]),
             CURLOPT_TIMEOUT => $this->timeoutSeconds,
             CURLOPT_SSL_VERIFYPEER => true,
@@ -543,6 +548,7 @@ final class ShiprocketAdapter implements CourierAdapterInterface
                 'Accept: application/json',
                 'Authorization: Bearer ' . $this->authenticate(),
             ],
+            CURLOPT_USERAGENT => self::USER_AGENT,
             CURLOPT_TIMEOUT => $this->timeoutSeconds,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_SSL_VERIFYPEER => true,

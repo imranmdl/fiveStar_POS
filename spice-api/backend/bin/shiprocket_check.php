@@ -109,6 +109,8 @@ function call(string $path, string $method = 'GET', ?array $payload = null, ?str
         CURLOPT_CUSTOMREQUEST => $method,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_HTTPHEADER => $headers,
+        // Same as the adapter: Shiprocket's firewall 403s requests with no User-Agent.
+        CURLOPT_USERAGENT => 'FiveStarSpices-Store/1.0 (+https://fivestarspices.com)',
         CURLOPT_TIMEOUT => 30,
     ];
 
