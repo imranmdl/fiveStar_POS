@@ -174,9 +174,8 @@ final class ShiprocketAdapter implements CourierAdapterInterface
         try {
             $created = $this->request('POST', '/orders/create/adhoc', $payload);
         } catch (\Throwable $exception) {
-            return ShipmentBooking::failed(
-                'The courier could not accept this parcel: ' . $exception->getMessage()
-            );
+            // ShipmentService adds "The courier could not accept this parcel:".
+            return ShipmentBooking::failed($exception->getMessage());
         }
 
         $shipmentId = $created['shipment_id'] ?? null;
