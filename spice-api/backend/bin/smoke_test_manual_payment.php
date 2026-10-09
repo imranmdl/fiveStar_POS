@@ -21,7 +21,10 @@ declare(strict_types=1);
  *     here exactly as it does to Razorpay/sandbox)
  *   - an administrator confirming with the correct amount pays the order,
  *     through the same applyVerification() choke point every other gateway uses
+ *   - a UTR is required and is saved on the manual attempt itself, even when
+ *     the active driver has since been switched away from manual
  *   - a second verify attempt on an already-resolved payment is refused
+ *   - one UTR cannot confirm two orders
  *   - the /admin/settings toggle actually switches the active driver
  *
  * Requires APP_ENV=local, OTP_EXPOSE_IN_RESPONSE=true, migrations and seeds
@@ -288,7 +291,7 @@ check('a customer cannot verify their own payment', $response['status'] === 403)
 // -----------------------------------------------------------------------
 echo "\n-- Administrator reviews and confirms the payment --\n";
 
-$response = call('GET', $baseUrl . '/admin/payments/pending', [], $adminToken);
+$response = call('GET', $baseUrl . '/admin/payments/pending?per_page=100', [], $adminToken);
 check('the pending queue loads', $response['status'] === 200, json_encode($response['body']));
 $queueUuids = array_column($response['body']['data']['items'] ?? [], 'uuid');
 check('this payment appears in the queue', in_array($paymentUuid, $queueUuids, true));
@@ -306,12 +309,42 @@ checkSame('the order is still unpaid after a mismatched confirmation', 'pending'
 
 $response = call('POST', $baseUrl . '/admin/payments/' . $paymentUuid . '/verify', [
     'confirmed_amount' => (string) $grandTotal,
-    'utr_or_reference' => 'TESTUTR123456',
+], $adminToken);
+check('confirming without a UTR is refused (422)', $response['status'] === 422, json_encode($response['body']));
+
+$response = call('POST', $baseUrl . '/admin/payments/' . $paymentUuid . '/verify', [
+    'confirmed_amount' => (string) $grandTotal,
+    'utr_or_reference' => 'ab#1',
+], $adminToken);
+check('a malformed UTR is refused (422)', $response['status'] === 422, json_encode($response['body']));
+
+// The store may have switched gateways since this payment was started. The
+// confirmation must still update this manual attempt — not create a new row
+// under the now-active gateway and leave the real one pending.
+$response = call('PATCH', $baseUrl . '/admin/settings/payment-driver', ['driver' => 'sandbox'], $adminToken);
+check('switched the active driver away from manual before confirming', $response['status'] === 200, json_encode($response['body']));
+
+$utr = (string) random_int(100000000000, 999999999999);
+$response = call('POST', $baseUrl . '/admin/payments/' . $paymentUuid . '/verify', [
+    'confirmed_amount' => (string) $grandTotal,
+    'utr_or_reference' => substr($utr, 0, 4) . ' ' . substr($utr, 4, 4) . ' ' . substr($utr, 8),
+    'paid_at' => date('Y-m-d H:i'),
 ], $adminToken);
 check('the correct amount is accepted', $response['status'] === 200, json_encode($response['body']));
 checkSame('the order is now confirmed', 'confirmed', $response['body']['data']['order']['status'] ?? null);
 checkSame('the order is now paid', 'paid', $response['body']['data']['order']['payment_status'] ?? null);
 check('an invoice number was issued', !empty($response['body']['data']['order']['invoice_number'] ?? null));
+
+$response = call('GET', $baseUrl . '/admin/orders/' . $orderUuid, [], $adminToken);
+$attempts = $response['body']['data']['payments'] ?? [];
+check('the order has exactly one payment record (no duplicate row)', count($attempts) === 1, json_encode($attempts));
+checkSame('that record is the manual attempt, now captured', 'manual:captured',
+    ($attempts[0]['gateway'] ?? '') . ':' . ($attempts[0]['status'] ?? ''));
+checkSame('the UTR was saved (spaces removed)', $utr, $attempts[0]['upi_transaction_id'] ?? null);
+check('no manual confirmation is left on the order page', ($response['body']['data']['pending_manual_payment'] ?? null) === null);
+
+$response = call('PATCH', $baseUrl . '/admin/settings/payment-driver', ['driver' => 'manual'], $adminToken);
+check('driver back to manual for the rest of the test', $response['status'] === 200, json_encode($response['body']));
 
 // -----------------------------------------------------------------------
 // A resolved payment cannot be verified again.
@@ -320,10 +353,11 @@ echo "\n-- A settled payment cannot be re-verified --\n";
 
 $response = call('POST', $baseUrl . '/admin/payments/' . $paymentUuid . '/verify', [
     'confirmed_amount' => (string) $grandTotal,
+    'utr_or_reference' => $utr,
 ], $adminToken);
 check('re-verifying an already-resolved payment is refused', $response['status'] === 409);
 
-$response = call('GET', $baseUrl . '/admin/payments/pending', [], $adminToken);
+$response = call('GET', $baseUrl . '/admin/payments/pending?per_page=100', [], $adminToken);
 $queueUuids = array_column($response['body']['data']['items'] ?? [], 'uuid');
 check('the resolved payment has left the pending queue', !in_array($paymentUuid, $queueUuids, true));
 
@@ -360,6 +394,14 @@ call('POST', $baseUrl . '/checkout/orders/' . $order2Uuid . '/verify-otp',
 
 $response = call('POST', $baseUrl . '/checkout/orders/' . $order2Uuid . '/payment', [], $customer2['token']);
 $payment2Uuid = $response['body']['data']['payment_uuid'];
+
+$response = call('POST', $baseUrl . '/admin/payments/' . $payment2Uuid . '/verify', [
+    'confirmed_amount' => (string) $grandTotal2,
+    'utr_or_reference' => $utr,
+], $adminToken);
+check('a UTR that already paid another order is refused', $response['status'] === 409, json_encode($response['body']));
+$response = call('GET', $baseUrl . '/orders/' . $order2Uuid, [], $customer2['token']);
+checkSame('that order is still unpaid', 'pending', $response['body']['data']['order']['payment_status'] ?? null);
 
 $response = call('POST', $baseUrl . '/admin/payments/' . $payment2Uuid . '/reject',
     ['reason' => 'No matching transfer found in the bank statement.'], $adminToken);

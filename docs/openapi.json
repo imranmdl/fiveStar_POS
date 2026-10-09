@@ -10475,12 +10475,17 @@
                                         "type": "number"
                                     },
                                     "utr_or_reference": {
-                                        "maxLength": 120,
+                                        "maxLength": 60,
+                                        "type": "string"
+                                    },
+                                    "paid_at": {
+                                        "format": "date",
                                         "type": "string"
                                     }
                                 },
                                 "required": [
-                                    "confirmed_amount"
+                                    "confirmed_amount",
+                                    "utr_or_reference"
                                 ]
                             }
                         }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, formatMoney } from '../../lib/api';
 import { toast } from '../../components/admin/toast';
 import { EmptyState, ErrorState, LoadingState } from '../../components/admin/shared';
+import ManualPaymentForm from '../../components/admin/ManualPaymentForm';
 import './Payments.css';
 
 /**
@@ -100,50 +101,16 @@ function ManualQueue() {
 }
 
 function PaymentCard({ payment, onChanged }) {
-  const [confirmedAmount, setConfirmedAmount] = useState(payment.amount);
-  const [utr, setUtr] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  async function handleConfirm(event) {
-    event.preventDefault();
-    if (!window.confirm('Confirm this payment for order shown above as paid?')) return;
-
-    setBusy(true);
-    try {
-      await api.post(`/admin/payments/${encodeURIComponent(payment.uuid)}/verify`, {
-        confirmed_amount: confirmedAmount,
-        utr_or_reference: utr,
-      });
-      toast('Payment verified — order confirmed.');
-      onChanged();
-    } catch (error) {
-      setBusy(false);
-      errorToast(error, 'Could not verify payment.');
-    }
-  }
-
-  async function handleReject() {
-    const reason = window.prompt(
-      'Why is this being rejected? (shown in the audit log, e.g. "no matching transfer found")',
-    );
-    if (!reason || reason.trim().length < 3) return;
-
-    setBusy(true);
-    try {
-      await api.post(`/admin/payments/${encodeURIComponent(payment.uuid)}/reject`, { reason });
-      toast('Payment rejected. The customer can retry.');
-      onChanged();
-    } catch (error) {
-      setBusy(false);
-      errorToast(error, 'Could not reject payment.');
-    }
-  }
-
   return (
     <div className="payment-card">
       <div className="payment-card__head">
         <div>
-          <div className="payment-card__order">Order {payment.order_number}</div>
+          <div className="payment-card__order">
+            Order {payment.order_number}
+            {payment.order_status && payment.order_status !== 'awaiting_payment' && (
+              <span className="payment-card__status"> · {payment.order_expired ? 'Closed — payment window passed' : payment.order_status_label}</span>
+            )}
+          </div>
           <div className="payment-card__meta">
             {payment.customer_name || 'Customer'} · {payment.customer_mobile || ''}
           </div>
@@ -159,37 +126,11 @@ function PaymentCard({ payment, onChanged }) {
 
       <div className="admin-alert admin-alert--warning">
         Check your bank or UPI app for a transfer of exactly <strong>₹{payment.amount}</strong> referencing{' '}
-        <code>{payment.order_number}</code> before confirming. Confirming with the wrong amount is refused
-        automatically, but confirming a transfer that never happened is not — this decision is the only check.
+        <code>{payment.order_number}</code>, then enter its UTR. A UTR alone is not proof of payment — only confirm a
+        transfer you can see in the account. The wrong amount, or a UTR already used for another order, is refused.
       </div>
 
-      <form className="payment-card__form" onSubmit={handleConfirm}>
-        <label className="payment-card__field">
-          <span>Amount received</span>
-          <input
-            value={confirmedAmount}
-            onChange={(event) => setConfirmedAmount(event.target.value)}
-            required
-            inputMode="decimal"
-          />
-        </label>
-        <label className="payment-card__field">
-          <span>UTR / reference (optional)</span>
-          <input
-            value={utr}
-            onChange={(event) => setUtr(event.target.value)}
-            placeholder="Bank reference number"
-          />
-        </label>
-        <div className="payment-card__actions">
-          <button type="submit" className="admin-btn admin-btn--primary" disabled={busy}>
-            {busy ? 'Working…' : 'Confirm payment'}
-          </button>
-          <button type="button" className="admin-btn" onClick={handleReject} disabled={busy}>
-            Reject
-          </button>
-        </div>
-      </form>
+      <ManualPaymentForm payment={payment} onDone={onChanged} />
     </div>
   );
 }

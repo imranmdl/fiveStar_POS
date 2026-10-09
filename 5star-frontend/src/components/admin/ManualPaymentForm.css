@@ -1,0 +1,106 @@
+.mp-form {
+  margin-top: 12px;
+}
+
+.mp-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px 12px;
+}
+
+.mp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.mp-field > span {
+  color: #555;
+}
+
+.mp-field > span b {
+  color: #c0392b;
+  font-weight: 600;
+}
+
+.mp-field input {
+  padding: 7px 9px;
+  border: 1px solid var(--border, #d8d8d8);
+  border-radius: 6px;
+  font: inherit;
+  min-width: 0;
+}
+
+.mp-field--utr input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.04em;
+}
+
+.mp-field input[aria-invalid='true'] {
+  border-color: #c0392b;
+}
+
+.mp-error {
+  color: #c0392b;
+  font-size: 12px;
+}
+
+.mp-note {
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.mp-note--info {
+  background: #eef5ff;
+  border: 1px solid #c9dcf5;
+  color: #1f3f66;
+}
+
+.mp-note--warn {
+  background: #fff7e6;
+  border: 1px solid #f0d9a8;
+  color: #6b4a00;
+}
+
+.mp-note--error {
+  background: #fdecea;
+  border: 1px solid #f3c2bc;
+  color: #8a1f12;
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+
+.mp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.mp-form--compact .mp-fields {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+/* Payment record on the order page */
+.mp-records {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.mp-records th,
+.mp-records td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border, #eee);
+  vertical-align: top;
+}
+
+.mp-records td.mp-utr {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  word-break: break-all;
+}

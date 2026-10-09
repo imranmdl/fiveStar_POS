@@ -284,8 +284,21 @@ final class OrderRepository extends BaseRepository
      *
      * @return array<int, array<string, mixed>>
      */
-    public function expiredUnpaidOrders(int $limit = 200): array
+    public function expiredUnpaidOrders(int $limit = 200, ?string $manualReviewSince = null): array
     {
+        // A manual UPI QR payment is checked by staff against the bank
+        // statement, which can take hours — far longer than the online payment
+        // window. While such an attempt is still waiting for that review (and
+        // was started after $manualReviewSince), the order must not be
+        // cancelled under the staff member about to confirm it.
+        $manualHold = $manualReviewSince === null ? '' :
+            "AND NOT EXISTS (SELECT 1 FROM `payments` p
+                              WHERE p.`order_id` = `orders`.`id`
+                                AND p.`gateway` = 'manual'
+                                AND p.`status` IN ('created','pending')
+                                AND p.`is_deleted` = 0
+                                AND p.`created_date` >= :manual_since)";
+
         return $this->db->select(
             sprintf(
                 "SELECT * FROM `orders`
@@ -294,10 +307,13 @@ final class OrderRepository extends BaseRepository
                     AND `expires_date` IS NOT NULL
                     AND `expires_date` < NOW()
                     AND `is_deleted` = 0
+                    %s
                   ORDER BY `expires_date` ASC
                   LIMIT %d",
+                $manualHold,
                 max(1, min($limit, 1000))
-            )
+            ),
+            $manualReviewSince === null ? [] : ['manual_since' => $manualReviewSince]
         );
     }
 

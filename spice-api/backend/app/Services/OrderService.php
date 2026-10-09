@@ -133,7 +133,15 @@ final class OrderService
         $detail['pending_manual_payment'] = $latest !== null
             && $latest['gateway'] === 'manual'
             && in_array($latest['status'], ['created', 'pending'], true)
-            ? ['uuid' => $latest['uuid'], 'amount' => $latest['amount']]
+            && !PaymentStatus::isSettled((string) $order['payment_status'])
+            ? [
+                'uuid' => $latest['uuid'],
+                'amount' => $latest['amount'],
+                // Closed by the payment-window timer before anyone verified
+                // it; confirming a real transfer reopens it.
+                'order_expired' => $order['status'] === OrderStatus::CANCELLED
+                    && $order['cancellation_reason'] === PaymentService::EXPIRY_CANCELLATION_REASON,
+            ]
             : null;
         $detail['internal_note'] = $order['internal_note'];
 
@@ -1006,9 +1014,12 @@ final class OrderService
                 'status' => $payment['status'],
                 'method' => $payment['method'],
                 'upi_vpa' => $payment['upi_vpa'],
+                'upi_transaction_id' => $payment['upi_transaction_id'],
                 'signature_verified' => (bool) $payment['signature_verified'],
                 'failure_reason' => $payment['failure_reason'],
                 'created_date' => $payment['created_date'],
+                'paid_date' => $payment['authorized_date'] ?? $payment['captured_date'],
+                'captured_date' => $payment['captured_date'],
             ], $this->payments->forOrder($orderId)),
             'invoice' => $order['invoice_number'] === null ? null : [
                 'number' => $order['invoice_number'],
