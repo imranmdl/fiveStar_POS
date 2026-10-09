@@ -77,3 +77,16 @@
 
 .csv-badge--secondary { background: #7a7a7a; }
 .csv-badge--info { background: #276f86; }
+
+/* Large imports: progress, summary, pager */
+.csv-import__progress { margin: 10px 0; padding: 10px 12px; border: 1px solid #e3ded8; border-radius: 6px; background: #fff; }
+.csv-import__bar { height: 10px; background: #eee8e2; border-radius: 999px; overflow: hidden; margin-bottom: 6px; }
+.csv-import__bar span { display: block; height: 100%; background: #2e7d32; transition: width .2s ease; }
+.csv-import__summary { margin: 10px 0; padding: 12px 14px; border-radius: 6px; background: #eef6ec; border: 1px solid #cfe5cb; }
+.csv-import__summary--warn { background: #fff8e6; border-color: #f0dfae; }
+.csv-import__summary-title { font-weight: 700; margin-bottom: 8px; }
+.csv-import__summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+.csv-import__summary-grid > div { display: flex; flex-direction: column; }
+.csv-import__summary-grid b { font-size: 20px; }
+.csv-import__summary-grid span { font-size: 12px; color: #555; }
+.csv-import__pager { display: flex; align-items: center; gap: 10px; margin: 8px 0; }

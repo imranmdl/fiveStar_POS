@@ -30,7 +30,21 @@ use App\Core\Request;
  */
 final class PurchaseCsvService
 {
+    /**
+     * Purchase (vendor-bill) mode only: a purchase order holds at most 100
+     * lines, so a bill file is capped to match. Products mode has no row
+     * limit — the whole file is read and checked, and items are then created
+     * in batches of at most CREATE_BATCH per request (see createItems()).
+     */
     private const MAX_ROWS = 100;
+
+    /** Products per createItems() request — a request-size bound, not an import limit. */
+    public const CREATE_BATCH = 100;
+
+    /** Upper bound for generated sample files (test data only). */
+    private const MAX_SAMPLE_ROWS = 2000;
+
+    private int $rowLimit = self::MAX_ROWS;
 
     private const ALIASES = [
         'sku' => ['sku', 'itemcode', 'productcode'],
@@ -93,12 +107,14 @@ final class PurchaseCsvService
         $images = [];
         $token = null;
         $name = strtolower((string) ($file['name'] ?? ''));
+        // Products: every row of the file, however many.
+        $this->rowLimit = $mode === 'products' ? PHP_INT_MAX : self::MAX_ROWS;
 
         if (str_ends_with($name, '.zip')) {
             $token = bin2hex(random_bytes(16));
             [$header, $dataRows, $images] = $this->readZip($file, $token);
         } else {
-            [$header, $dataRows] = $this->imports->readTable($file, self::MAX_ROWS);
+            [$header, $dataRows] = $this->imports->readTable($file, $this->rowLimit);
         }
 
         $map = $this->mapHeader($header);
@@ -230,7 +246,7 @@ final class PurchaseCsvService
             throw new HttpException('No Excel (.xlsx) or CSV file was found inside the ZIP.', 422);
         }
 
-        [$header, $rows] = $this->imports->readTableFromPath($sheetPath, (string) $sheetType, self::MAX_ROWS);
+        [$header, $rows] = $this->imports->readTableFromPath($sheetPath, (string) $sheetType, $this->rowLimit);
         @unlink($sheetPath);
 
         return [$header, $rows, $images];
@@ -754,8 +770,11 @@ final class PurchaseCsvService
      */
     public function createItems(array $items, Request $request): array
     {
-        if (count($items) > self::MAX_ROWS) {
-            throw new HttpException('Too many items in one go.', 422);
+        if (count($items) > self::CREATE_BATCH) {
+            throw new HttpException(
+                sprintf('Send at most %d items per request — the import screen splits a large file into batches automatically.', self::CREATE_BATCH),
+                422
+            );
         }
 
         $results = [];
@@ -764,6 +783,17 @@ final class PurchaseCsvService
             try {
                 if (empty($item['category_uuid']) || empty($item['product_name'])) {
                     throw new HttpException('Category and product name are required.', 422);
+                }
+
+                // Checked again here, not only at review: batches are separate
+                // requests, so a retried or repeated batch must not create the
+                // same product twice. A duplicate is reported as skipped.
+                $duplicate = $this->duplicateOf($item);
+
+                if ($duplicate !== null) {
+                    $results[] = ['ok' => false, 'skipped' => true, 'error' => $duplicate];
+
+                    continue;
                 }
 
                 if (!empty($item['publish']) && trim((string) ($item['short_description'] ?? '')) === '') {
@@ -812,6 +842,49 @@ final class PurchaseCsvService
     }
 
     // -----------------------------------------------------------------------
+    /**
+     * Why this item would duplicate something already on file (its SKU or
+     * barcode is taken, or — with neither given — a pack with the same
+     * product name and pack name exists), or null.
+     *
+     * @param array<string, mixed> $item
+     */
+    private function duplicateOf(array $item): ?string
+    {
+        $specs = is_array($item['variants'] ?? null) && $item['variants'] !== [] ? $item['variants'] : [$item];
+
+        foreach ($specs as $spec) {
+            foreach (['sku' => 'SKU', 'barcode' => 'Barcode'] as $field => $label) {
+                $code = trim((string) ($spec[$field] ?? ''));
+
+                if ($code !== '' && $this->db->scalar(
+                    'SELECT 1 FROM `product_variants` WHERE `sku` = :c1 OR `barcode` = :c2 LIMIT 1',
+                    ['c1' => $code, 'c2' => $code]
+                ) !== null) {
+                    return "Duplicate: {$label} {$code} is already used by an existing item.";
+                }
+            }
+
+            if (trim((string) ($spec['sku'] ?? '')) === '' && trim((string) ($spec['barcode'] ?? '')) === '') {
+                $variantName = trim((string) ($spec['variant_name'] ?? '')) ?: 'Standard';
+                $same = $this->db->selectOne(
+                    'SELECT p.`name`, v.`variant_name` FROM `product_variants` v
+                       INNER JOIN `products` p ON p.`id` = v.`product_id`
+                      WHERE v.`is_deleted` = 0 AND p.`is_deleted` = 0
+                        AND LOWER(TRIM(p.`name`)) = LOWER(TRIM(:p)) AND LOWER(TRIM(v.`variant_name`)) = LOWER(TRIM(:v))
+                      LIMIT 1',
+                    ['p' => (string) ($item['product_name'] ?? ''), 'v' => $variantName]
+                );
+
+                if ($same !== null) {
+                    return sprintf('Duplicate: "%s — %s" already exists.', $same['name'], $same['variant_name']);
+                }
+            }
+        }
+
+        return null;
+    }
+
     // Template + generated test data
     // -----------------------------------------------------------------------
 
@@ -866,7 +939,7 @@ final class PurchaseCsvService
      */
     public function sampleRows(int $target, bool $withErrors): array
     {
-        $target = max(5, min($target, self::MAX_ROWS));
+        $target = max(5, min($target, self::MAX_SAMPLE_ROWS));
         $tag = strtoupper(substr(bin2hex(random_bytes(3)), 0, 4));
         $seq = 0;
         $exp = static fn (int $m): string => date('Y-m-d', strtotime("+{$m} months"));
