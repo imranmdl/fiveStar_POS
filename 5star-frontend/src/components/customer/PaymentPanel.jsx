@@ -57,6 +57,8 @@ export default function PaymentPanel({ order, payment, onPaid, heading = true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRazorpay, payment.gateway_order_id]);
   const isQrImageUrl = isManual && typeof payment.qr_payload === 'string' && /^https?:\/\//i.test(payment.qr_payload);
+  // Manual mode with no QR picture and no UPI ID: there is nothing to pay with.
+  const manualNotSetUp = isManual && !isQrImageUrl && !payment.upi_intent_url;
 
   useEffect(() => {
     let stopped = false;
@@ -106,6 +108,13 @@ export default function PaymentPanel({ order, payment, onPaid, heading = true })
         </>
       )}
 
+      {manualNotSetUp && (
+        <div className="sf-error">
+          Online payment isn&apos;t set up for this shop yet, so there is no QR code or UPI ID to pay to.
+          Please contact the shop to complete this order.
+        </div>
+      )}
+
       {isRazorpay && (
         <>
           <p className="sf-small">Pay with GPay, PhonePe, Paytm, BHIM or any UPI app — or another online method.</p>
@@ -144,7 +153,7 @@ export default function PaymentPanel({ order, payment, onPaid, heading = true })
         </>
       )}
 
-      <div className="sf-status">
+      {!manualNotSetUp && <div className="sf-status">
         {pollStatus === 'cancelled'
           ? 'This order was cancelled because payment was not completed in time.'
           : pollStatus === 'timeout-manual'
@@ -152,7 +161,7 @@ export default function PaymentPanel({ order, payment, onPaid, heading = true })
             : pollStatus === 'timeout-auto'
               ? <>We have not seen your payment yet. If money has left your account it will be matched within a few minutes. <Link to={`/orders/${order.uuid}`}>Check this order</Link></>
               : 'Waiting for your payment to be confirmed…'}
-      </div>
+      </div>}
     </div>
   );
 }
