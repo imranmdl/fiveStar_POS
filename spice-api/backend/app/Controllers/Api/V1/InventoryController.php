@@ -107,6 +107,47 @@ final class InventoryController extends BaseController
         return Response::success(['variant' => $variant], is_string($barcode) && $barcode !== '' ? 'Barcode linked' : 'Barcode ready');
     }
 
+    /**
+     * GET /api/v1/admin/inventory/barcodes?q=&missing=1
+     * Every pack with its SKU and barcode — the inventory "Barcodes" tab.
+     */
+    public function barcodes(Request $request): Response
+    {
+        $params = $this->paginationParams($request, 'product_name', 100);
+        $missing = $request->query('missing');
+        $result = $this->inventory->barcodeList([
+            'q' => (string) ($request->query('q') ?? ''),
+            'missing' => in_array((string) $missing, ['1', 'true', 'yes'], true),
+        ], $params);
+
+        return $this->paginated($result['items'], $result['total'], $params, 'Barcodes loaded');
+    }
+
+    /**
+     * POST /api/v1/admin/inventory/variants/{variantUuid}/generate-barcode
+     * Saves a barcode and makes it the SKU (see InventoryService::generateSkuBarcode).
+     */
+    public function generateSkuBarcode(Request $request): Response
+    {
+        $result = $this->inventory->generateSkuBarcode((string) $request->routeParam('variantUuid'), $request);
+
+        return Response::success($result, $result['action'] === 'already_set' ? 'Barcode already set' : 'Barcode saved as SKU');
+    }
+
+    /** POST /api/v1/admin/inventory/barcodes/generate  { variant_uuids: [...] } */
+    public function generateSkuBarcodes(Request $request): Response
+    {
+        $uuids = $request->input('variant_uuids');
+
+        if (!is_array($uuids) || $uuids === [] || count($uuids) > 200) {
+            throw new HttpException('Choose between 1 and 200 items.', 422, ['variant_uuids' => ['Send 1–200 item ids.']]);
+        }
+
+        $results = $this->inventory->generateSkuBarcodes(array_map('strval', $uuids), $request);
+
+        return Response::success(['results' => $results], 'Barcodes processed');
+    }
+
     /** GET /api/v1/admin/inventory/low-stock */
     public function lowStock(Request $request): Response
     {

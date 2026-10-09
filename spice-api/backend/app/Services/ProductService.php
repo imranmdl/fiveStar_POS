@@ -465,7 +465,15 @@ final class ProductService
         $productId = (int) $variant['product_id'];
         $actorId = $request->authUserId();
 
-        if (!empty($data['sku']) && $this->variants->skuExists((string) $data['sku'], (int) $variant['id'])) {
+        // A blank SKU from the edit form means "leave it" — never clear a SKU
+        // or store an empty one (packs without a SKU keep NULL until
+        // "Generate Barcode" assigns one).
+        if (array_key_exists('sku', $data) && trim((string) $data['sku']) === '') {
+            unset($data['sku']);
+        }
+
+        if (!empty($data['sku']) && ($this->variants->skuExists((string) $data['sku'], (int) $variant['id'])
+            || $this->variants->codeTaken((string) $data['sku'], (int) $variant['id']))) {
             throw new HttpException('That SKU is already in use.', 409, ['sku' => ['Choose a unique SKU.']]);
         }
 

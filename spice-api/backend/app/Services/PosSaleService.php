@@ -131,7 +131,8 @@ final class PosSaleService
 
             $resolvedLines[] = [
                 'variant_id' => (int) $variant['id'],
-                'sku' => $variant['sku'],
+                // A pack still waiting for "Generate Barcode" has no SKU yet.
+                'sku' => (string) ($variant['sku'] ?? ''),
                 'product_name' => $variant['product_name'],
                 'variant_name' => $variant['variant_name'],
                 'quantity' => $quantity,

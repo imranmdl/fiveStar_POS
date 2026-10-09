@@ -43,10 +43,12 @@ import InventoryExpiry from './InventoryExpiry';
 import InventoryAlerts from './InventoryAlerts';
 import InventoryImport from './InventoryImport';
 import InventoryDeleted from './InventoryDeleted';
+import InventoryBarcodes from './InventoryBarcodes';
 import './Inventory.css';
 
 const TABS = [
   ['stock', 'Stock'],
+  ['barcodes', 'Barcodes & SKU'],
   ['movements', 'Movement ledger'],
   ['damage-loss', 'Damage & loss'],
   ['expiry', 'Expiry'],
@@ -154,6 +156,7 @@ export default function Inventory() {
       {tab === 'import' && <InventoryImport role={role} warehouses={warehouses} />}
       {tab === 'deleted' && <InventoryDeleted role={role} />}
       {tab === 'stock' && <InventoryStock role={role} warehouses={warehouses} />}
+      {tab === 'barcodes' && <InventoryBarcodes />}
     </div>
   );
 }

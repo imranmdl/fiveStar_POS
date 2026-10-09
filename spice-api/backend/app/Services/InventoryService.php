@@ -472,7 +472,7 @@ final class InventoryService
                 entityUuid: $variantUuid
             );
 
-            return (array) $this->variants->findBySku((string) $variant['sku']);
+            return (array) $this->variants->findDetailByUuid($variantUuid);
         }
 
         if (!empty($variant['barcode'])) {
@@ -480,12 +480,12 @@ final class InventoryService
             // findBySku() joins the product in, which is what the caller
             // (the barcode-generator screen) actually needs to print a
             // label with the item's name on it, not just its raw row.
-            return (array) $this->variants->findBySku((string) $variant['sku']);
+            return (array) $this->variants->findDetailByUuid($variantUuid);
         }
 
         do {
             $barcode = Barcode::generateEan13();
-        } while ($this->variants->barcodeExists($barcode));
+        } while ($this->variants->codeTaken($barcode));
 
         $this->variants->update((int) $variant['id'], ['barcode' => $barcode], $request->authUserId());
 
@@ -498,7 +498,129 @@ final class InventoryService
             entityUuid: $variantUuid
         );
 
-        return (array) $this->variants->findBySku((string) $variant['sku']);
+        return (array) $this->variants->findDetailByUuid($variantUuid);
+    }
+
+    /**
+     * "Generate Barcode" on the inventory screen. Makes sure a pack has both a
+     * SKU and a barcode, and that they are the same value, so the label, the
+     * scanner and the till all agree:
+     *
+     *  - SKU and barcode already set   -> nothing changes;
+     *  - SKU set, no barcode           -> the SKU becomes the barcode;
+     *  - barcode set, no SKU           -> the barcode becomes the SKU;
+     *  - neither                       -> a new internal EAN-13 (GS1 in-store
+     *                                     range "2…") is saved as both.
+     *
+     * Never overwrites an existing SKU or barcode. Every value is checked
+     * against every other pack's SKU *and* barcode, and the row is locked
+     * for the duration, so two clicks can't hand out the same code.
+     *
+     * @return array{action:string, variant:array<string, mixed>}
+     */
+    public function generateSkuBarcode(string $variantUuid, Request $request): array
+    {
+        $result = $this->db->transaction(function () use ($variantUuid, $request): array {
+            $variant = $this->db->selectOne(
+                'SELECT * FROM `product_variants` WHERE `uuid` = :uuid AND `is_deleted` = 0 LIMIT 1 FOR UPDATE',
+                ['uuid' => $variantUuid]
+            );
+
+            if ($variant === null) {
+                throw new NotFoundException('That pack size does not exist.');
+            }
+
+            $id = (int) $variant['id'];
+            $sku = trim((string) ($variant['sku'] ?? ''));
+            $barcode = trim((string) ($variant['barcode'] ?? ''));
+
+            if ($sku !== '' && $barcode !== '') {
+                return ['action' => 'already_set', 'id' => $id, 'changes' => []];
+            }
+
+            if ($sku !== '') {
+                $this->assertCodeUsable($sku, $id);
+                $changes = ['barcode' => $sku];
+                $action = 'sku_used_as_barcode';
+            } elseif ($barcode !== '') {
+                if (strlen($barcode) > 50) {
+                    throw new HttpException('This barcode is too long to be used as the SKU (50 characters at most).', 422);
+                }
+                $this->assertCodeUsable($barcode, $id);
+                $changes = ['sku' => $barcode];
+                $action = 'barcode_used_as_sku';
+            } else {
+                do {
+                    $code = Barcode::generateEan13();
+                } while ($this->variants->codeTaken($code));
+                $changes = ['sku' => $code, 'barcode' => $code];
+                $action = 'generated';
+            }
+
+            $this->variants->update($id, $changes, $request->authUserId());
+
+            $this->audit->log(
+                entityName: 'product_variants',
+                entityId: $id,
+                action: 'generate_sku_barcode',
+                oldValues: ['sku' => $variant['sku'], 'barcode' => $variant['barcode']],
+                newValues: $changes,
+                request: $request,
+                entityUuid: $variantUuid
+            );
+
+            return ['action' => $action, 'id' => $id, 'changes' => $changes];
+        });
+
+        return [
+            'action' => $result['action'],
+            'variant' => (array) $this->variants->findDetailByUuid($variantUuid),
+        ];
+    }
+
+    /**
+     * Generate Barcode for several packs. Each is done on its own, so one
+     * clash doesn't stop the rest.
+     *
+     * @param array<int, string> $variantUuids
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function generateSkuBarcodes(array $variantUuids, Request $request): array
+    {
+        $results = [];
+
+        foreach (array_values(array_unique($variantUuids)) as $uuid) {
+            try {
+                $results[] = ['uuid' => $uuid, 'ok' => true] + $this->generateSkuBarcode((string) $uuid, $request);
+            } catch (HttpException $e) {
+                $results[] = ['uuid' => $uuid, 'ok' => false, 'error' => $e->getMessage()];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * @param array{q?:string, missing?:bool} $filters
+     * @param array{per_page:int, offset:int} $params
+     *
+     * @return array{items:array<int, array<string, mixed>>, total:int}
+     */
+    public function barcodeList(array $filters, array $params): array
+    {
+        return $this->variants->listForBarcodes($filters, $params);
+    }
+
+    private function assertCodeUsable(string $code, int $variantId): void
+    {
+        if ($this->variants->codeTaken($code, $variantId)) {
+            throw new HttpException(
+                sprintf('"%s" is already used as another item\'s SKU or barcode, so it can\'t be reused here.', $code),
+                409,
+                ['code' => ['Already in use by another item.']]
+            );
+        }
     }
 
     /** @return array<int, array<string, mixed>>|null null when the variant does not exist */

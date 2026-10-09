@@ -252,4 +252,91 @@ final class ProductVariantRepository extends BaseRepository
             ['product_id' => $productId]
         );
     }
+
+    /**
+     * Whether a code is already used as ANY pack's SKU or barcode (deleted
+     * rows included — the unique keys cover them too). A barcode must never
+     * equal another pack's SKU, or a scan could match the wrong item.
+     */
+    public function codeTaken(string $code, ?int $exceptId = null): bool
+    {
+        return $this->db->scalar(
+            'SELECT 1 FROM `product_variants`
+              WHERE (`sku` = :c1 OR `barcode` = :c2)' . ($exceptId === null ? '' : ' AND `id` <> :except') . '
+              LIMIT 1',
+            array_merge(['c1' => $code, 'c2' => $code], $exceptId === null ? [] : ['except' => $exceptId])
+        ) !== null;
+    }
+
+    /**
+     * A pack with exactly this product name + pack name (case-insensitive) —
+     * how an import row with no SKU and no barcode is recognised, so the same
+     * file imported twice updates instead of creating duplicates.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findByNames(string $productName, string $variantName): ?array
+    {
+        return $this->db->selectOne(
+            'SELECT v.*, p.`uuid` AS `product_uuid`, p.`name` AS `product_name`, p.`gst_rate`, p.`category_id`
+               FROM `product_variants` v
+               INNER JOIN `products` p ON p.`id` = v.`product_id`
+              WHERE v.`is_deleted` = 0 AND p.`is_deleted` = 0
+                AND LOWER(TRIM(p.`name`)) = LOWER(TRIM(:product_name))
+                AND LOWER(TRIM(v.`variant_name`)) = LOWER(TRIM(:variant_name))
+              ORDER BY v.`id` ASC
+              LIMIT 1',
+            ['product_name' => $productName, 'variant_name' => $variantName]
+        );
+    }
+
+    /**
+     * Packs for the inventory "Barcodes" list: product, pack, SKU, barcode,
+     * prices. `missing` limits it to packs without a SKU or a barcode.
+     *
+     * @param array{q?:string, missing?:bool} $filters
+     * @param array{per_page:int, offset:int} $params
+     *
+     * @return array{items:array<int, array<string, mixed>>, total:int}
+     */
+    public function listForBarcodes(array $filters, array $params): array
+    {
+        $where = ['v.`is_deleted` = 0', 'p.`is_deleted` = 0'];
+        $bindings = [];
+
+        if (!empty($filters['missing'])) {
+            $where[] = "(v.`sku` IS NULL OR v.`sku` = '' OR v.`barcode` IS NULL OR v.`barcode` = '')";
+        }
+
+        $q = trim((string) ($filters['q'] ?? ''));
+
+        if ($q !== '') {
+            $where[] = '(p.`name` LIKE :q1 OR v.`variant_name` LIKE :q2 OR v.`sku` LIKE :q3 OR v.`barcode` LIKE :q4)';
+            foreach (['q1', 'q2', 'q3', 'q4'] as $k) {
+                $bindings[$k] = '%' . $q . '%';
+            }
+        }
+
+        $whereSql = implode(' AND ', $where);
+        $from = 'FROM `product_variants` v INNER JOIN `products` p ON p.`id` = v.`product_id`';
+
+        $total = (int) $this->db->scalar("SELECT COUNT(*) {$from} WHERE {$whereSql}", $bindings);
+
+        $items = $total === 0 ? [] : $this->db->select(
+            sprintf(
+                'SELECT v.`uuid`, v.`sku`, v.`barcode`, v.`variant_name`, v.`mrp`, v.`selling_price`,
+                        p.`uuid` AS `product_uuid`, p.`name` AS `product_name`
+                   %s WHERE %s
+                  ORDER BY (v.`sku` IS NULL OR v.`barcode` IS NULL) DESC, p.`name` ASC, v.`id` ASC
+                  LIMIT %d OFFSET %d',
+                $from,
+                $whereSql,
+                (int) $params['per_page'],
+                (int) $params['offset']
+            ),
+            $bindings
+        );
+
+        return ['items' => $items, 'total' => $total];
+    }
 }
