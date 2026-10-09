@@ -778,6 +778,14 @@
   font-size: 14px;
 }
 
+/* ---------- UPI QR (till screen) ---------- */
+
+.till-upi-qr { border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-3); text-align: center; background: #fff; margin: var(--space-2) 0; }
+.till-upi-qr__title { font-weight: 800; font-size: 18px; margin-bottom: var(--space-2); }
+.till-upi-qr__code svg { display: block; margin: 0 auto; width: 180px; height: 180px; }
+.till-upi-qr__id { margin-top: var(--space-2); font-size: 14px; word-break: break-all; }
+.till-upi-qr__hint { margin-top: var(--space-1); font-size: 12px; color: var(--ink-500); }
+
 /* ---------- Print ---------- */
 
 .till-receipt__print { display: flex; align-items: center; gap: var(--space-2); }

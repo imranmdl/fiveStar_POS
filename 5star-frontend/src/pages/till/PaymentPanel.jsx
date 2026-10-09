@@ -1,5 +1,53 @@
-import { formatMoney } from '../../lib/api';
+import { useEffect, useState } from 'react';
+import { api, formatMoney } from '../../lib/api';
+import { buildUpiUri, qrSvg } from '../../lib/upiQr';
 import { remainderDue, round2, roundToRupee } from './tillMath';
+
+let shopPromise = null;
+
+/** The shop's UPI ID / name for the on-screen QR (fetched once per page). */
+function useShop() {
+  const [shop, setShop] = useState(null);
+  useEffect(() => {
+    let live = true;
+    if (!shopPromise) {
+      shopPromise = api.get('/admin/pos/shop').then((r) => r.data).catch(() => {
+        shopPromise = null;
+        return null;
+      });
+    }
+    shopPromise.then((data) => { if (live) setShop(data); });
+    return () => { live = false; };
+  }, []);
+  return shop;
+}
+
+/**
+ * "Scan & Pay ₹X" on the till screen when UPI is chosen. It only shows the
+ * customer what to pay; the sale is recorded when the cashier presses
+ * Complete sale after seeing the money arrive, exactly as before.
+ */
+function UpiQrPanel({ shop, amount }) {
+  if (!shop) return null;
+  if (!shop.upi) {
+    return (
+      <div className="till-alert till-alert--warning till-alert--sm">
+        No shop UPI ID is set, so no payment QR can be shown. An administrator can add it under Admin → Payments → Settings.
+      </div>
+    );
+  }
+  const uri = buildUpiUri({ vpa: shop.upi.vpa, payeeName: shop.upi.payee_name, amount, note: 'Five Star Spices bill' });
+  if (!uri) return null;
+  return (
+    <div className="till-upi-qr">
+      <div className="till-upi-qr__title">Scan &amp; Pay {formatMoney(amount)}</div>
+      {/* qrSvg builds the SVG itself from the UPI link; no outside markup. */}
+      <div className="till-upi-qr__code" dangerouslySetInnerHTML={{ __html: qrSvg(uri, { sizeMm: 40 }) }} />
+      <div className="till-upi-qr__id">UPI ID: <strong>{shop.upi.vpa}</strong></div>
+      <div className="till-upi-qr__hint">Complete the sale only after the payment shows in the shop&apos;s UPI app.</div>
+    </div>
+  );
+}
 
 /**
  * Totals summary, wallet application, payment method/amount and the
@@ -31,6 +79,11 @@ export default function PaymentPanel({
   disabled,
 }) {
   const due = remainderDue(totals.grandTotal, walletApplied);
+  const shop = useShop();
+  // UPI now: the typed amount (a part payment) or, if blank, everything due.
+  const upiAmount = paymentMethod === 'upi'
+    ? round2(amountTendered === '' ? due : Math.min(Number(amountTendered) || 0, due))
+    : 0;
   const canUseWallet = Boolean(selectedCustomer) && !selectedCustomer.wallet.is_frozen && Number(selectedCustomer.wallet.balance) > 0;
 
   const raw = amountTendered;
@@ -123,6 +176,8 @@ export default function PaymentPanel({
         </div>
 
         {shortfallHint && <div className="till-alert till-alert--warning till-alert--sm">{shortfallHint}</div>}
+
+        {paymentMethod === 'upi' && upiAmount > 0 && !disabled && <UpiQrPanel shop={shop} amount={upiAmount} />}
 
         <label className="till-field till-field--sm">
           <span>Items given to the customer?</span>

@@ -52,7 +52,43 @@ final class SettingsService
         'cod_enabled',
         'store_logo_path',
         'inventory_price_change_mode',
+        'store_name',
+        'store_address_line1',
+        'store_address_line2',
+        'store_city',
+        'store_state',
+        'store_pincode',
+        'store_phone',
+        'store_email',
+        'store_website',
+        'seller_gstin',
     ];
+
+    /**
+     * Shop details printed on receipts, editable under Admin → Payments →
+     * Settings → Shop details. Field => [label, max length].
+     */
+    private const SHOP_FIELDS = [
+        'store_name' => ['Shop name', 120],
+        'store_address_line1' => ['Address line 1', 160],
+        'store_address_line2' => ['Address line 2', 160],
+        'store_city' => ['City', 80],
+        'store_state' => ['State', 80],
+        'store_pincode' => ['PIN code', 6],
+        'store_phone' => ['Phone', 20],
+        'store_email' => ['Email', 120],
+        'store_website' => ['Website', 160],
+        'seller_gstin' => ['GSTIN', 15],
+    ];
+
+    public const DEFAULT_STORE_NAME = 'Five Star Spices & Dry Fruits';
+    public const DEFAULT_WEBSITE = 'https://fivestarspices.com';
+
+    /** A UPI ID (VPA) such as "fivestar@okaxis" or "9876543210@ybl". */
+    public static function isValidVpa(string $vpa): bool
+    {
+        return preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,255}@[a-zA-Z][a-zA-Z0-9]{1,63}$/', $vpa) === 1;
+    }
 
     public function __construct(
         private readonly SettingRepository $settings,
@@ -82,6 +118,7 @@ final class SettingsService
             // active; see CheckoutService::review()/place() for where a
             // customer actually sees and chooses it.
             'cod_enabled' => $this->settings->boolValue('cod_enabled', false),
+            'shop' => $this->shopDetails(),
             'razorpay' => $this->razorpayStatus(),
             // Text messages (OTP codes, order updates). Any SMS_DRIVER but "http" means
             // nothing is actually sent unless SMS_DRIVER=http — the dashboard warns about it.
@@ -222,11 +259,126 @@ final class SettingsService
     }
 
     /**
+     * Shop details for receipts. Address and phone fall back to the given
+     * warehouse row (the till's store) when not filled in here. `upi` is the
+     * shop's own UPI ID from the payment settings — null when none is set or
+     * it isn't a valid UPI ID, so nothing can print a QR code to a bad
+     * address. Holds no secrets.
+     *
+     * @param array<string, mixed>|null $warehouse
+     *
+     * @return array<string, mixed>
+     */
+    public function shopDetails(?array $warehouse = null): array
+    {
+        $get = fn (string $key): string => trim((string) ($this->settings->value($key) ?? ''));
+
+        $hasOwnAddress = $get('store_address_line1') !== '';
+        $fromWarehouse = static fn (string $column): string => trim((string) ($warehouse[$column] ?? ''));
+
+        $name = $get('store_name') !== '' ? $get('store_name') : self::DEFAULT_STORE_NAME;
+        $vpa = $get('manual_payment_vpa');
+        $payee = $get('manual_payment_payee_name');
+
+        return [
+            'name' => $name,
+            'address_line1' => $hasOwnAddress ? $get('store_address_line1') : $fromWarehouse('store_address_line1'),
+            'address_line2' => $hasOwnAddress ? $get('store_address_line2') : $fromWarehouse('store_address_line2'),
+            'city' => $hasOwnAddress ? $get('store_city') : $fromWarehouse('store_city'),
+            'state' => $hasOwnAddress ? $get('store_state') : $fromWarehouse('store_state'),
+            'pincode' => $hasOwnAddress ? $get('store_pincode') : $fromWarehouse('store_pincode'),
+            'phone' => $get('store_phone') !== '' ? $get('store_phone') : $fromWarehouse('store_phone'),
+            'email' => $get('store_email'),
+            'website' => $this->settings->value('store_website') === null ? self::DEFAULT_WEBSITE : $get('store_website'),
+            'gstin' => $get('seller_gstin'),
+            'upi' => $vpa !== '' && self::isValidVpa($vpa)
+                ? ['vpa' => $vpa, 'payee_name' => $payee !== '' ? $payee : $name]
+                : null,
+            // Lets the admin page warn about a saved but unusable UPI ID.
+            'upi_id_invalid' => $vpa !== '' && !self::isValidVpa($vpa),
+        ];
+    }
+
+    /**
+     * Saves the shop details printed on receipts. Only the fields sent are
+     * changed; an empty string clears a field.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return array<string, mixed>
+     */
+    public function updateShopDetails(Request $request, array $data): array
+    {
+        $clean = [];
+        $errors = [];
+
+        foreach (self::SHOP_FIELDS as $key => [$label, $max]) {
+            if (!array_key_exists($key, $data) || $data[$key] === null) {
+                continue;
+            }
+
+            $value = trim(preg_replace('/\s+/', ' ', (string) $data[$key]) ?? '');
+
+            if (mb_strlen($value) > $max) {
+                $errors[$key][] = "{$label} can be at most {$max} characters.";
+
+                continue;
+            }
+
+            if ($value !== '') {
+                $ok = match ($key) {
+                    'store_pincode' => preg_match('/^[1-9][0-9]{5}$/', $value) === 1,
+                    'store_phone' => preg_match('/^\+?[0-9][0-9 \-]{6,18}$/', $value) === 1,
+                    'store_email' => filter_var($value, FILTER_VALIDATE_EMAIL) !== false,
+                    'store_website' => preg_match('#^https?://[a-z0-9.-]+\.[a-z]{2,}(/\S*)?$#i', $value) === 1,
+                    'seller_gstin' => preg_match('/^[0-9]{2}[A-Z0-9]{13}$/', strtoupper($value)) === 1,
+                    default => true,
+                };
+
+                if (!$ok) {
+                    $errors[$key][] = match ($key) {
+                        'store_pincode' => 'Enter a 6-digit PIN code.',
+                        'store_phone' => 'Enter a phone number (digits, spaces or dashes).',
+                        'store_email' => 'Enter a valid email address.',
+                        'store_website' => 'Enter a full web address starting with https://',
+                        'seller_gstin' => 'A GSTIN has 15 characters, e.g. 29ABCDE1234F1Z5.',
+                        default => 'Invalid value.',
+                    };
+
+                    continue;
+                }
+            }
+
+            $clean[$key] = $key === 'seller_gstin' ? strtoupper($value) : $value;
+        }
+
+        if ($errors !== []) {
+            throw new HttpException('Please check the highlighted shop details.', 422, $errors);
+        }
+
+        foreach ($clean as $key => $value) {
+            $this->write($key, $value, $request);
+        }
+
+        return $this->current();
+    }
+
+    /**
      * Updates the manual-payment display details: the VPA/payee name shown
      * under the QR code at checkout.
      */
     public function updateManualSettings(Request $request, ?string $vpa, ?string $payeeName): array
     {
+        $vpa = $vpa === null ? null : trim($vpa);
+
+        if ($vpa !== null && $vpa !== '' && !self::isValidVpa($vpa)) {
+            throw new HttpException(
+                'That UPI ID doesn\'t look right. It should look like name@bank, e.g. fivestar@okaxis.',
+                422,
+                ['manual_payment_vpa' => ['Enter a valid UPI ID (name@bank).']]
+            );
+        }
+
         if ($vpa !== null) {
             $this->write('manual_payment_vpa', $vpa, $request);
         }

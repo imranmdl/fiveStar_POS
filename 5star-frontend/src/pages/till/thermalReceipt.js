@@ -1,3 +1,5 @@
+import { buildUpiUri, qrSvg } from '../../lib/upiQr.js';
+
 /**
  * Thermal receipt printing for the till (80 mm roll by default, 58 mm optional).
  *
@@ -105,12 +107,21 @@ function gstSummary(items) {
  * The receipt body (no <html> wrapper).
  * `reprint` marks a copy printed again from Sales history.
  */
-export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new Date() } = {}) {
-  const storeName = receiptStoreName(sale.store_name);
+export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new Date(), paper = 80 } = {}) {
+  // `shop` comes from Admin → Payments → Settings → Shop details (address
+  // and phone fall back to the till's warehouse). Older responses without it
+  // still print from the sale's own store_* fields.
+  const shop = sale.shop || {
+    name: sale.store_name, address_line1: sale.store_address_line1, address_line2: sale.store_address_line2,
+    city: sale.store_city, state: sale.store_state, pincode: sale.store_pincode, phone: sale.store_phone,
+    gstin: sale.store_gstin, website: '', email: '', upi: null,
+  };
+  const storeName = receiptStoreName(shop.name);
   const brand = storeName.match(/^(Five Star)\s+(.+)$/i);
-  const cityLine = [sale.store_city, sale.store_state].filter(Boolean).join(', ')
-    + (sale.store_pincode ? ` - ${sale.store_pincode}` : '');
-  const addressLines = [sale.store_address_line1, sale.store_address_line2, cityLine.trim()].filter(Boolean);
+  const cityLine = [shop.city, shop.state].filter(Boolean).join(', ')
+    + (shop.pincode ? ` - ${shop.pincode}` : '');
+  const addressLines = [shop.address_line1, shop.address_line2, cityLine.trim()].filter(Boolean);
+  const website = String(shop.website || '').replace(/^https?:\/\//i, '').replace(/\/$/, '');
 
   const items = Array.isArray(sale.items) ? sale.items : [];
   const totalQty = items.reduce((sum, i) => sum + num(i.quantity), 0);
@@ -163,6 +174,29 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
 
   const pDate = dateTime(printedAt.toISOString());
 
+  // UPI QR only for money still owed on this bill (a part-paid / credit
+  // sale). A bill already settled by cash, UPI, card or wallet gets no QR, so
+  // nobody is asked to pay twice. The amount is the bill's own balance.
+  const balanceDue = isCredit && sale.status !== 'voided'
+    ? Math.round((grandTotal - num(sale.amount_paid)) * 100) / 100
+    : 0;
+  let qrBlock = '';
+  if (balanceDue > 0.004) {
+    const uri = shop.upi
+      ? buildUpiUri({ vpa: shop.upi.vpa, payeeName: shop.upi.payee_name, amount: balanceDue, note: `Bill ${sale.sale_number}` })
+      : null;
+    qrBlock = uri
+      ? `<div class="rule solid"></div>
+      <section class="upi center">
+        <div class="upi-title">Scan &amp; Pay &#8377;${amt(balanceDue)}</div>
+        <div class="upi-qr">${qrSvg(uri, { sizeMm: paper === 58 ? 30 : 36 })}</div>
+        <div class="upi-id">UPI ID: <b>${esc(shop.upi.vpa)}</b></div>
+        <div class="fine">GPay &middot; PhonePe &middot; Paytm &middot; BHIM &middot; any UPI app</div>
+        <div class="fine">Balance due on bill ${esc(sale.sale_number)}</div>
+      </section>`
+      : `<div class="rule solid"></div><div class="center b">Balance due &#8377;${amt(balanceDue)} &mdash; please pay at the counter.</div>`;
+  }
+
   return `
     <div class="receipt">
       <header class="center">
@@ -172,8 +206,9 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
           : `<div class="brand">${esc(storeName.toUpperCase())}</div>`}
         <div class="addr">
           ${addressLines.map((l) => `<div>${esc(l)}</div>`).join('')}
-          ${sale.store_phone ? `<div>Tel: ${esc(sale.store_phone)}</div>` : ''}
-          ${sale.store_gstin ? `<div>GSTIN: ${esc(sale.store_gstin)}</div>` : ''}
+          ${shop.phone ? `<div>Tel: ${esc(shop.phone)}</div>` : ''}
+          ${shop.email ? `<div>${esc(shop.email)}</div>` : ''}
+          ${shop.gstin ? `<div>GSTIN: ${esc(shop.gstin)}</div>` : ''}
         </div>
       </header>
 
@@ -217,6 +252,8 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
         ${gstRows}
       </section>` : ''}
 
+      ${qrBlock}
+
       ${discount > 0 ? `<div class="saved">You saved &#8377;${amt(discount)} on this bill</div>` : ''}
       ${sale.status === 'voided' ? '<div class="band">*** VOIDED ***</div>' : ''}
 
@@ -225,6 +262,7 @@ export function receiptMarkup(sale, { logoUrl, reprint = false, printedAt = new 
         <div class="thanks">Thank you for shopping with us!</div>
         <div>We look forward to serving you again.</div>
         <div class="fine">${esc(storeName)}</div>
+        ${website ? `<div class="web">${esc(website)}</div>` : ''}
         ${reprint ? `<div class="fine">Reprinted ${pDate}</div>` : ''}
       </footer>
     </div>`;
@@ -303,7 +341,12 @@ export function receiptDocument(sale, paper, { logoUrl, heightMm, reprint = fals
   footer { line-height: 1.38; }
   .thanks { font-weight: 800; font-size: 1.08em; margin-bottom: 0.3mm; }
   .fine { font-size: 0.82em; margin-top: 0.6mm; }
-</style></head><body>${receiptMarkup(sale, { logoUrl, reprint })}</body></html>`;
+  .upi { margin-top: 1mm; }
+  .upi-title { font-size: ${narrow ? 1.15 : 1.3}em; font-weight: 800; margin-bottom: 1mm; }
+  .upi-qr svg { display: block; margin: 0 auto; }
+  .upi-id { margin-top: 1mm; word-break: break-all; }
+  .web { font-weight: 700; margin-top: 0.6mm; }
+</style></head><body>${receiptMarkup(sale, { logoUrl, reprint, paper })}</body></html>`;
 }
 
 function waitForImages(doc) {

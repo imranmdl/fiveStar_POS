@@ -11407,6 +11407,45 @@
                 }
             }
         },
+        "/api/v1/admin/pos/shop": {
+            "get": {
+                "operationId": "settingsControllerShopForTill",
+                "tags": [
+                    "Admin: Pos"
+                ],
+                "summary": "The shop details and UPI ID the till shows and prints (cashier access; no secrets in it).",
+                "description": "Requires one of these roles: administrator, supervisor, manager, cashier.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            }
+        },
         "/api/v1/admin/pricing/decisions": {
             "post": {
                 "operationId": "pricingDecisionControllerStore",
@@ -15332,6 +15371,45 @@
                         }
                     }
                 },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/settings/shop": {
+            "patch": {
+                "operationId": "settingsControllerUpdateShop",
+                "tags": [
+                    "Admin: Settings"
+                ],
+                "summary": "Shop details printed on receipts.",
+                "description": "Requires one of these roles: administrator.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Success",

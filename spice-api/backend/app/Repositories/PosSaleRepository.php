@@ -107,9 +107,7 @@ final class PosSaleRepository extends BaseRepository
                     w.`city` AS `store_city`, w.`state` AS `store_state`, w.`pincode` AS `store_pincode`,
                     w.`phone` AS `store_phone`,
                     COALESCE(c.`full_name`, s.`walk_in_name`) AS `customer_name`,
-                    COALESCE(c.`mobile`, s.`walk_in_mobile`) AS `customer_mobile`,
-                    (SELECT st.`setting_value` FROM `settings` st WHERE st.`setting_key` = 'store_name' LIMIT 1) AS `store_name`,
-                    (SELECT st.`setting_value` FROM `settings` st WHERE st.`setting_key` = 'seller_gstin' LIMIT 1) AS `store_gstin`
+                    COALESCE(c.`mobile`, s.`walk_in_mobile`) AS `customer_mobile`
                FROM `pos_sales` s
                INNER JOIN `users` u ON u.`id` = s.`cashier_id`
                INNER JOIN `warehouses` w ON w.`id` = s.`warehouse_id`

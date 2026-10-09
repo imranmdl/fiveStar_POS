@@ -484,14 +484,14 @@ function SettingsPanel() {
 
       <div className="settings-grid">
         <label className="settings-field">
-          <span>UPI VPA shown under QR (optional)</span>
+          <span>Shop UPI ID — used for payment QR codes</span>
           <input
             value={form.manual_payment_vpa}
             onChange={(event) => setForm((f) => ({ ...f, manual_payment_vpa: event.target.value }))}
           />
         </label>
         <label className="settings-field">
-          <span>Payee name shown under QR</span>
+          <span>Name shown in UPI apps</span>
           <input
             value={form.manual_payment_payee_name}
             onChange={(event) => setForm((f) => ({ ...f, manual_payment_payee_name: event.target.value }))}
@@ -559,6 +559,83 @@ function SettingsPanel() {
             </div>
           )}
         </div>
+      </div>
+
+      <hr />
+
+      <ShopDetailsCard shop={settings.shop} onSaved={load} />
+    </div>
+  );
+}
+
+const SHOP_FIELDS = [
+  ['store_name', 'name', 'Shop name', 'Five Star Spices & Dry Fruits'],
+  ['store_address_line1', 'address_line1', 'Address line 1', 'Shop no., street'],
+  ['store_address_line2', 'address_line2', 'Address line 2', 'Area / landmark (optional)'],
+  ['store_city', 'city', 'City', 'Bengaluru'],
+  ['store_state', 'state', 'State', 'Karnataka'],
+  ['store_pincode', 'pincode', 'PIN code', '560001'],
+  ['store_phone', 'phone', 'Phone / mobile', '98XXXXXXXX'],
+  ['store_email', 'email', 'Email (optional)', 'shop@example.com'],
+  ['store_website', 'website', 'Website', 'https://fivestarspices.com'],
+  ['seller_gstin', 'gstin', 'GSTIN (optional)', '29ABCDE1234F1Z5'],
+];
+
+/**
+ * Shop details printed on till receipts (name, address, contact, website,
+ * GSTIN). Blank address/phone fall back to the default warehouse's.
+ */
+function ShopDetailsCard({ shop, onSaved }) {
+  const initial = () => Object.fromEntries(SHOP_FIELDS.map(([key, field]) => [key, (shop && shop[field]) || '']));
+  const [form, setForm] = useState(initial);
+  const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  useEffect(() => {
+    setForm(initial());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shop]);
+
+  async function save() {
+    setSaving(true);
+    setFieldErrors({});
+    try {
+      await api.patch('/admin/settings/shop', form);
+      toast('Shop details saved. New receipts will use them.');
+      onSaved();
+    } catch (error) {
+      setFieldErrors(error?.errors && typeof error.errors === 'object' ? error.errors : {});
+      errorToast(error, 'Could not save shop details.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="settings-label">Shop details — printed on receipts</div>
+      <p className="small-muted">
+        Shown at the top and bottom of every till receipt. The UPI ID for payment QR codes is the
+        &ldquo;Shop UPI ID&rdquo; above.
+        {shop && !shop.upi && ' No valid UPI ID is set yet, so receipts and the till will not show a payment QR.'}
+      </p>
+      <div className="settings-grid">
+        {SHOP_FIELDS.map(([key, , label, placeholder]) => (
+          <label className="settings-field" key={key}>
+            <span>{label}</span>
+            <input
+              value={form[key]}
+              placeholder={placeholder}
+              onChange={(event) => setForm((f) => ({ ...f, [key]: event.target.value }))}
+            />
+            {fieldErrors[key] && <span className="settings-error">{[].concat(fieldErrors[key])[0]}</span>}
+          </label>
+        ))}
+      </div>
+      <div className="payment-card__actions">
+        <button type="button" className="admin-btn admin-btn--primary" onClick={save} disabled={saving}>
+          {saving ? 'Saving…' : 'Save shop details'}
+        </button>
       </div>
     </div>
   );
