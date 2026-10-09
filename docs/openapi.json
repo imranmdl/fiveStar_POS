@@ -6637,6 +6637,95 @@
                 }
             }
         },
+        "/api/v1/admin/inventory/barcodes": {
+            "get": {
+                "operationId": "inventoryControllerBarcodes",
+                "tags": [
+                    "Admin: Inventory"
+                ],
+                "summary": "Every pack with its SKU and barcode — the inventory \"Barcodes\" tab.",
+                "description": "Requires one of these roles: administrator, supervisor, manager, inventory_staff, executive.",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/inventory/barcodes/generate": {
+            "post": {
+                "operationId": "inventoryControllerGenerateSkuBarcodes",
+                "tags": [
+                    "Admin: Inventory"
+                ],
+                "summary": "{ variant_uuids: [...] }",
+                "description": "Requires one of these roles: administrator, supervisor, manager, inventory_staff, executive.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            }
+        },
         "/api/v1/admin/inventory/deleted": {
             "get": {
                 "operationId": "inventoryControllerDeleted",
@@ -7683,6 +7772,59 @@
                     "Admin: Inventory"
                 ],
                 "summary": "Generates and saves a barcode for this pack size if it doesn't have one yet; returns the existing one unchanged otherwise. Safe to call whenever staff wants to print a label — it always has something to hand back.",
+                "description": "Requires one of these roles: administrator, supervisor, manager, inventory_staff, executive.",
+                "parameters": [
+                    {
+                        "name": "variantUuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "VariantUuid"
+                    }
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/inventory/variants/{variantUuid}/generate-barcode": {
+            "post": {
+                "operationId": "inventoryControllerGenerateSkuBarcode",
+                "tags": [
+                    "Admin: Inventory"
+                ],
+                "summary": "Saves a barcode and makes it the SKU (see InventoryService::generateSkuBarcode).",
                 "description": "Requires one of these roles: administrator, supervisor, manager, inventory_staff, executive.",
                 "parameters": [
                     {

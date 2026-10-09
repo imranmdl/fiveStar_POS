@@ -385,6 +385,11 @@ return static function (Router $router): void {
         // Generating/fetching a barcode to print is a labelling convenience,
         // not a sensitive write — open to the same tier as lookup/adjust.
         $router->post('/admin/inventory/variants/{variantUuid}/barcode', [InventoryController::class, 'assignBarcode'], $inventoryStaff);
+        // "Generate Barcode": the barcode is saved as the SKU (or the SKU as
+        // the barcode) — never overwriting either. Same tier as above.
+        $router->get('/admin/inventory/barcodes', [InventoryController::class, 'barcodes'], $inventoryStaff);
+        $router->post('/admin/inventory/barcodes/generate', [InventoryController::class, 'generateSkuBarcodes'], $inventoryStaff);
+        $router->post('/admin/inventory/variants/{variantUuid}/generate-barcode', [InventoryController::class, 'generateSkuBarcode'], $inventoryStaff);
         // Creating a catalog entry on the fly (unrecognised scanned barcode)
         // is as sensitive as any other new-product action, hence $manager —
         // not opened to inventoryStaff the way the lookup/adjust reads are.

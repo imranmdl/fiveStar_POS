@@ -588,24 +588,60 @@ final class ImportService
         $errors = [];
         $sku = trim((string) ($row['sku'] ?? ''));
 
-        if ($sku === '') {
-            return ['is_valid' => false, 'errors' => ['sku' => ['SKU is required.']], 'action' => 'skip', 'normalized' => []];
-        }
+        // No SKU is fine: the row is matched to an existing pack by its
+        // barcode, else by product name + pack name, and a new pack is created
+        // WITHOUT a SKU (none is generated here — "Generate Barcode" on the
+        // inventory screen assigns it later).
+        $rowBarcode = trim((string) ($row['barcode'] ?? ''));
+        $rowProduct = trim((string) ($row['product_name'] ?? ''));
+        $rowVariant = trim((string) ($row['variant_name'] ?? ''));
 
-        if (isset($seenSkus[$sku])) {
+        if ($sku === '' && $rowBarcode === '' && ($rowProduct === '' || $rowVariant === '')) {
             return [
                 'is_valid' => false,
-                'errors' => ['sku' => ["Duplicate SKU within this file (already on row {$seenSkus[$sku]})."]],
+                'errors' => ['sku' => ['Give a SKU, a barcode, or the product name and pack name.']],
                 'action' => 'skip',
-                'normalized' => ['sku' => $sku],
+                'normalized' => [],
             ];
         }
 
-        $seenSkus[$sku] = $rowNumber;
+        $rowKey = $sku !== '' ? 's:' . mb_strtolower($sku)
+            : ($rowBarcode !== '' ? 'b:' . $rowBarcode : 'n:' . mb_strtolower($rowProduct) . '|' . mb_strtolower($rowVariant));
 
-        $existing = $this->variants->findBySku($sku);
+        if (isset($seenSkus[$rowKey])) {
+            return [
+                'is_valid' => false,
+                'errors' => ['sku' => ["Duplicate row within this file (same item as row {$seenSkus[$rowKey]})."]],
+                'action' => 'skip',
+                'normalized' => ['sku' => $sku !== '' ? $sku : null],
+            ];
+        }
+
+        $seenSkus[$rowKey] = $rowNumber;
+
+        if ($sku !== '') {
+            $existing = $this->variants->findBySku($sku);
+
+            if ($existing === null && $this->variants->codeTaken($sku)) {
+                return [
+                    'is_valid' => false,
+                    'errors' => ['sku' => ["SKU {$sku} is already used as another item's barcode."]],
+                    'action' => 'skip',
+                    'normalized' => ['sku' => $sku],
+                ];
+            }
+        } elseif ($rowBarcode !== '') {
+            $existing = $this->variants->findByCode($rowBarcode);
+        } else {
+            $existing = $this->variants->findByNames($rowProduct, $rowVariant);
+        }
+
         $isNew = $existing === null;
-        $normalized = ['sku' => $sku];
+        $normalized = ['sku' => $sku !== '' ? $sku : null];
+
+        if (!$isNew) {
+            $normalized['variant_id'] = (int) $existing['id'];
+        }
 
         // --- category (required for a new SKU) --------------------------
         $categorySlug = trim((string) ($row['category'] ?? ''));
@@ -820,8 +856,11 @@ final class ImportService
      *
      * @return array<string, mixed> the first variant, plus `variants` (all of them)
      */
-    public function createFromScan(array $data, Request $request): array
+    public function createFromScan(array $data, Request $request, bool $fromImport = false): array
     {
+        // $fromImport (Products → Import Excel/CSV): a row with no SKU is saved
+        // WITHOUT one — no code is invented. The SKU is assigned later, only
+        // when staff press "Generate Barcode" on the inventory screen.
         $category = $this->categories->findByUuid((string) $data['category_uuid']);
 
         if ($category === null) {
@@ -931,8 +970,10 @@ final class ImportService
         $actorId = $request->authUserId();
         $foodLike = $weightRequired;
 
-        $variantIds = $this->db->transaction(function () use ($clean, $category, $data, $actorId, $foodLike, $request): array {
-            $firstSku = $clean[0]['sku'] !== '' ? $clean[0]['sku'] : ($clean[0]['barcode'] !== '' ? $clean[0]['barcode'] : $this->uniqueGeneratedBarcode());
+        $variantIds = $this->db->transaction(function () use ($clean, $category, $data, $actorId, $foodLike, $request, $fromImport): array {
+            $firstSku = $clean[0]['sku'] !== '' ? $clean[0]['sku']
+                : ($clean[0]['barcode'] !== '' ? $clean[0]['barcode']
+                    : ($fromImport ? (string) $data['product_name'] : $this->uniqueGeneratedBarcode()));
 
             $productId = $this->products->create([
                 'category_id' => (int) $category['id'],
@@ -952,14 +993,27 @@ final class ImportService
             $usedSkus = [];
 
             foreach ($clean as $index => $v) {
-                $barcode = $v['barcode'] !== '' ? $v['barcode'] : $this->uniqueGeneratedBarcode();
-                $sku = $v['sku'] !== '' ? $v['sku'] : $barcode;
+                if ($fromImport) {
+                    // Keep exactly what the file says; nothing generated.
+                    $barcode = $v['barcode'] !== '' ? $v['barcode'] : null;
+                    $sku = $v['sku'] !== '' ? $v['sku'] : null;
+                } else {
+                    $barcode = $v['barcode'] !== '' ? $v['barcode'] : $this->uniqueGeneratedBarcode();
+                    $sku = $v['sku'] !== '' ? $v['sku'] : $barcode;
+                }
 
-                if (isset($usedSkus[$sku]) || $this->variants->skuExists($sku)) {
+                if ($sku !== null && (isset($usedSkus[$sku]) || $this->variants->skuExists($sku)
+                    || ($sku !== $barcode && $this->variants->codeTaken($sku)))) {
                     throw new HttpException("SKU {$sku} is already in use.", 422, ['sku' => ['Already in use.']]);
                 }
 
-                $usedSkus[$sku] = true;
+                if ($fromImport && $barcode !== null && $barcode !== $sku && $this->variants->codeTaken($barcode)) {
+                    throw new HttpException("Barcode {$barcode} is already in use.", 422, ['barcode' => ['Already in use.']]);
+                }
+
+                if ($sku !== null) {
+                    $usedSkus[$sku] = true;
+                }
 
                 $variantId = $this->variants->create([
                     'product_id' => $productId,
@@ -1039,14 +1093,22 @@ final class ImportService
     private function applyRow(array $row, Request $request): array
     {
         $normalized = $row['normalized'];
-        $sku = $normalized['sku'];
-        $existing = $this->variants->findBySku($sku);
+        $sku = $normalized['sku'] ?? null;
+        // Matched at preview by SKU, barcode or name; re-read so a row whose
+        // pack was deleted since then is created again rather than lost.
+        $existing = isset($normalized['variant_id'])
+            ? $this->variants->findById((int) $normalized['variant_id'])
+            : ($sku !== null ? $this->variants->findBySku($sku) : null);
         $actorId = $request->authUserId();
+
+        if ($existing !== null && (int) ($existing['is_deleted'] ?? 0) === 1) {
+            $existing = null;
+        }
 
         if ($existing === null) {
             $productId = $this->products->create([
                 'category_id' => $normalized['category_id'],
-                'product_code' => $this->uniqueProductCode($sku),
+                'product_code' => $this->uniqueProductCode($sku ?? ($normalized['barcode'] ?? $normalized['product_name'])),
                 'slug' => $this->uniqueSlug($normalized['product_name']),
                 'name' => $normalized['product_name'],
                 'status' => 'draft',

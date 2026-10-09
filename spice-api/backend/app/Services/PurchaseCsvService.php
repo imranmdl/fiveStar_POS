@@ -557,6 +557,29 @@ final class PurchaseCsvService
             $warnings[] = 'No expiry date for a food item.';
         }
 
+        // ---- no SKU and no barcode: recognise an item already on file by name -----
+        // so importing the same sheet again can't create the products twice.
+        if ($existing === null && $sku === '' && $barcode === '' && $row['product_name'] !== '') {
+            $sameName = $this->db->selectOne(
+                'SELECT v.`sku`, v.`variant_name`, p.`name` AS `product_name`
+                   FROM `product_variants` v INNER JOIN `products` p ON p.`id` = v.`product_id`
+                  WHERE v.`is_deleted` = 0 AND p.`is_deleted` = 0
+                    AND LOWER(TRIM(p.`name`)) = LOWER(TRIM(:product_name))
+                    AND LOWER(TRIM(v.`variant_name`)) = LOWER(TRIM(:variant_name))
+                  LIMIT 1',
+                ['product_name' => $row['product_name'], 'variant_name' => (string) ($row['variant_name'] ?? '')]
+            );
+
+            if ($sameName !== null) {
+                $errors[] = sprintf(
+                    'Duplicate: "%s — %s" is already in your products (%s). Add its SKU or barcode to this row to update it instead.',
+                    $sameName['product_name'],
+                    $sameName['variant_name'],
+                    $sameName['sku'] !== null && $sameName['sku'] !== '' ? 'SKU ' . $sameName['sku'] : 'no SKU yet'
+                );
+            }
+        }
+
         // ---- duplicate detection within the file --------------------------------
         $key = $existing !== null ? 'v:' . $existing['uuid']
             : 'n:' . ($row['category_uuid'] ?? '') . '|' . mb_strtolower($row['product_name']) . '|' . mb_strtolower($row['variant_name']);
@@ -747,7 +770,8 @@ final class PurchaseCsvService
                     $item['short_description'] = $this->autoDescription($item);
                 }
 
-                $created = $this->imports->createFromScan($item, $request);
+                // Import: no SKU in the file means no SKU yet (see "Generate Barcode").
+                $created = $this->imports->createFromScan($item, $request, true);
                 $published = false;
                 $publishNote = null;
                 $imageAttached = false;

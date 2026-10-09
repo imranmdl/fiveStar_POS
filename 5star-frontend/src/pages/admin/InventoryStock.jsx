@@ -4,6 +4,7 @@ import { toast } from '../../components/admin/toast';
 import { EmptyState, ErrorState, LoadingState } from '../../components/admin/shared';
 import { WarehouseSelect, Pagination, qty, canManageStock, reportError } from './InventoryShared';
 import { TraceModal, PriceHistoryModal, AdjustModal } from './InventoryModals';
+import { GenerateBarcodeButton, needsBarcode } from './InventoryBarcodes';
 
 /** The inline "Set…" / threshold-value link every stock table shares. Manager-tier only — PATCH /admin/inventory/reorder-threshold is $manager-gated. */
 function ReorderCell({ role, variantUuid, warehouseUuid, current, onSaved }) {
@@ -117,7 +118,19 @@ export default function InventoryStock({ role, warehouses }) {
                   <tr key={`${row.variant_uuid}:${row.warehouse_uuid}`}>
                     <td>
                       <div style={{ fontWeight: 600 }}>{row.product_name}</div>
-                      <div className="small-muted">{row.variant_name} · {row.sku}{row.barcode ? ` · ${row.barcode}` : ''}</div>
+                      <div className="small-muted">
+                        {row.variant_name} · {row.sku || <em>no SKU</em>}{row.barcode ? ` · ${row.barcode}` : ''}
+                      </div>
+                      {needsBarcode(row) && (
+                        <GenerateBarcodeButton
+                          variantUuid={row.variant_uuid}
+                          className="inv-link"
+                          onDone={(v) => setState((s) => ({
+                            ...s,
+                            rows: s.rows.map((r) => (r.variant_uuid === v.uuid ? { ...r, sku: v.sku, barcode: v.barcode } : r)),
+                          }))}
+                        />
+                      )}
                     </td>
                     <td className="small-muted">{row.warehouse_name}</td>
                     <td style={{ textAlign: 'right' }}><QuantityCell row={row} /></td>
