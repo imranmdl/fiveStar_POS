@@ -37,6 +37,8 @@ use App\Services\Orders\PaymentStatus;
  */
 final class ShipmentService
 {
+    public const SHIPROCKET_TRACKING_URL = 'https://shiprocket.co/tracking/';
+
     public function __construct(
         private readonly ShipmentRepository $shipments,
         private readonly CourierRepository $couriers,
@@ -950,6 +952,15 @@ final class ShipmentService
     /** @param array<string, mixed> $courier */
     private function trackingUrl(array $courier, string $awb): ?string
     {
+        // Parcels booked through Shiprocket are tracked on Shiprocket's own
+        // page, which works for every courier it assigns (Shadowfax,
+        // Delhivery, XpressBees…) — the carriers' public sites each need a
+        // different, often form-based URL, and the courier Shiprocket picks
+        // can differ from the brand on the row.
+        if (($courier['adapter'] ?? null) === 'shiprocket') {
+            return self::SHIPROCKET_TRACKING_URL . rawurlencode($awb);
+        }
+
         $template = $courier['tracking_url_template'] ?? null;
 
         if (!is_string($template) || $template === '') {
