@@ -100,12 +100,22 @@ final class PosSaleRepository extends BaseRepository
     public function detailByUuid(string $uuid): ?array
     {
         return $this->db->selectOne(
-            'SELECT s.*, u.`full_name` AS `cashier_name`, w.`name` AS `warehouse_name`
+            // Store and customer details are read here only for the printed
+            // receipt; nothing about the sale itself is changed.
+            "SELECT s.*, u.`full_name` AS `cashier_name`, w.`name` AS `warehouse_name`,
+                    w.`address_line1` AS `store_address_line1`, w.`address_line2` AS `store_address_line2`,
+                    w.`city` AS `store_city`, w.`state` AS `store_state`, w.`pincode` AS `store_pincode`,
+                    w.`phone` AS `store_phone`,
+                    COALESCE(c.`full_name`, s.`walk_in_name`) AS `customer_name`,
+                    COALESCE(c.`mobile`, s.`walk_in_mobile`) AS `customer_mobile`,
+                    (SELECT st.`setting_value` FROM `settings` st WHERE st.`setting_key` = 'store_name' LIMIT 1) AS `store_name`,
+                    (SELECT st.`setting_value` FROM `settings` st WHERE st.`setting_key` = 'seller_gstin' LIMIT 1) AS `store_gstin`
                FROM `pos_sales` s
                INNER JOIN `users` u ON u.`id` = s.`cashier_id`
                INNER JOIN `warehouses` w ON w.`id` = s.`warehouse_id`
+               LEFT JOIN `users` c ON c.`id` = s.`customer_id`
               WHERE s.`uuid` = :uuid AND s.`is_deleted` = 0
-              LIMIT 1',
+              LIMIT 1",
             ['uuid' => $uuid]
         );
     }

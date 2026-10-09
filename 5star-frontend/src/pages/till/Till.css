@@ -780,10 +780,29 @@
 
 /* ---------- Print ---------- */
 
+.till-receipt__print { display: flex; align-items: center; gap: var(--space-2); }
+.till-receipt__paper { height: 30px; font-size: 13px; padding: 0 6px; border: 1px solid var(--border); border-radius: var(--radius-sm, 4px); background: var(--surface); }
+
+/* The "Print receipt" button prints a separate thermal document (see
+   thermalReceipt.js). This covers Ctrl+P on the till instead: print only the
+   receipt, narrow and in portrait, never the whole till screen. */
 @media print {
+  @page { size: portrait; margin: 0; }
+
   .till-topbar,
   .till-tabs,
   .till-no-print {
     display: none !important;
   }
+
+  body * { visibility: hidden !important; }
+  .till-receipt, .till-receipt * { visibility: visible !important; }
+  .till-receipt {
+    position: absolute; left: 0; top: 0;
+    width: 72mm; max-width: 72mm; margin: 0 4mm;
+    padding: 2mm 0; border: 0; border-radius: 0; background: #fff; color: #000;
+    font-size: 11px;
+  }
+  .till-receipt__table { font-size: 11px; }
+  .till-receipt__table th, .till-receipt__table td { padding: 1px 2px; }
 }
