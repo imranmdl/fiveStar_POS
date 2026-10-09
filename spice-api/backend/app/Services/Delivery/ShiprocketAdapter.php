@@ -33,6 +33,8 @@ use App\Repositories\SettingRepository;
 final class ShiprocketAdapter implements CourierAdapterInterface
 {
     private const API_BASE = 'https://apiv2.shiprocket.in/v1/external';
+
+    private const USER_AGENT = 'FiveStarSpices-Store/1.0 (+https://fivestarspices.com)';
     private const TOKEN_SETTING = 'shiprocket_token';
     private const TOKEN_EXPIRY_SETTING = 'shiprocket_token_expires';
 
@@ -430,7 +432,10 @@ final class ShiprocketAdapter implements CourierAdapterInterface
         curl_setopt_array($handle, [
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json'],
+            // Shiprocket's firewall answers a bare 403 to requests that carry
+            // no User-Agent (PHP's curl sends none by default).
+            CURLOPT_USERAGENT => self::USER_AGENT,
             CURLOPT_POSTFIELDS => json_encode(['email' => $this->email, 'password' => $this->password]),
             CURLOPT_TIMEOUT => $this->timeoutSeconds,
             CURLOPT_SSL_VERIFYPEER => true,
@@ -451,6 +456,8 @@ final class ShiprocketAdapter implements CourierAdapterInterface
                 'http_status' => $status,
                 'email' => $this->maskedEmail(),
                 'shiprocket_message' => is_array($decoded) ? ($decoded['message'] ?? null) : null,
+                // First bytes of a non-JSON reply (e.g. a firewall page) — never contains the password.
+                'body_start' => is_array($decoded) || $raw === false ? null : substr(preg_replace('/\s+/', ' ', strip_tags((string) $raw)) ?? '', 0, 200),
                 'curl_error' => $curlError !== '' ? $curlError : null,
             ], 'delivery');
 
@@ -481,6 +488,19 @@ final class ShiprocketAdapter implements CourierAdapterInterface
             return 'SHIPROCKET_EMAIL "' . $this->email . '" is not a full email address.' . $said;
         }
 
+        // A 403 with no Shiprocket JSON (an HTML/blank page) comes from the
+        // firewall in front of Shiprocket's API, not from the password check:
+        // this server's IP address is being blocked.
+        if ($status === 403 && !is_array($decoded)) {
+            $ip = $this->outboundIp();
+
+            return 'Shiprocket\'s firewall blocked this server (403 without a Shiprocket reply) — this is about the server\'s '
+                . 'IP address, not the email or password.'
+                . ($ip !== null ? ' This server reaches the internet from IP ' . $ip . '.' : '')
+                . ' Ask Shiprocket support to allow this IP for API access (or add it under the API user\'s allowed IPs), '
+                . 'or use a fixed outbound IP for the server.';
+        }
+
         return match (true) {
             $status === 403 => 'Shiprocket refused this login (403). Use the API user from Shiprocket → Settings → API '
                 . '→ Create an API User — not your normal dashboard login — in SHIPROCKET_EMAIL / SHIPROCKET_PASSWORD.' . $said,
@@ -489,6 +509,17 @@ final class ShiprocketAdapter implements CourierAdapterInterface
             $status === 429 => 'Too many login attempts; Shiprocket asks to wait a few minutes.' . $said,
             default => 'Shiprocket answered ' . $status . '.' . $said,
         };
+    }
+
+    /** The public IP this server's requests come from (for Shiprocket's allow-list), or null. */
+    private function outboundIp(): ?string
+    {
+        $handle = curl_init('https://api.ipify.org');
+        curl_setopt_array($handle, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 4, CURLOPT_CONNECTTIMEOUT => 3]);
+        $ip = trim((string) curl_exec($handle));
+        curl_close($handle);
+
+        return filter_var($ip, FILTER_VALIDATE_IP) !== false ? $ip : null;
     }
 
     private function maskedEmail(): string
@@ -517,6 +548,7 @@ final class ShiprocketAdapter implements CourierAdapterInterface
                 'Accept: application/json',
                 'Authorization: Bearer ' . $this->authenticate(),
             ],
+            CURLOPT_USERAGENT => self::USER_AGENT,
             CURLOPT_TIMEOUT => $this->timeoutSeconds,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_SSL_VERIFYPEER => true,
