@@ -129,9 +129,10 @@ final class InwardSetupService
             'name' => $data['name'],
             'parent_slug' => $parentSlug,
             'item_type' => $data['item_type'] ?? null,
-            // A new top-level category stays off the storefront menu until an
-            // administrator publishes it; a sub-category follows its parent.
-            'show_in_menu' => $parentSlug === null ? 0 : 1,
+            // Visible in the shop as soon as it holds a published product —
+            // the menu skips empty categories, so nothing appears early.
+            // (Created hidden before, they never showed up at all.)
+            'show_in_menu' => 1,
         ], $request);
     }
 }

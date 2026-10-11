@@ -81,7 +81,11 @@
 .collection-card__media img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  /* Whole product photo, never cropped (see .sf-media in storefront.css). */
+  object-fit: contain;
+  padding: 4%;
+  box-sizing: border-box;
+  background: #fff;
 }
 
 .collection-card__badges {
