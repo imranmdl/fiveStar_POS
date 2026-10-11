@@ -88,10 +88,11 @@ final class InwardSetupService
     public function createCategory(array $data, Request $request): array
     {
         $parentSlug = null;
+        $parentId = null;
 
         if (!empty($data['parent_uuid'])) {
             $parent = $this->db->selectOne(
-                'SELECT `slug` FROM `categories` WHERE `uuid` = :uuid AND `is_deleted` = 0 LIMIT 1',
+                'SELECT `id`, `slug` FROM `categories` WHERE `uuid` = :uuid AND `is_deleted` = 0 LIMIT 1',
                 ['uuid' => $data['parent_uuid']]
             );
 
@@ -100,7 +101,25 @@ final class InwardSetupService
             }
 
             $parentSlug = (string) $parent['slug'];
-        } elseif (empty($data['item_type'])) {
+            $parentId = (int) $parent['id'];
+        }
+
+        // Same name in the same place already? Use it rather than making a
+        // duplicate — "add the suggested category" can be clicked twice, or
+        // by two people, without splitting items across two "Perfumes".
+        $existing = $this->db->selectOne(
+            'SELECT `uuid`, `slug`, `name`, `item_type` FROM `categories`
+              WHERE `is_deleted` = 0 AND LOWER(TRIM(`name`)) = LOWER(TRIM(:name))
+                AND ' . ($parentId === null ? '`parent_id` IS NULL' : '`parent_id` = :parent_id') . '
+              LIMIT 1',
+            $parentId === null ? ['name' => $data['name']] : ['name' => $data['name'], 'parent_id' => $parentId]
+        );
+
+        if ($existing !== null) {
+            return $existing + ['existing' => true];
+        }
+
+        if ($parentId === null && empty($data['item_type'])) {
             throw new HttpException('Choose what kind of business this category is for.', 422, [
                 'item_type' => ['Required for a new top-level category.'],
             ]);

@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react';
 import { api, formatMoney, ApiError } from '../../lib/api';
 import { toast } from '../../components/admin/toast.js';
+import { RowSuggestion, resolveSuggestions } from '../../components/admin/CategoryPicker';
 
 /**
  * Vendor bill upload for Purchase Inward — ported from
@@ -18,7 +19,7 @@ import { toast } from '../../components/admin/toast.js';
  * variants) and drops every line into the purchase order's items table.
  */
 
-const GST_BY_TYPE = { grocery: 5, oils: 5, clothing: 12, footwear: 12, toys: 12, stationery: 12, general: 18 };
+const GST_BY_TYPE = { grocery: 5, oils: 5, clothing: 12, footwear: 12, toys: 12, stationery: 12, perfumes: 18, personal_care: 18, pooja: 12, home_kitchen: 18, general: 18 };
 
 const num = (v) => (v === '' || v === null || v === undefined ? null : Number(v));
 const round2 = (n) => Math.round(n * 100) / 100;
@@ -34,7 +35,10 @@ export default function PurchaseInwardCsvUpload({ setup, onAddLine, onClose }) {
   const [sampleErrors, setSampleErrors] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
-  const cats = () => setup.categories || [];
+  // Categories added from suggestions during this upload join the list.
+  const [extraCats, setExtraCats] = useState([]);
+  const [suggesting, setSuggesting] = useState(false);
+  const cats = () => [...(setup.categories || []), ...extraCats.filter((c) => !(setup.categories || []).some((x) => x.uuid === c.uuid))];
   const byUuid = (u) => cats().find((c) => c.uuid === u);
   const tops = () => cats().filter((c) => !c.parent_uuid);
   const kids = (u) => cats().filter((c) => c.parent_uuid === u);
@@ -185,6 +189,51 @@ export default function PurchaseInwardCsvUpload({ setup, onAddLine, onClose }) {
       next[index] = revalidated;
       return next;
     });
+  }
+
+  /** Fills missing categories from the suggestion read off each item name. */
+  async function applySuggestedCategories(onlyIndex = null) {
+    const targets = rows
+      .map((row, index) => ({ row, index }))
+      .filter(({ row, index }) => (onlyIndex === null || index === onlyIndex)
+        && row.kind === 'new' && !row.category_uuid && row.category_suggestion);
+    if (targets.length === 0) return;
+
+    setSuggesting(true);
+    try {
+      let known = cats();
+      const resolved = await resolveSuggestions(
+        targets.map((t) => t.row.category_suggestion),
+        known,
+        (node) => { known = [...known, node]; setExtraCats((list) => [...list, node]); },
+      );
+      setRows((prev) => {
+        const next = [...prev];
+        targets.forEach(({ row, index }) => {
+          const picked = resolved.get(row.category_suggestion.label);
+          if (!picked) return;
+          const r = { ...next[index] };
+          const hasKids = known.some((c) => c.parent_uuid === picked.topUuid);
+          if (hasKids && !picked.subUuid) {
+            r.category_uuid = null;
+            r.category_pending_top = picked.topUuid;
+          } else {
+            r.category_uuid = picked.subUuid || picked.topUuid;
+            r.category_pending_top = null;
+          }
+          const leaf = known.find((c) => c.uuid === r.category_uuid);
+          if (leaf && !r.gst_edited) r.gst_rate = GST_BY_TYPE[leaf.item_type || 'general'] ?? 18;
+          next[index] = revalidate(r);
+          if (next[index].errors.length === 0 && !next[index].include) next[index].include = true;
+        });
+        return next;
+      });
+      setFeedback({ tone: 'success', text: `Category filled in from the item name for ${targets.length} row${targets.length === 1 ? '' : 's'} — check them before adding.` });
+    } catch (error) {
+      setFeedback({ tone: 'danger', text: error instanceof ApiError ? error.message : 'Could not apply the suggested categories.' });
+    } finally {
+      setSuggesting(false);
+    }
   }
 
   async function addAll() {
@@ -408,6 +457,9 @@ export default function PurchaseInwardCsvUpload({ setup, onAddLine, onClose }) {
                                     {subs.map((c) => <option key={c.uuid} value={c.uuid}>{c.name}</option>)}
                                   </select>
                                 )}
+                                {!row.category_uuid && (
+                                  <RowSuggestion suggestion={row.category_suggestion} disabled={suggesting} onUse={() => applySuggestedCategories(i)} />
+                                )}
                               </>
                             )}
                           </td>
@@ -461,6 +513,14 @@ export default function PurchaseInwardCsvUpload({ setup, onAddLine, onClose }) {
             </div>
 
             <div className="pi-toolbar">
+              {(() => {
+                const n = rows.filter((r) => r.kind === 'new' && !r.category_uuid && r.category_suggestion).length;
+                return n > 0 ? (
+                  <button type="button" className="admin-btn" disabled={adding || suggesting} onClick={() => applySuggestedCategories()}>
+                    {suggesting ? 'Filling categories…' : `Use suggested categories (${n} row${n === 1 ? '' : 's'})`}
+                  </button>
+                ) : null;
+              })()}
               <button type="button" className="admin-btn admin-btn--primary" disabled={adding} onClick={addAll}>
                 {adding ? 'Adding…' : 'Add ready rows to this purchase'}
               </button>

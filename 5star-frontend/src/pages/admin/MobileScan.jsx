@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { api, formatMoney, ApiError } from '../../lib/api';
+import CategoryPicker, { leafOf } from '../../components/admin/CategoryPicker';
 import { LoadingState, ErrorState } from '../../components/admin/shared.jsx';
 import { toast } from '../../components/admin/toast.js';
 import CameraScanner from '../../components/CameraScanner';
@@ -199,6 +200,8 @@ export default function MobileScan() {
   const [cart, setCart] = useState([]);
   const [quickCreate, setQuickCreate] = useState(null); // emptyQuickCreate(barcode) while open
   const [categories, setCategories] = useState([]);
+  const [quickCat, setQuickCat] = useState({ topUuid: '', subUuid: '' });
+  const [quickCatErrors, setQuickCatErrors] = useState(false);
   const [quickCreateBusy, setQuickCreateBusy] = useState(false);
 
   const [vendorUuid, setVendorUuid] = useState('');
@@ -306,10 +309,14 @@ export default function MobileScan() {
         // The quick-create form needs the screen — close the camera.
         setCameraOpen(false);
 
+        setQuickCat({ topUuid: '', subUuid: '' });
+        setQuickCatErrors(false);
+
         if (categories.length === 0) {
           try {
-            const response = await api.get('/admin/categories', { per_page: 200 });
-            setCategories(response.data || []);
+            // Carries parent_uuid / item_type for the Category › Sub-category picker.
+            const response = await api.get('/admin/inventory/setup');
+            setCategories((response.data && response.data.categories) || []);
           } catch {
             setCategories([]);
           }
@@ -323,10 +330,16 @@ export default function MobileScan() {
 
   async function handleQuickCreateSubmit(event) {
     event.preventDefault();
+    const leaf = leafOf(categories, quickCat.topUuid, quickCat.subUuid);
+    if (!leaf) {
+      setQuickCatErrors(true);
+      setFeedback({ tone: 'danger', text: quickCat.topUuid ? 'Choose a sub-category for this item.' : 'Choose a category for this item (or tap a suggestion).' });
+      return;
+    }
     setQuickCreateBusy(true);
 
     try {
-      const response = await api.post('/admin/inventory/quick-create', quickCreate);
+      const response = await api.post('/admin/inventory/quick-create', { ...quickCreate, category_uuid: leaf });
       const variant = response.data;
 
       setCart((current) => [
@@ -517,27 +530,24 @@ export default function MobileScan() {
               </button>
 
               <label className="mscan-field">
-                <span>Category</span>
-                <select
-                  value={quickCreate.category_uuid}
-                  onChange={(event) => updateQuickCreateField('category_uuid', event.target.value)}
-                  required
-                >
-                  <option value="">Select…</option>
-                  {categories.map((c) => (
-                    <option key={c.uuid} value={c.uuid}>{c.name}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="mscan-field">
                 <span>Product name</span>
                 <input
                   value={quickCreate.product_name}
                   onChange={(event) => updateQuickCreateField('product_name', event.target.value)}
+                  placeholder="e.g. Toor Dal, Rose Attar, Kids sandal"
                   required
                 />
               </label>
+
+              <CategoryPicker
+                idPrefix="ms"
+                categories={categories}
+                name={quickCreate.product_name}
+                value={quickCat}
+                showErrors={quickCatErrors}
+                onCreated={(c) => setCategories((list) => (list.some((x) => x.uuid === c.uuid) ? list : [...list, c]))}
+                onChange={(next) => { setQuickCat(next); setQuickCatErrors(false); }}
+              />
 
               <label className="mscan-field">
                 <span>Pack size (e.g. &ldquo;500g pouch&rdquo;)</span>

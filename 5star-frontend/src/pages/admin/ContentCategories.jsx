@@ -15,7 +15,15 @@ function reportError(error) {
   toast(text, 'danger');
 }
 
-const EMPTY_FORM = { name: '', parent_slug: '', description: '', is_featured: false };
+const EMPTY_FORM = { name: '', parent_slug: '', item_type: 'general', description: '', is_featured: false };
+
+/** Kind of business a top-level category is for (inherited by its sub-categories). */
+const ITEM_TYPES = [
+  ['grocery', 'Grocery (spices, dry fruits, staples)'], ['oils', 'Oils & ghee'], ['clothing', 'Clothing'],
+  ['footwear', 'Footwear'], ['perfumes', 'Perfumes & attar'], ['personal_care', 'Personal care'],
+  ['pooja', 'Pooja items'], ['home_kitchen', 'Home & kitchen'], ['toys', 'Toys'], ['stationery', 'Stationery'],
+  ['general', 'Other / general'],
+];
 
 /** Flattens the category tree into rows with an indent depth, same as the source's recursive categoryRow(). */
 function flattenRows(categories, depth = 0) {
@@ -62,6 +70,7 @@ export default function ContentCategories() {
 
     const payload = { name, is_featured: form.is_featured };
     if (form.parent_slug) payload.parent_slug = form.parent_slug;
+    else payload.item_type = form.item_type || 'general';
     if (form.description.trim()) payload.description = form.description.trim();
 
     setAdding(true);
@@ -166,6 +175,18 @@ export default function ContentCategories() {
                 Only top-level categories appear in the shop's navigation strip.
               </div>
             </div>
+
+            {!form.parent_slug && (
+              <div className="content-field">
+                <label htmlFor="cat_item_type">Kind of items *</label>
+                <select id="cat_item_type" value={form.item_type} onChange={set('item_type')}>
+                  {ITEM_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+                <div className="content-hint">
+                  Decides the fields shown when adding items here (sizes &amp; colours for clothing, weight for grocery…) and the default GST.
+                </div>
+              </div>
+            )}
 
             <div className="content-field">
               <label htmlFor="cat_description">Description</label>

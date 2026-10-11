@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Core\Database;
 use App\Core\Exceptions\HttpException;
 use App\Core\Request;
+use App\Services\Catalog\CategorySuggestionService;
 
 /**
  * Vendor bill upload: one CSV/XLSX -> a reviewed list of purchase lines that
@@ -82,13 +83,15 @@ final class PurchaseCsvService
     ];
 
     private const GST_BY_TYPE = [
-        'grocery' => 5.0, 'oils' => 5.0, 'clothing' => 12.0, 'footwear' => 12.0, 'toys' => 12.0, 'stationery' => 12.0, 'general' => 18.0,
+        'grocery' => 5.0, 'oils' => 5.0, 'clothing' => 12.0, 'footwear' => 12.0, 'toys' => 12.0, 'stationery' => 12.0,
+        'perfumes' => 18.0, 'personal_care' => 18.0, 'pooja' => 12.0, 'home_kitchen' => 18.0, 'general' => 18.0,
     ];
 
     public function __construct(
         private readonly ImportService $imports,
         private readonly Database $db,
         private readonly ProductService $products,
+        private readonly CategorySuggestionService $suggestions,
     ) {
     }
 
@@ -419,6 +422,16 @@ final class PurchaseCsvService
 
             if (isset($resolved['error'])) {
                 $errors[] = $resolved['error'];
+
+                // Missing / unknown category: offer what the item's name
+                // suggests, so the import screen can fill it in one click.
+                $suggested = $get('product_name') !== ''
+                    ? ($this->suggestions->suggest($get('product_name'), 1)['suggestions'][0] ?? null)
+                    : null;
+
+                if ($suggested !== null) {
+                    $row['category_suggestion'] = $suggested;
+                }
             }
 
             $row['category_uuid'] = $resolved['uuid'] ?? null;
@@ -497,7 +510,7 @@ final class PurchaseCsvService
         }
 
         if ($gst === null) {
-            $gst = $gstDefault ?? self::GST_BY_TYPE[$type];
+            $gst = $gstDefault ?? (self::GST_BY_TYPE[$type] ?? self::GST_BY_TYPE['general']);
             $notes[] = "GST {$gst}% assumed for " . ($existing !== null ? 'this item' : $type . ' items') . '.';
         }
 
