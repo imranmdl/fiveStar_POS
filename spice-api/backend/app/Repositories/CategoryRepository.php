@@ -49,11 +49,19 @@ final class CategoryRepository extends BaseRepository
             $byParent[(int) ($row['parent_id'] ?? 0)][] = $row;
         }
 
-        $build = static function (int $parentId) use (&$build, $byParent): array {
+        $build = static function (int $parentId) use (&$build, $byParent, $menuOnly): array {
             $branch = [];
 
             foreach ($byParent[$parentId] ?? [] as $node) {
                 $children = $build((int) $node['id']);
+
+                // The shop menu (and the home page's category strip) only
+                // lists categories that actually hold something to buy, so a
+                // category made for stock that isn't published yet stays out
+                // of sight without anyone having to hide and un-hide it.
+                if ($menuOnly && (int) $node['product_count'] === 0 && $children === []) {
+                    continue;
+                }
 
                 unset($node['id'], $node['parent_id']);
                 $node['children'] = $children;
