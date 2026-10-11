@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
+import { RowSuggestion, resolveSuggestions } from '../../components/admin/CategoryPicker';
 import { toast } from '../../components/admin/toast';
 import './ProductCsvImport.css';
 
@@ -21,7 +22,7 @@ const BATCH_SIZE = 25;
 /** Rows shown per page in the review table (all rows are imported). */
 const PAGE_SIZE = 100;
 
-const GST_BY_TYPE = { grocery: 5, oils: 5, clothing: 12, footwear: 12, toys: 12, stationery: 12, general: 18 };
+const GST_BY_TYPE = { grocery: 5, oils: 5, clothing: 12, footwear: 12, toys: 12, stationery: 12, perfumes: 18, personal_care: 18, pooja: 12, home_kitchen: 18, general: 18 };
 
 export default function ProductCsvImport({ setup, onClose, onDone }) {
   const [rows, setRows] = useState([]);
@@ -35,7 +36,10 @@ export default function ProductCsvImport({ setup, onClose, onDone }) {
   const [result, setResult] = useState(null);     // final summary after a run
   const [page, setPage] = useState(0);
 
-  const cats = () => setup.categories || [];
+  // Categories added from suggestions during this import join the list.
+  const [extraCats, setExtraCats] = useState([]);
+  const [suggesting, setSuggesting] = useState(false);
+  const cats = () => [...(setup.categories || []), ...extraCats.filter((c) => !(setup.categories || []).some((x) => x.uuid === c.uuid))];
   const byUuid = (u) => cats().find((c) => c.uuid === u);
   const tops = () => cats().filter((c) => !c.parent_uuid);
   const kids = (u) => cats().filter((c) => c.parent_uuid === u);
@@ -147,6 +151,55 @@ export default function ProductCsvImport({ setup, onClose, onDone }) {
       if (next[index].errors.length === 0 && !next[index].include) next[index].include = true;
       return next;
     });
+  }
+
+  /**
+   * Fills the category of rows that have none (or a wrong one) from the
+   * suggestion read off their item name — all rows, or just `onlyIndex`.
+   */
+  async function applySuggestedCategories(onlyIndex = null) {
+    const targets = rows
+      .map((row, index) => ({ row, index }))
+      .filter(({ row, index }) => (onlyIndex === null || index === onlyIndex)
+        && row.kind === 'new' && !row.category_uuid && row.category_suggestion);
+    if (targets.length === 0) return;
+
+    setSuggesting(true);
+    try {
+      let known = cats();
+      const resolved = await resolveSuggestions(
+        targets.map((t) => t.row.category_suggestion),
+        known,
+        (node) => { known = [...known, node]; setExtraCats((list) => [...list, node]); },
+      );
+      const find = (u) => known.find((c) => c.uuid === u);
+      setRows((prev) => {
+        const next = [...prev];
+        targets.forEach(({ row, index }) => {
+          const picked = resolved.get(row.category_suggestion.label);
+          if (!picked) return;
+          const r = { ...next[index] };
+          const hasKids = known.some((c) => c.parent_uuid === picked.topUuid);
+          if (hasKids && !picked.subUuid) {
+            r.category_uuid = null;
+            r.category_pending_top = picked.topUuid;
+          } else {
+            r.category_uuid = picked.subUuid || picked.topUuid;
+            r.category_pending_top = null;
+          }
+          const leaf = find(r.category_uuid);
+          if (leaf && !r.gst_edited) r.gst_rate = GST_BY_TYPE[leaf.item_type || 'general'] ?? 18;
+          next[index] = revalidate(r);
+          if (next[index].errors.length === 0 && !next[index].include) next[index].include = true;
+        });
+        return next;
+      });
+      setFeedback({ tone: 'success', text: `Category filled in from the item name for ${targets.length} row${targets.length === 1 ? '' : 's'} — check them before importing.` });
+    } catch (error) {
+      setFeedback({ tone: 'danger', text: error instanceof ApiError ? error.message : 'Could not apply the suggested categories.' });
+    } finally {
+      setSuggesting(false);
+    }
   }
 
   /** One product (with all its pack sizes) as sent to quick-create-batch. */
@@ -466,6 +519,9 @@ export default function ProductCsvImport({ setup, onClose, onDone }) {
                                 {subs.map((c) => <option key={c.uuid} value={c.uuid}>{c.name}</option>)}
                               </select>
                             )}
+                            {!row.category_uuid && (
+                              <RowSuggestion suggestion={row.category_suggestion} disabled={suggesting} onUse={() => applySuggestedCategories(i)} />
+                            )}
                           </>
                         )}
                       </td>
@@ -561,6 +617,14 @@ export default function ProductCsvImport({ setup, onClose, onDone }) {
           )}
 
           <div className="csv-import__actions">
+            {(() => {
+              const n = rows.filter((r) => r.kind === 'new' && !r.category_uuid && r.category_suggestion).length;
+              return n > 0 ? (
+                <button className="admin-btn" type="button" disabled={adding || suggesting} onClick={() => applySuggestedCategories()}>
+                  {suggesting ? 'Filling categories…' : `Use suggested categories (${n} row${n === 1 ? '' : 's'})`}
+                </button>
+              ) : null;
+            })()}
             <button className="admin-btn admin-btn--primary" type="button" disabled={adding} onClick={addAll}>
               {adding ? 'Importing…' : `Import ${ready.length} ready row${ready.length === 1 ? '' : 's'}`}
             </button>

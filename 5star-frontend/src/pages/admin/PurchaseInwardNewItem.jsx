@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { toast } from '../../components/admin/toast.js';
+import { CategorySuggestions } from '../../components/admin/CategoryPicker';
 
 /**
  * "New item" form for Purchase Inward — ported from
@@ -25,6 +26,10 @@ const PROFILES = {
   footwear: { label: 'Footwear', mode: 'grid', gst: 12 },
   toys: { label: 'Toys', mode: 'plain', gst: 12 },
   stationery: { label: 'Stationery', mode: 'plain', gst: 12 },
+  perfumes: { label: 'Perfumes & Attar', mode: 'plain', gst: 18 },
+  personal_care: { label: 'Personal Care', mode: 'plain', gst: 18 },
+  pooja: { label: 'Pooja Items', mode: 'plain', gst: 12 },
+  home_kitchen: { label: 'Home & Kitchen', mode: 'plain', gst: 18 },
   general: { label: 'General', mode: 'plain', gst: 18 },
 };
 
@@ -54,6 +59,9 @@ export default function PurchaseInwardNewItem({ setup, initialBarcode = '', onCa
   const [catSaving, setCatSaving] = useState(false);
   const [feedback, setFeedback] = useState(null); // { tone, text }
   const [creating, setCreating] = useState(false);
+  // Sub-category chosen together with a category (from a suggestion),
+  // applied once the category-change reset below has run.
+  const pendingSub = useRef('');
 
   const top = tops.find((c) => c.uuid === topUuid);
   const type = top ? (top.item_type || 'general') : null;
@@ -71,12 +79,15 @@ export default function PurchaseInwardNewItem({ setup, initialBarcode = '', onCa
     const prof = PROFILES[tType] || PROFILES.general;
     setMode('packed');
     setUnit(tType === 'oils' ? 'litre' : 'kg');
-    setSubUuid('');
+    setSubUuid(pendingSub.current || '');
+    pendingSub.current = '';
     setSizes([]);
     setColours([]);
     setCustomSizes([]);
     setCustomColours([]);
     setFields((f) => ({
+      // Typed first (it drives the category suggestion), so it survives the switch.
+      product_name: f.product_name || '',
       barcode: f.barcode || '',
       brand: f.brand || '',
       hsn_code: f.hsn_code || '',
@@ -90,6 +101,8 @@ export default function PurchaseInwardNewItem({ setup, initialBarcode = '', onCa
     setFields((f) => ({ ...f, [name]: value }));
   }
   const val = (name) => (fields[name] ?? '').toString().trim();
+  // What an input shows: untrimmed, so spaces can be typed ("Kids Flip Flop").
+  const raw = (name) => (fields[name] ?? '').toString();
 
   const baseSizes = profile?.mode === 'grid'
     ? optionValues('size').filter((v) => (type === 'footwear' ? /^\d+$/.test(v) : !/^\d+$/.test(v)))
@@ -168,8 +181,9 @@ export default function PurchaseInwardNewItem({ setup, initialBarcode = '', onCa
   }
 
   async function handleCreate() {
-    if (!leafUuid) { setFeedback({ tone: 'danger', text: 'Choose a sub-category for this item.' }); return; }
     if (!val('product_name')) { setFeedback({ tone: 'danger', text: 'Enter the item name.' }); return; }
+    if (!topUuid) { setFeedback({ tone: 'danger', text: 'Choose a category for this item (or tap a suggestion).' }); return; }
+    if (!leafUuid) { setFeedback({ tone: 'danger', text: 'Choose a sub-category for this item.' }); return; }
     if (!val('mrp') || !val('selling_price')) { setFeedback({ tone: 'danger', text: 'Enter the MRP and the selling price.' }); return; }
     if (Number(val('selling_price')) > Number(val('mrp'))) {
       setFeedback({ tone: 'danger', text: 'Selling price cannot be above the MRP.' });
@@ -296,9 +310,36 @@ export default function PurchaseInwardNewItem({ setup, initialBarcode = '', onCa
           </div>
         )}
 
+        <label className="pi-field pi-field-full">
+          <span>Item name <b className="cp-req">*</b></span>
+          <input
+            autoFocus
+            required
+            maxLength={180}
+            placeholder="e.g. Cotton round-neck T-shirt, Rose Attar 10 ml, Toor Dal"
+            value={raw('product_name')}
+            onChange={(e) => setField('product_name', e.target.value)}
+          />
+        </label>
+        <CategorySuggestions
+          name={fields.product_name}
+          categories={categories}
+          current={leafUuid}
+          onCreated={onCategoryCreated}
+          onPick={(picked) => {
+            setFeedback(null);
+            if (picked.topUuid !== topUuid) {
+              pendingSub.current = picked.subUuid;
+              setTopUuid(picked.topUuid);
+            } else {
+              setSubUuid(picked.subUuid);
+            }
+          }}
+        />
+
         <div className="pi-grid pi-grid-2">
           <label className="pi-field">
-            <span>Category</span>
+            <span>Category <b className="cp-req">*</b></span>
             <div className="pi-inline-group">
               <select value={topUuid} onChange={(e) => setTopUuid(e.target.value)}>
                 <option value="">Select category…</option>
@@ -309,7 +350,7 @@ export default function PurchaseInwardNewItem({ setup, initialBarcode = '', onCa
           </label>
 
           <label className="pi-field">
-            <span>Sub-category</span>
+            <span>Sub-category {subs.length > 0 && <b className="cp-req">*</b>}</span>
             <div className="pi-inline-group">
               <select
                 value={subUuid}
@@ -359,7 +400,7 @@ export default function PurchaseInwardNewItem({ setup, initialBarcode = '', onCa
         <hr className="pi-hr" />
 
         {!profile ? (
-          <div className="pi-muted">Choose a category to see the right fields for that kind of item.</div>
+          <div className="pi-muted">Type the item name and choose a category (or tap a suggestion) to see the right fields for that kind of item.</div>
         ) : (
           <div className="pi-grid">
             {profile.mode === 'weighed' && (
@@ -370,10 +411,6 @@ export default function PurchaseInwardNewItem({ setup, initialBarcode = '', onCa
                     <label><input type="radio" checked={mode === 'loose'} onChange={() => setMode('loose')} /> Loose — weighed / measured for the customer</label>
                   </div>
                 </div>
-                <label className="pi-field pi-field-lg">
-                  <span>Item name</span>
-                  <input required maxLength={180} value={val('product_name')} onChange={(e) => setField('product_name', e.target.value)} />
-                </label>
 
                 {mode === 'loose' ? (
                   <>
@@ -385,15 +422,15 @@ export default function PurchaseInwardNewItem({ setup, initialBarcode = '', onCa
                     </label>
                     <label className="pi-field">
                       <span>Barcode on the pack</span>
-                      <input placeholder="Scan the pack (blank = make one)" value={val('barcode')} onChange={(e) => setField('barcode', e.target.value)} />
+                      <input placeholder="Scan the pack (blank = make one)" value={raw('barcode')} onChange={(e) => setField('barcode', e.target.value)} />
                     </label>
                     <label className="pi-field">
                       <span>MRP per {UNIT_NAMES[unit]}</span>
-                      <input type="number" step="0.01" min="0.01" value={val('mrp')} onChange={(e) => setField('mrp', e.target.value)} />
+                      <input type="number" step="0.01" min="0.01" value={raw('mrp')} onChange={(e) => setField('mrp', e.target.value)} />
                     </label>
                     <label className="pi-field">
                       <span>Selling price per {UNIT_NAMES[unit]}</span>
-                      <input type="number" step="0.01" min="0.01" value={val('selling_price')} onChange={(e) => setField('selling_price', e.target.value)} />
+                      <input type="number" step="0.01" min="0.01" value={raw('selling_price')} onChange={(e) => setField('selling_price', e.target.value)} />
                     </label>
                     <div className="pi-field pi-field-lg pi-muted">
                       Stock is counted in {UNIT_NAMES[unit]}s. Enter the quantity received below in the same unit; the counter can then sell any amount at this price.
@@ -403,15 +440,15 @@ export default function PurchaseInwardNewItem({ setup, initialBarcode = '', onCa
                   <>
                     <label className="pi-field pi-field-lg">
                       <span>{type === 'oils' ? 'Pack size (e.g. "1 L pouch")' : 'Pack size (e.g. "500 g pouch")'}</span>
-                      <input required maxLength={80} value={val('variant_name')} onChange={(e) => setField('variant_name', e.target.value)} />
+                      <input required maxLength={80} value={raw('variant_name')} onChange={(e) => setField('variant_name', e.target.value)} />
                     </label>
                     <label className="pi-field">
                       <span>{type === 'oils' ? 'Weight (g) — approx.' : 'Weight (g)'}</span>
-                      <input type="number" min="1" max="100000" required value={val('weight_grams')} onChange={(e) => setField('weight_grams', e.target.value)} />
+                      <input type="number" min="1" max="100000" required value={raw('weight_grams')} onChange={(e) => setField('weight_grams', e.target.value)} />
                     </label>
                     <label className="pi-field">
                       <span>Pack type</span>
-                      <select value={val('pack_type') || 'pouch'} onChange={(e) => setField('pack_type', e.target.value)}>
+                      <select value={raw('pack_type') || 'pouch'} onChange={(e) => setField('pack_type', e.target.value)}>
                         <option value="pouch">Pouch</option>
                         <option value="jar">Jar</option>
                         <option value="box">Box</option>
@@ -423,15 +460,15 @@ export default function PurchaseInwardNewItem({ setup, initialBarcode = '', onCa
                     </label>
                     <label className="pi-field">
                       <span>Barcode on the pack</span>
-                      <input placeholder="Scan the pack (blank = make one)" value={val('barcode')} onChange={(e) => setField('barcode', e.target.value)} />
+                      <input placeholder="Scan the pack (blank = make one)" value={raw('barcode')} onChange={(e) => setField('barcode', e.target.value)} />
                     </label>
                     <label className="pi-field">
                       <span>MRP</span>
-                      <input type="number" step="0.01" min="0.01" value={val('mrp')} onChange={(e) => setField('mrp', e.target.value)} />
+                      <input type="number" step="0.01" min="0.01" value={raw('mrp')} onChange={(e) => setField('mrp', e.target.value)} />
                     </label>
                     <label className="pi-field">
                       <span>Selling price</span>
-                      <input type="number" step="0.01" min="0.01" value={val('selling_price')} onChange={(e) => setField('selling_price', e.target.value)} />
+                      <input type="number" step="0.01" min="0.01" value={raw('selling_price')} onChange={(e) => setField('selling_price', e.target.value)} />
                     </label>
                   </>
                 )}
@@ -440,17 +477,13 @@ export default function PurchaseInwardNewItem({ setup, initialBarcode = '', onCa
 
             {profile.mode === 'grid' && (
               <>
-                <label className="pi-field pi-field-lg">
-                  <span>Item name</span>
-                  <input required maxLength={180} placeholder="e.g. Cotton round-neck T-shirt" value={val('product_name')} onChange={(e) => setField('product_name', e.target.value)} />
-                </label>
                 <label className="pi-field">
                   <span>MRP (same for all)</span>
-                  <input type="number" step="0.01" min="0.01" value={val('mrp')} onChange={(e) => setField('mrp', e.target.value)} />
+                  <input type="number" step="0.01" min="0.01" value={raw('mrp')} onChange={(e) => setField('mrp', e.target.value)} />
                 </label>
                 <label className="pi-field">
                   <span>Selling price (same for all)</span>
-                  <input type="number" step="0.01" min="0.01" value={val('selling_price')} onChange={(e) => setField('selling_price', e.target.value)} />
+                  <input type="number" step="0.01" min="0.01" value={raw('selling_price')} onChange={(e) => setField('selling_price', e.target.value)} />
                 </label>
 
                 <div className="pi-field pi-field-full">
@@ -486,47 +519,43 @@ export default function PurchaseInwardNewItem({ setup, initialBarcode = '', onCa
             {profile.mode === 'plain' && (
               <>
                 <label className="pi-field pi-field-lg">
-                  <span>Item name</span>
-                  <input required maxLength={180} value={val('product_name')} onChange={(e) => setField('product_name', e.target.value)} />
-                </label>
-                <label className="pi-field pi-field-lg">
                   <span>Variant / pack (optional, e.g. "Pack of 10")</span>
-                  <input maxLength={80} value={val('variant_name')} onChange={(e) => setField('variant_name', e.target.value)} />
+                  <input maxLength={80} value={raw('variant_name')} onChange={(e) => setField('variant_name', e.target.value)} />
                 </label>
                 <label className="pi-field">
                   <span>Barcode on the pack</span>
-                  <input placeholder="Scan the pack (blank = make one)" value={val('barcode')} onChange={(e) => setField('barcode', e.target.value)} />
+                  <input placeholder="Scan the pack (blank = make one)" value={raw('barcode')} onChange={(e) => setField('barcode', e.target.value)} />
                 </label>
                 <label className="pi-field">
                   <span>MRP</span>
-                  <input type="number" step="0.01" min="0.01" value={val('mrp')} onChange={(e) => setField('mrp', e.target.value)} />
+                  <input type="number" step="0.01" min="0.01" value={raw('mrp')} onChange={(e) => setField('mrp', e.target.value)} />
                 </label>
                 <label className="pi-field">
                   <span>Selling price</span>
-                  <input type="number" step="0.01" min="0.01" value={val('selling_price')} onChange={(e) => setField('selling_price', e.target.value)} />
+                  <input type="number" step="0.01" min="0.01" value={raw('selling_price')} onChange={(e) => setField('selling_price', e.target.value)} />
                 </label>
                 <label className="pi-field">
                   <span>Weight (g) (optional)</span>
-                  <input type="number" min="1" max="100000" value={val('weight_grams')} onChange={(e) => setField('weight_grams', e.target.value)} />
+                  <input type="number" min="1" max="100000" value={raw('weight_grams')} onChange={(e) => setField('weight_grams', e.target.value)} />
                 </label>
               </>
             )}
 
             <label className="pi-field">
               <span>Brand (optional)</span>
-              <input maxLength={120} value={val('brand')} onChange={(e) => setField('brand', e.target.value)} />
+              <input maxLength={120} value={raw('brand')} onChange={(e) => setField('brand', e.target.value)} />
             </label>
             <label className="pi-field">
               <span>GST %</span>
-              <input type="number" step="0.01" min="0" max="28" value={val('gst_rate')} onChange={(e) => setField('gst_rate', e.target.value)} />
+              <input type="number" step="0.01" min="0" max="28" value={raw('gst_rate')} onChange={(e) => setField('gst_rate', e.target.value)} />
             </label>
             <label className="pi-field">
               <span>HSN code (optional)</span>
-              <input maxLength={15} value={val('hsn_code')} onChange={(e) => setField('hsn_code', e.target.value)} />
+              <input maxLength={15} value={raw('hsn_code')} onChange={(e) => setField('hsn_code', e.target.value)} />
             </label>
             <label className="pi-field">
               <span>Cost price (each)</span>
-              <input type="number" step="0.01" min="0" placeholder="Optional" value={val('unit_cost')} onChange={(e) => setField('unit_cost', e.target.value)} />
+              <input type="number" step="0.01" min="0" placeholder="Optional" value={raw('unit_cost')} onChange={(e) => setField('unit_cost', e.target.value)} />
             </label>
           </div>
         )}

@@ -396,6 +396,7 @@ return static function (Router $router): void {
         $router->post('/admin/inventory/quick-create', [ImportController::class, 'quickCreate'], $manager);
         $router->post('/admin/inventory/quick-category', [InwardSetupController::class, 'storeCategory'], $manager);
         $router->get('/admin/inventory/setup', [InwardSetupController::class, 'show'], $inventoryStaff);
+        $router->get('/admin/inventory/suggest-category', [InwardSetupController::class, 'suggestCategory'], $inventoryStaff);
         $router->get('/admin/inventory/low-stock', [InventoryController::class, 'lowStock'], $inventoryStaff);
         $router->get('/admin/inventory/movements', [InventoryController::class, 'movements'], $inventoryStaff);
         $router->get('/admin/inventory/reports/damage-loss', [InventoryController::class, 'damageLoss'], $inventoryStaff);

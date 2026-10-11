@@ -9,6 +9,7 @@ use App\Core\Exceptions\HttpException;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Validator;
+use App\Services\Catalog\ItemTypes;
 use App\Services\CategoryService;
 
 final class CategoryController extends BaseController
@@ -57,7 +58,7 @@ final class CategoryController extends BaseController
             'show_in_menu' => 'nullable|boolean',
             'meta_title' => 'nullable|string|max:180',
             'meta_description' => 'nullable|string|max:320',
-            'item_type' => 'nullable|in:grocery,oils,clothing,footwear,toys,stationery,general',
+            'item_type' => 'nullable|' . ItemTypes::rule(),
         ]);
 
         return Response::created(
@@ -80,7 +81,7 @@ final class CategoryController extends BaseController
             'is_active' => 'nullable|boolean',
             'meta_title' => 'nullable|string|max:180',
             'meta_description' => 'nullable|string|max:320',
-            'item_type' => 'nullable|in:grocery,oils,clothing,footwear,toys,stationery,general',
+            'item_type' => 'nullable|' . ItemTypes::rule(),
         ]);
 
         // Apply only what the caller actually sent.

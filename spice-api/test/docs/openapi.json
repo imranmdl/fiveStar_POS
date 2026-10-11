@@ -3005,15 +3005,6 @@
                                         "type": "string"
                                     },
                                     "item_type": {
-                                        "enum": [
-                                            "grocery",
-                                            "oils",
-                                            "clothing",
-                                            "footwear",
-                                            "toys",
-                                            "stationery",
-                                            "general"
-                                        ],
                                         "type": "string"
                                     }
                                 },
@@ -3123,15 +3114,6 @@
                                         "type": "string"
                                     },
                                     "item_type": {
-                                        "enum": [
-                                            "grocery",
-                                            "oils",
-                                            "clothing",
-                                            "footwear",
-                                            "toys",
-                                            "stationery",
-                                            "general"
-                                        ],
                                         "type": "string"
                                     }
                                 }
@@ -7226,15 +7208,6 @@
                                         "type": "string"
                                     },
                                     "item_type": {
-                                        "enum": [
-                                            "grocery",
-                                            "oils",
-                                            "clothing",
-                                            "footwear",
-                                            "toys",
-                                            "stationery",
-                                            "general"
-                                        ],
                                         "type": "string"
                                     }
                                 },
@@ -7758,6 +7731,45 @@
                     },
                     "404": {
                         "$ref": "#/components/responses/NotFound"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/inventory/suggest-category": {
+            "get": {
+                "operationId": "inwardSetupControllerSuggestCategory",
+                "tags": [
+                    "Admin: Inventory"
+                ],
+                "summary": "Category / sub-category suggestions for an item, read from its name.",
+                "description": "Requires one of these roles: administrator, supervisor, manager, inventory_staff, executive.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
                     },
                     "429": {
                         "$ref": "#/components/responses/RateLimited"

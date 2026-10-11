@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, formatMoney } from '../../lib/api';
 import { toast } from '../../components/admin/toast';
 import { StatusBadge, LoadingState, ErrorState } from '../../components/admin/shared.jsx';
+import CategoryPicker, { leafOf, pathLabel, splitCategory } from '../../components/admin/CategoryPicker';
 import './ProductEditor.css';
 
 /**
@@ -141,10 +142,7 @@ function AiDescriptionWriter({ formRef, packs }) {
       return;
     }
 
-    const categorySelect = el('category_slug');
-    const category = categorySelect && categorySelect.selectedIndex > 0
-      ? categorySelect.options[categorySelect.selectedIndex].text
-      : '';
+    const category = el('category_slug')?.dataset?.label || '';
     const newPack = (el('v_variant_name')?.value || '').trim();
     const shelf = Number(el('shelf_life_days')?.value || 0);
 
@@ -226,13 +224,29 @@ function formValues(product) {
   };
 }
 
-function ProductForm({ product, categories, sizeType, onSubmit, saving, onCancel }) {
+function ProductForm({ product, categories, onCategoryCreated, sizeType, onSubmit, saving, onCancel }) {
   const editing = Boolean(product);
   const p = formValues(product);
   const formRef = useRef(null);
+  const [itemName, setItemName] = useState(p.name || '');
+  const [cat, setCat] = useState(() => splitCategory(categories, p.category_slug));
+  const [catErrors, setCatErrors] = useState(false);
+  const leafUuid = leafOf(categories, cat.topUuid, cat.subUuid);
+  const leaf = categories.find((c) => c.uuid === leafUuid);
+  // Editing a product whose category was never touched sends nothing, so an
+  // older product filed on a parent category can still be saved; changing
+  // it requires a complete Category › Sub-category choice.
+  const categoryTouched = !editing || cat.topUuid !== splitCategory(categories, p.category_slug).topUuid
+    || cat.subUuid !== splitCategory(categories, p.category_slug).subUuid;
 
   function handleSubmit(event) {
     event.preventDefault();
+    if (categoryTouched && !leafUuid) {
+      setCatErrors(true);
+      toast(cat.topUuid ? 'Choose a sub-category for this product.' : 'Choose a category for this product.', 'danger');
+      document.getElementById('pe-category')?.focus();
+      return;
+    }
     onSubmit(formRef.current);
   }
 
@@ -245,7 +259,7 @@ function ProductForm({ product, categories, sizeType, onSubmit, saving, onCancel
             <label className="admin-label" htmlFor="name">
               Product name {!editing && <span className="text-danger">*</span>}
             </label>
-            <input className="admin-input" id="name" name="name" defaultValue={p.name || ''} required={!editing} />
+            <input className="admin-input" id="name" name="name" defaultValue={p.name || ''} required={!editing} onChange={(e) => setItemName(e.target.value)} />
             <div className="admin-hint">What customers see. &quot;Organic Turmeric Powder&quot;, not &quot;TURM-01&quot;.</div>
           </div>
 
@@ -257,16 +271,28 @@ function ProductForm({ product, categories, sizeType, onSubmit, saving, onCancel
             <div className="admin-hint">Your own reference. Not shown to customers.</div>
           </div>
 
-          <div className="col-6">
-            <label className="admin-label" htmlFor="category_slug">
-              Category {!editing && <span className="text-danger">*</span>}
-            </label>
-            <select className="admin-input" id="category_slug" name="category_slug" defaultValue={p.category_slug || ''} required={!editing}>
-              <option value="">Choose a category…</option>
-              {categories.map((category) => (
-                <option key={category.slug} value={category.slug}>{category.name}</option>
-              ))}
-            </select>
+          <div className="col-12">
+            <div className="admin-label">
+              Category &amp; sub-category {!editing && <span className="text-danger">*</span>}
+            </div>
+            <CategoryPicker
+              idPrefix="pe"
+              categories={categories}
+              name={itemName}
+              value={cat}
+              showErrors={catErrors}
+              onCreated={onCategoryCreated}
+              onChange={(next) => { setCat(next); setCatErrors(false); }}
+            />
+            {/* What the form submits: the sub-category (or a category with none). */}
+            <input
+              type="hidden"
+              id="category_slug"
+              name="category_slug"
+              value={categoryTouched && leaf ? leaf.slug : ''}
+              data-label={leaf ? pathLabel(categories, leaf.uuid) : ''}
+            />
+            <div className="admin-hint">Type the product name — a category is suggested from it. New kinds of items can be added in one click.</div>
           </div>
 
           <GstField formRef={formRef} initial={p.gst_rate} />
@@ -932,11 +958,13 @@ export default function ProductEditor({ identifier, onClose, onCreated }) {
     setError(null);
 
     try {
-      const [categoriesResponse] = await Promise.all([
-        api.get('/admin/categories', { per_page: 200 }).catch(() => ({ data: [] })),
+      // The inventory setup list carries parent_uuid / item_type, which the
+      // Category › Sub-category picker needs.
+      const [setupResponse] = await Promise.all([
+        api.get('/admin/inventory/setup').catch(() => ({ data: { categories: [] } })),
         loadSizeType(),
       ]);
-      setCategories(categoriesResponse.data.categories || categoriesResponse.data || []);
+      setCategories((setupResponse.data && setupResponse.data.categories) || []);
 
       if (identifier) {
         const response = await api.get(`/admin/products/${encodeURIComponent(identifier)}`);
@@ -1128,6 +1156,7 @@ export default function ProductEditor({ identifier, onClose, onCreated }) {
         key={`${identifier || 'new'}-${formVersion}`}
         product={product}
         categories={categories}
+        onCategoryCreated={(c) => setCategories((list) => (list.some((x) => x.uuid === c.uuid) ? list : [...list, c]))}
         sizeType={sizeType}
         onSubmit={handleProductSubmit}
         saving={saving}

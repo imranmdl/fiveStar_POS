@@ -867,6 +867,8 @@ final class ImportService
             throw new HttpException('That category does not exist.', 422, ['category_uuid' => ['Unknown category.']]);
         }
 
+        $this->categories->assertCanHoldItems($category, 'category_uuid');
+
         $itemType = $this->effectiveItemType((int) $category['id']);
         $weightRequired = in_array($itemType, ['grocery', 'oils'], true);
 

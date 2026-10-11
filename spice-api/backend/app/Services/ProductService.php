@@ -989,6 +989,8 @@ final class ProductService
             );
         }
 
+        $this->categories->assertCanHoldItems($category, 'category_slug');
+
         return $category;
     }
 

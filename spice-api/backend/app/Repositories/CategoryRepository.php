@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Core\Exceptions\HttpException;
+
 final class CategoryRepository extends BaseRepository
 {
     protected function table(): string
@@ -100,7 +102,14 @@ final class CategoryRepository extends BaseRepository
 
     public function slugExists(string $slug, ?int $exceptId = null): bool
     {
-        return $this->existsWhere('slug', strtolower($slug), $exceptId);
+        // Deleted categories count too: the unique key on `slug` covers every
+        // row, so re-creating a deleted "Perfumes" must get "perfumes-2"
+        // rather than fail on the database's duplicate check.
+        return (int) $this->db->scalar(
+            'SELECT COUNT(*) FROM `categories` WHERE `slug` = :slug'
+                . ($exceptId !== null ? ' AND `id` <> :except_id' : ''),
+            $exceptId !== null ? ['slug' => strtolower($slug), 'except_id' => $exceptId] : ['slug' => strtolower($slug)]
+        ) > 0;
     }
 
     /**
@@ -196,5 +205,47 @@ final class CategoryRepository extends BaseRepository
         );
 
         return ['items' => $items, 'total' => $total];
+    }
+
+    /**
+     * Names of the active sub-categories directly under a category, in menu
+     * order. Non-empty means an item must go into one of them, not here.
+     *
+     * @return array<int, string>
+     */
+    public function activeChildNames(int $categoryId): array
+    {
+        return array_map(
+            static fn (array $row): string => (string) $row['name'],
+            $this->db->select(
+                'SELECT `name` FROM `categories`
+                  WHERE `parent_id` = :id AND `is_deleted` = 0 AND `is_active` = 1
+                  ORDER BY `display_order`, `name`',
+                ['id' => $categoryId]
+            )
+        );
+    }
+
+    /**
+     * Refuses a category that has sub-categories as an item's home: every
+     * item is filed under a sub-category when its category has them.
+     *
+     * @param array<string, mixed> $category
+     */
+    public function assertCanHoldItems(array $category, string $field): void
+    {
+        $children = $this->activeChildNames((int) $category['id']);
+
+        if ($children !== []) {
+            throw new HttpException(
+                sprintf(
+                    '"%s" has sub-categories — choose one for this item: %s.',
+                    (string) $category['name'],
+                    implode(', ', array_slice($children, 0, 12))
+                ),
+                422,
+                [$field => ['Choose a sub-category under ' . $category['name'] . '.']]
+            );
+        }
     }
 }
