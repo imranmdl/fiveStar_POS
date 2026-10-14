@@ -124,6 +124,55 @@ final class ShipmentController extends BaseController
         );
     }
 
+    /**
+     * POST /api/v1/admin/orders/{uuid}/ship-manual
+     *
+     * Ship with the store's own courier (not Shiprocket): courier name and
+     * tracking number, optionally its tracking link. Sent again for an order
+     * already shipped this way, it corrects those details.
+     */
+    public function shipManual(Request $request): Response
+    {
+        $data = Validator::make($request->all(), [
+            'carrier_name' => 'required|string|min:2|max:100',
+            'tracking_number' => 'required|string|min:3|max:60',
+            'tracking_url' => 'nullable|string|max:500',
+            'shipped_date' => 'nullable|date',
+            'note' => 'nullable|string|max:255',
+        ]);
+
+        return Response::success(
+            $this->shipments->shipManually($request, (string) $request->routeParam('uuid'), $data),
+            'Shipment recorded'
+        );
+    }
+
+    /**
+     * POST /api/v1/admin/shipments/{uuid}/manual-status
+     *
+     * Out for delivery / delivered / failed attempt / returning, for a parcel
+     * sent with the store's own courier.
+     */
+    public function manualStatus(Request $request): Response
+    {
+        $data = Validator::make($request->all(), [
+            'status' => 'required|in:' . implode(',', array_keys(ShipmentService::MANUAL_STATUSES)),
+            'note' => 'nullable|string|max:255',
+            'occurred_at' => 'nullable|date',
+        ]);
+
+        return Response::success(
+            $this->shipments->updateManualStatus(
+                $request,
+                (string) $request->routeParam('uuid'),
+                (string) $data['status'],
+                $data['note'] ?? null,
+                $data['occurred_at'] ?? null
+            ),
+            'Parcel status updated'
+        );
+    }
+
     /** POST /api/v1/admin/shipments/{uuid}/label */
     public function label(Request $request): Response
     {

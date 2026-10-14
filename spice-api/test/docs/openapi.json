@@ -10261,6 +10261,98 @@
                 }
             }
         },
+        "/api/v1/admin/orders/{uuid}/ship-manual": {
+            "post": {
+                "operationId": "shipmentControllerShipManual",
+                "tags": [
+                    "Admin: Orders"
+                ],
+                "summary": "Ship with the store's own courier (not Shiprocket): courier name and tracking number, optionally its tracking link. Sent again for an order already shipped this way, it corrects those details.",
+                "description": "Requires one of these roles: administrator, supervisor, executive.",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Resource identifier. The platform never exposes numeric ids."
+                    }
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "carrier_name": {
+                                        "maxLength": 100,
+                                        "minLength": 2,
+                                        "type": "string"
+                                    },
+                                    "tracking_number": {
+                                        "maxLength": 60,
+                                        "minLength": 3,
+                                        "type": "string"
+                                    },
+                                    "tracking_url": {
+                                        "maxLength": 500,
+                                        "type": "string"
+                                    },
+                                    "shipped_date": {
+                                        "format": "date",
+                                        "type": "string"
+                                    },
+                                    "note": {
+                                        "maxLength": 255,
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "carrier_name",
+                                    "tracking_number"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            }
+        },
         "/api/v1/admin/orders/{uuid}/status": {
             "post": {
                 "operationId": "orderControllerAdminAdvance",
@@ -15763,6 +15855,89 @@
                         "bearerAuth": []
                     }
                 ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/shipments/{uuid}/manual-status": {
+            "post": {
+                "operationId": "shipmentControllerManualStatus",
+                "tags": [
+                    "Admin: Shipments"
+                ],
+                "summary": "Out for delivery / delivered / failed attempt / returning, for a parcel sent with the store's own courier.",
+                "description": "Requires one of these roles: administrator, supervisor, executive.",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Resource identifier. The platform never exposes numeric ids."
+                    }
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "status": {
+                                        "enum": [
+                                            ""
+                                        ],
+                                        "type": "string"
+                                    },
+                                    "note": {
+                                        "maxLength": 255,
+                                        "type": "string"
+                                    },
+                                    "occurred_at": {
+                                        "format": "date",
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "status"
+                                ]
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "Success",

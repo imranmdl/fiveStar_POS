@@ -246,3 +246,10 @@
 .orders-slideover__body {
   padding: 16px;
 }
+
+.orders-manual-ship .orders-form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px 12px;
+  margin-bottom: 10px;
+}

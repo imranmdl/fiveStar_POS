@@ -354,6 +354,107 @@ function PaymentRecords({ payments }) {
   );
 }
 
+/** Couriers people commonly use — suggestions only; any name can be typed. */
+const COMMON_CARRIERS = [
+  'India Post (Speed Post)', 'DTDC', 'Delhivery', 'Blue Dart', 'XpressBees', 'Ekart', 'Shadowfax',
+  'Professional Couriers', 'ST Courier', 'Trackon', 'Shree Maruti Courier', 'Ecom Express', 'Amazon Shipping',
+  'Local delivery (own staff)', 'Porter', 'Dunzo',
+];
+
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * Ship with the store's own courier (not Shiprocket): the courier's name and
+ * tracking number, optionally its tracking link. With `initial` it corrects
+ * the details of a parcel already sent this way.
+ */
+function ManualShipForm({ uuid, initial, onDone, onCancel }) {
+  const editing = Boolean(initial && initial.awb_number);
+  const [form, setForm] = useState({
+    carrier_name: (initial && initial.courier_name && initial.courier_name !== 'Own courier' ? initial.courier_name : ''),
+    tracking_number: (initial && initial.awb_number) || '',
+    tracking_url: (initial && initial.tracking_url) || '',
+    shipped_date: todayIso(),
+    note: '',
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const set = (k) => (e) => { setForm((f) => ({ ...f, [k]: e.target.value })); setError(''); };
+
+  async function submit(event) {
+    event.preventDefault();
+    if (form.carrier_name.trim().length < 2) { setError('Enter the courier name.'); return; }
+    if (form.tracking_number.trim().length < 3) { setError('Enter the tracking number from the courier receipt.'); return; }
+    if (form.tracking_url.trim() && !/^https?:\/\//i.test(form.tracking_url.trim())) {
+      setError('The tracking link must start with http:// or https:// (or leave it empty).');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post(`/admin/orders/${encodeURIComponent(uuid)}/ship-manual`, {
+        carrier_name: form.carrier_name.trim(),
+        tracking_number: form.tracking_number.trim(),
+        tracking_url: form.tracking_url.trim() || null,
+        shipped_date: form.shipped_date || null,
+        note: form.note.trim() || null,
+      });
+      toast(editing ? 'Tracking details updated.' : 'Order marked as shipped. The customer has been sent the tracking number.');
+      onDone();
+    } catch (err) {
+      const fields = err instanceof ApiError ? err.fieldMessages() : [];
+      setError(fields.length ? fields.join(' ') : (err.message || 'Could not save.'));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="orders-manual-ship" onSubmit={submit}>
+      <p className="orders-hint">
+        {editing
+          ? 'Correct the courier or tracking number for this parcel.'
+          : 'Sending this parcel yourself (not through Shiprocket)? Enter the courier and the tracking number from its receipt — the order moves to Shipped and the customer gets the tracking number.'}
+      </p>
+      <div className="orders-form-row">
+        <label className="orders-field">
+          <span>Courier *</span>
+          <input list="orders-carriers" value={form.carrier_name} onChange={set('carrier_name')} placeholder="e.g. India Post, DTDC" maxLength={100} required />
+          <datalist id="orders-carriers">{COMMON_CARRIERS.map((c) => <option key={c} value={c} />)}</datalist>
+        </label>
+        <label className="orders-field">
+          <span>Tracking / AWB number *</span>
+          <input value={form.tracking_number} onChange={set('tracking_number')} placeholder="From the courier receipt" maxLength={60} required style={{ fontFamily: 'monospace' }} />
+        </label>
+        <label className="orders-field">
+          <span>Tracking link (optional)</span>
+          <input type="url" value={form.tracking_url} onChange={set('tracking_url')} placeholder="https://…" maxLength={500} />
+        </label>
+        {!editing && (
+          <label className="orders-field">
+            <span>Shipped on</span>
+            <input type="date" value={form.shipped_date} max={todayIso()} onChange={set('shipped_date')} />
+          </label>
+        )}
+        <label className="orders-field">
+          <span>Note (optional)</span>
+          <input value={form.note} onChange={set('note')} placeholder="e.g. 2 boxes" maxLength={255} />
+        </label>
+      </div>
+      {error && <div className="admin-alert admin-alert--danger" role="alert">{error}</div>}
+      <div className="orders-action-row">
+        <button type="submit" className="admin-btn admin-btn--primary" disabled={busy}>
+          {busy ? 'Saving…' : editing ? 'Save tracking details' : 'Mark as shipped'}
+        </button>
+        <button type="button" className="admin-btn" disabled={busy} onClick={onCancel}>Cancel</button>
+      </div>
+    </form>
+  );
+}
+
+/** Out for delivery / delivered / failed attempt for a parcel sent with the store's own courier. */
+async function reportParcel(shipmentUuid, status, note) {
+  await api.post(`/admin/shipments/${encodeURIComponent(shipmentUuid)}/manual-status`, { status, ...(note ? { note } : {}) });
+}
+
 /** The actions available, given what the server will actually allow — exact transition rules from the source. */
 function OrderActions({ uuid, order, detail, onChanged }) {
   const [mode, setMode] = useState(null); // null | 'courier' | { cancelReason }
@@ -364,6 +465,17 @@ function OrderActions({ uuid, order, detail, onChanged }) {
 
   if (mode === 'courier') {
     return <CourierChooser uuid={uuid} onBooked={() => { setMode(null); onChanged(); }} onCancel={() => setMode(null)} />;
+  }
+
+  if (mode === 'manual-ship' || mode === 'edit-tracking') {
+    return (
+      <ManualShipForm
+        uuid={uuid}
+        initial={mode === 'edit-tracking' ? detail.shipment : null}
+        onDone={() => { setMode(null); onChanged(); }}
+        onCancel={() => setMode(null)}
+      />
+    );
   }
 
   if (mode && mode.cancelReason) {
@@ -434,12 +546,51 @@ function OrderActions({ uuid, order, detail, onChanged }) {
     }
   }
 
+  async function handleParcel(status, label) {
+    let note = null;
+    if (status === 'failed_delivery') {
+      note = window.prompt('What happened? (e.g. customer not at home) — kept on the order');
+      if (note === null) return;
+    } else if (!window.confirm(`Mark this parcel as "${label}"?`)) {
+      return;
+    }
+    setBusyAction(status);
+    try {
+      await reportParcel(detail.shipment.uuid, status, note);
+      toast(`Parcel marked as ${label.toLowerCase()}.`);
+      onChanged();
+    } catch (error) {
+      reportError(error);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  const shipment = detail.shipment || null;
+  const ownCourier = shipment && shipment.is_manual;
+  const useShiprocket = detail.delivery_mode === 'shiprocket';
+
   const buttons = [];
   if (order.status === 'confirmed') {
     buttons.push(['packed', 'Mark as packed', 'admin-btn--primary', () => handleStatusAction('packed')]);
   }
-  if (['packed', 'ready_to_ship'].includes(order.status) && !shipped) {
-    buttons.push(['__ship', 'Book a courier', 'admin-btn--primary', () => setMode('courier')]);
+  if (['confirmed', 'packed', 'ready_to_ship'].includes(order.status) && !shipment) {
+    if (useShiprocket && order.status !== 'confirmed') {
+      buttons.push(['__ship', 'Book with Shiprocket', 'admin-btn--primary', () => setMode('courier')]);
+    }
+    buttons.push(['__manual', 'Ship with my own courier', useShiprocket || order.status === 'confirmed' ? '' : 'admin-btn--primary', () => setMode('manual-ship')]);
+  }
+  // Booked while the store was in manual delivery mode: no tracking number yet.
+  if (ownCourier && !shipment.awb_number) {
+    buttons.push(['__manual', 'Enter tracking number', 'admin-btn--primary', () => setMode('manual-ship')]);
+  }
+  if (ownCourier && shipment.awb_number && !['delivered', 'rto_delivered', 'cancelled'].includes(shipment.status)) {
+    if (shipment.status !== 'out_for_delivery') {
+      buttons.push(['out_for_delivery', 'Out for delivery', '', () => handleParcel('out_for_delivery', 'Out for delivery')]);
+    }
+    buttons.push(['delivered', 'Mark delivered', 'admin-btn--primary', () => handleParcel('delivered', 'Delivered')]);
+    buttons.push(['failed_delivery', 'Delivery failed', '', () => handleParcel('failed_delivery', 'Delivery attempt failed')]);
+    buttons.push(['__edit', 'Edit tracking details', '', () => setMode('edit-tracking')]);
   }
   if (['confirmed', 'packed'].includes(order.status)) {
     buttons.push(['cancelled', 'Cancel order', '', handleCancelClick]);
@@ -564,8 +715,12 @@ function OrderDetail({ uuid, onBack }) {
                     {shipping.tracking_number && (
                       <>
                         <hr />
-                        <div>{shipping.courier_name || 'Courier'}</div>
+                        <div>{shipping.courier_name || 'Courier'}{detail.shipment && detail.shipment.is_manual ? <span className="orders-subtext"> · own courier</span> : null}</div>
                         <div style={{ fontFamily: 'monospace' }}>{shipping.tracking_number}</div>
+                        {shipping.tracking_url && (
+                          <a href={shipping.tracking_url} target="_blank" rel="noopener noreferrer" className="orders-link">Track parcel ↗</a>
+                        )}
+                        {detail.shipment && <div className="orders-subtext">Parcel: {String(detail.shipment.status).replace(/_/g, ' ')}</div>}
                       </>
                     )}
                   </div>

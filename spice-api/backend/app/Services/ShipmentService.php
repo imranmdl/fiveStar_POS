@@ -228,7 +228,9 @@ final class ShipmentService
                 shipmentId: $id,
                 status: 'booked',
                 title: 'Shipment booked',
-                description: sprintf('%s assigned AWB %s.', $courier['name'], $booking->awbNumber),
+                description: $booking->awbNumber === null
+                    ? 'Ready to dispatch — the tracking number is added once the parcel is handed to the courier.'
+                    : sprintf('%s assigned AWB %s.', $courier['name'], $booking->awbNumber),
                 location: null,
                 occurredAt: date('Y-m-d H:i:s'),
                 courierEventId: 'booked:' . $booking->awbNumber,
@@ -243,7 +245,7 @@ final class ShipmentService
                 'courier_code' => $courier['code'],
                 'courier_name' => $courier['name'],
                 'tracking_number' => $booking->awbNumber,
-                'tracking_url' => $this->trackingUrl($courier, (string) $booking->awbNumber),
+                'tracking_url' => $booking->awbNumber === null ? null : $this->trackingUrl($courier, (string) $booking->awbNumber),
             ], $request->authUserId());
 
             $this->advanceOrder(
@@ -252,7 +254,9 @@ final class ShipmentService
                 OrderStatus::ASSIGNED,
                 'Handed to courier',
                 (string) $order['payment_status'],
-                sprintf('%s, tracking number %s.', $courier['name'], $booking->awbNumber),
+                $booking->awbNumber === null
+                    ? 'Ready to dispatch; tracking number to follow.'
+                    : sprintf('%s, tracking number %s.', $courier['name'], $booking->awbNumber),
                 $request->authUserId()
             );
 
@@ -273,6 +277,299 @@ final class ShipmentService
         );
 
         return $this->present((array) $this->shipments->findById($shipmentId), staffView: true);
+    }
+
+    /** Internal courier row for parcels sent outside Shiprocket (migration 062). */
+    public const MANUAL_COURIER_CODE = 'MANUAL';
+
+    /** Statuses staff can report for a parcel no courier API is tracking. */
+    public const MANUAL_STATUSES = [
+        TrackingUpdate::OUT_FOR_DELIVERY => 'Out for delivery',
+        TrackingUpdate::DELIVERED => 'Delivered',
+        TrackingUpdate::FAILED_DELIVERY => 'Delivery attempt failed',
+        TrackingUpdate::RTO_INITIATED => 'Returning to us',
+    ];
+
+    /**
+     * Ships an order with the store's own courier — India Post, DTDC, a local
+     * delivery person — instead of booking through Shiprocket: staff enter the
+     * courier's name and tracking number (and its tracking link if they have
+     * one). The order moves to Shipped and the customer gets the usual
+     * "shipped" message with that tracking number.
+     *
+     * Called again on an order already shipped this way, it corrects the
+     * details without moving the order. It also completes a shipment booked
+     * in manual delivery mode, which has no tracking number until now.
+     *
+     * @param array{carrier_name: string, tracking_number: string, tracking_url?: ?string, shipped_date?: ?string, note?: ?string} $data
+     *
+     * @return array<string, mixed>
+     */
+    public function shipManually(Request $request, string $orderUuid, array $data): array
+    {
+        $order = $this->orders->findByUuid($orderUuid);
+
+        if ($order === null) {
+            throw new NotFoundException('That order does not exist.');
+        }
+
+        if (!PaymentStatus::isSettled((string) $order['payment_status'])) {
+            throw new HttpException(
+                'This order has not been paid for, so it cannot be handed to a courier.',
+                409,
+                ['payment_status' => [(string) $order['payment_status']]]
+            );
+        }
+
+        $carrier = trim((string) $data['carrier_name']);
+        $awb = strtoupper((string) preg_replace('/\s+/', '', (string) $data['tracking_number']));
+        $url = isset($data['tracking_url']) && trim((string) $data['tracking_url']) !== '' ? trim((string) $data['tracking_url']) : null;
+        $shippedAt = !empty($data['shipped_date']) ? date('Y-m-d H:i:s', (int) strtotime((string) $data['shipped_date'])) : date('Y-m-d H:i:s');
+        $note = isset($data['note']) && trim((string) $data['note']) !== '' ? trim((string) $data['note']) : null;
+
+        if ($url !== null && preg_match('~^https?://\S+$~i', $url) !== 1) {
+            throw new HttpException(
+                'The tracking link must be a web address starting with http:// or https://.',
+                422,
+                ['tracking_url' => ['Paste the full link, e.g. https://… — or leave it empty.']]
+            );
+        }
+
+        if (strtotime($shippedAt) > time() + 300) {
+            throw new HttpException('The shipped date cannot be in the future.', 422, ['shipped_date' => ['Use today or an earlier date.']]);
+        }
+
+        $manualCourier = $this->couriers->findByCode(self::MANUAL_COURIER_CODE);
+
+        if ($manualCourier === null) {
+            throw new HttpException('Manual shipping is not set up yet — run the latest database migrations.', 500);
+        }
+
+        $current = null;
+
+        foreach ($this->shipments->forOrder((int) $order['id']) as $shipment) {
+            if ($shipment['status'] !== 'cancelled') {
+                $current = $shipment;
+            }
+        }
+
+        if ($current !== null && !$this->isManual($current)) {
+            throw new HttpException(sprintf(
+                'This order is already booked with %s (AWB %s). Cancel that shipment first to send it with another courier.',
+                $this->carrierNameOf($current),
+                $current['awb_number'] ?? '—'
+            ), 409);
+        }
+
+        if ($current === null && !in_array($order['status'], [OrderStatus::CONFIRMED, OrderStatus::PACKED, OrderStatus::READY_TO_SHIP], true)) {
+            throw new HttpException(sprintf(
+                'Only a confirmed or packed order can be shipped. This one is %s.',
+                OrderStatus::label((string) $order['status'])
+            ), 409);
+        }
+
+        // One tracking number belongs to one parcel.
+        $clash = $this->shipments->findByAwbAnyCourier($awb);
+
+        if ($clash !== null && ($current === null || (int) $clash['id'] !== (int) $current['id']) && $clash['status'] !== 'cancelled') {
+            $other = $this->orders->findById((int) $clash['order_id']);
+            throw new HttpException(
+                sprintf('Tracking number %s is already used on order %s.', $awb, $other['order_number'] ?? '—'),
+                409,
+                ['tracking_number' => ['Already used on order ' . ($other['order_number'] ?? '—') . '.']]
+            );
+        }
+
+        $correction = $current !== null && $current['awb_number'] !== null;
+
+        $shipmentId = $this->db->transaction(function () use ($order, $current, $manualCourier, $carrier, $awb, $url, $shippedAt, $note, $correction, $request): int {
+            $locked = $this->orders->lockForUpdate((int) $order['id']);
+            $status = (string) $locked['status'];
+            $actor = $request->authUserId();
+
+            if ($current === null) {
+                if ($status === OrderStatus::CONFIRMED) {
+                    $this->advanceOrder((int) $order['id'], $status, OrderStatus::PACKED, 'Packed', (string) $locked['payment_status'], null, $actor);
+                    $status = OrderStatus::PACKED;
+                }
+
+                $parcel = $this->routing->buildParcel((int) $order['id']);
+
+                $shipmentId = $this->shipments->create([
+                    'shipment_number' => $this->numbering->nextShipmentNumber(),
+                    'order_id' => (int) $order['id'],
+                    'courier_id' => (int) $manualCourier['id'],
+                    'carrier_name' => $carrier,
+                    'awb_number' => $awb,
+                    'tracking_url' => $url,
+                    'status' => 'booked',
+                    'actual_weight_grams' => $parcel->actualWeightGrams,
+                    'volumetric_weight_grams' => $parcel->actualWeightGrams,
+                    'chargeable_weight_grams' => $parcel->actualWeightGrams,
+                    'length_mm' => $parcel->lengthMm,
+                    'width_mm' => $parcel->widthMm,
+                    'height_mm' => $parcel->heightMm,
+                    'used_default_dimensions' => $parcel->usedDefaultDimensions ? 1 : 0,
+                    'declared_value' => $parcel->declaredValue->toDecimal(),
+                    'courier_charge' => 0,
+                    'customer_paid_delivery' => (float) $order['delivery_charge'],
+                    // The date promised at checkout — there is no courier SLA here.
+                    'estimated_delivery_date' => !empty($order['expected_delivery_date'])
+                        ? date('Y-m-d', (int) strtotime((string) $order['expected_delivery_date']))
+                        : null,
+                    'booking_response' => json_encode(['manual' => true, 'carrier' => $carrier, 'entered_by' => $actor, 'note' => $note]),
+                ], $actor);
+            } else {
+                $shipmentId = (int) $current['id'];
+                $this->shipments->update($shipmentId, [
+                    'carrier_name' => $carrier,
+                    'awb_number' => $awb,
+                    'tracking_url' => $url,
+                ] + (empty($current['estimated_delivery_date']) && !empty($order['expected_delivery_date'])
+                    ? ['estimated_delivery_date' => date('Y-m-d', (int) strtotime((string) $order['expected_delivery_date']))]
+                    : []), $actor);
+            }
+
+            $this->orders->update((int) $order['id'], [
+                'courier_code' => self::MANUAL_COURIER_CODE,
+                'courier_name' => $carrier,
+                'tracking_number' => $awb,
+                'tracking_url' => $url,
+            ], $actor);
+
+            if ($correction) {
+                $this->shipments->appendEvent(
+                    shipmentId: $shipmentId,
+                    status: (string) $current['status'],
+                    title: 'Tracking details updated',
+                    description: sprintf('%s, tracking number %s.', $carrier, $awb),
+                    location: null,
+                    occurredAt: date('Y-m-d H:i:s'),
+                    courierEventId: 'manual-edit:' . $awb . ':' . time(),
+                    eventCode: null,
+                    source: 'manual',
+                    raw: ['note' => $note],
+                );
+
+                return $shipmentId;
+            }
+
+            if (in_array($status, [OrderStatus::PACKED, OrderStatus::READY_TO_SHIP], true)) {
+                $this->advanceOrder(
+                    (int) $order['id'],
+                    $status,
+                    OrderStatus::ASSIGNED,
+                    'Handed to courier',
+                    (string) $locked['payment_status'],
+                    sprintf('%s, tracking number %s.', $carrier, $awb),
+                    $actor
+                );
+            }
+
+            // Recorded as the courier's pickup scan, so everything that follows
+            // a real pickup happens here too: order → Shipped, the executive's
+            // assignment closes, the customer's "shipped" SMS goes out.
+            $this->applyUpdates($shipmentId, [new TrackingUpdate(
+                status: TrackingUpdate::PICKED_UP,
+                title: 'Shipped with ' . $carrier,
+                description: 'Tracking number ' . $awb . ($note !== null ? ' — ' . $note : ''),
+                location: null,
+                occurredAt: $shippedAt,
+                courierEventId: 'manual-shipped:' . $awb,
+                raw: ['manual' => true],
+            )], 'manual', $request);
+
+            return $shipmentId;
+        });
+
+        $this->audit->log(
+            entityName: 'shipments',
+            entityId: $shipmentId,
+            action: $correction ? 'manual_tracking_corrected' : 'manual_shipped',
+            newValues: ['order_number' => $order['order_number'], 'carrier' => $carrier, 'awb' => $awb, 'tracking_url' => $url],
+            request: $request,
+        );
+
+        return $this->present((array) $this->shipments->findById($shipmentId), staffView: true);
+    }
+
+    /**
+     * Staff report what happened to a parcel no courier API is tracking:
+     * out for delivery, delivered, a failed attempt, or coming back. The
+     * order follows (Delivered completes it and earns any commission).
+     *
+     * @return array<string, mixed>
+     */
+    public function updateManualStatus(Request $request, string $shipmentUuid, string $status, ?string $note, ?string $when): array
+    {
+        if (!array_key_exists($status, self::MANUAL_STATUSES)) {
+            throw new HttpException('Unknown parcel status.', 422, ['status' => ['Choose one of: ' . implode(', ', array_keys(self::MANUAL_STATUSES))]]);
+        }
+
+        $shipment = $this->requireShipment($shipmentUuid);
+
+        if (!$this->isManual($shipment)) {
+            throw new HttpException('This parcel is tracked by the courier automatically — its status updates by itself.', 409);
+        }
+
+        if ($shipment['awb_number'] === null) {
+            throw new HttpException('Enter the tracking number first.', 409);
+        }
+
+        if (in_array($shipment['status'], ['delivered', 'rto_delivered', 'cancelled'], true)) {
+            throw new HttpException('This parcel is already ' . str_replace('_', ' ', (string) $shipment['status']) . '.', 409);
+        }
+
+        $at = $when !== null && $when !== '' ? date('Y-m-d H:i:s', (int) strtotime($when)) : date('Y-m-d H:i:s');
+
+        $applied = $this->applyUpdates((int) $shipment['id'], [new TrackingUpdate(
+            status: $status,
+            title: self::MANUAL_STATUSES[$status],
+            description: $note,
+            location: null,
+            occurredAt: $at,
+            courierEventId: 'manual:' . $status . ':' . $shipment['awb_number'] . ':' . microtime(true),
+            raw: ['manual' => true, 'by' => $request->authUserId()],
+        )], 'manual', $request);
+
+        $this->audit->log(
+            entityName: 'shipments',
+            entityId: (int) $shipment['id'],
+            action: 'manual_status',
+            newValues: ['status' => $status, 'note' => $note, 'applied' => $applied],
+            request: $request,
+        );
+
+        return $this->present((array) $this->shipments->findById((int) $shipment['id']), staffView: true);
+    }
+
+    /**
+     * Sent outside a courier integration: the MANUAL courier, or booked while
+     * the store was in manual delivery mode.
+     *
+     * @param array<string, mixed> $shipment
+     */
+    private function isManual(array $shipment): bool
+    {
+        $courier = $this->couriers->findById((int) $shipment['courier_id']);
+
+        if ($courier !== null && ($courier['code'] === self::MANUAL_COURIER_CODE || $courier['adapter'] === 'manual')) {
+            return true;
+        }
+
+        $raw = json_decode((string) ($shipment['booking_response'] ?? ''), true);
+
+        return is_array($raw) && !empty($raw['manual']);
+    }
+
+    /** @param array<string, mixed> $shipment */
+    private function carrierNameOf(array $shipment): string
+    {
+        if (!empty($shipment['carrier_name'])) {
+            return (string) $shipment['carrier_name'];
+        }
+
+        return (string) (($this->couriers->findById((int) $shipment['courier_id']) ?? [])['name'] ?? 'the courier');
     }
 
     /** @return array<string, mixed> */
@@ -779,7 +1076,7 @@ final class ShipmentService
                     'sms',
                     [
                         'order_number' => (string) $order['order_number'],
-                        'courier_name' => (string) ($courier['name'] ?? 'our courier'),
+                        'courier_name' => (string) ($shipment['carrier_name'] ?? $courier['name'] ?? 'our courier'),
                         'tracking_number' => (string) ($shipment['awb_number'] ?? ''),
                         'expected_date' => (string) ($shipment['estimated_delivery_date'] ?? 'shortly'),
                     ],
@@ -905,11 +1202,13 @@ final class ShipmentService
             'uuid' => $shipment['uuid'],
             'shipment_number' => $shipment['shipment_number'],
             'status' => $shipment['status'],
-            'courier_name' => $courier['name'] ?? null,
+            'courier_name' => $shipment['carrier_name'] ?? ($courier['name'] ?? null),
             'awb_number' => $shipment['awb_number'],
             'tracking_url' => $shipment['awb_number'] === null
                 ? null
-                : $this->trackingUrl($courier, (string) $shipment['awb_number']),
+                : ($shipment['tracking_url'] ?? ($this->isManual($shipment) ? null : $this->trackingUrl($courier, (string) $shipment['awb_number']))),
+            // Sent outside Shiprocket: staff record its progress by hand.
+            'is_manual' => $this->isManual($shipment),
             'estimated_delivery_date' => $shipment['estimated_delivery_date'],
             'delivered_date' => $shipment['delivered_date'],
             'last_scan_status' => $shipment['last_scan_status'],

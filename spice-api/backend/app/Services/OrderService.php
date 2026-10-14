@@ -144,6 +144,38 @@ final class OrderService
             ]
             : null;
         $detail['internal_note'] = $order['internal_note'];
+        // Which shipping options the order page offers: Shiprocket booking
+        // (and own-courier shipping as an alternative), or own courier only.
+        $detail['delivery_mode'] = $this->settings->value('delivery_driver') === 'shiprocket' ? 'shiprocket' : 'manual';
+
+        // The live parcel, so the order page can offer the right next step
+        // (enter tracking / mark delivered for one sent with the store's own
+        // courier; nothing to do by hand for a Shiprocket parcel).
+        $shipment = $this->db->selectOne(
+            "SELECT s.`uuid`, s.`shipment_number`, s.`status`, s.`awb_number`, s.`carrier_name`, s.`tracking_url`,
+                    s.`booking_response`, s.`delivered_date`, c.`code`, c.`adapter`, c.`name` AS `courier_name`
+               FROM `shipments` s JOIN `couriers` c ON c.`id` = s.`courier_id`
+              WHERE s.`order_id` = :id AND s.`is_deleted` = 0 AND s.`status` <> 'cancelled'
+              ORDER BY s.`id` DESC LIMIT 1",
+            ['id' => (int) $order['id']]
+        );
+
+        if ($shipment !== null) {
+            $raw = json_decode((string) ($shipment['booking_response'] ?? ''), true);
+            $detail['shipment'] = [
+                'uuid' => $shipment['uuid'],
+                'shipment_number' => $shipment['shipment_number'],
+                'status' => $shipment['status'],
+                'courier_name' => $shipment['carrier_name'] ?? $shipment['courier_name'],
+                'awb_number' => $shipment['awb_number'],
+                'tracking_url' => $shipment['tracking_url'],
+                'delivered_date' => $shipment['delivered_date'],
+                'is_manual' => $shipment['code'] === 'MANUAL' || $shipment['adapter'] === 'manual'
+                    || (is_array($raw) && !empty($raw['manual'])),
+            ];
+        } else {
+            $detail['shipment'] = null;
+        }
 
         return $detail;
     }
