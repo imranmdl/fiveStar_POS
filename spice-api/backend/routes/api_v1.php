@@ -761,6 +761,8 @@ return static function (Router $router): void {
         // BR-007: booking with no courier_code lets the selector choose.
         $router->get('/admin/orders/{uuid}/courier-options', [ShipmentController::class, 'courierOptions'], $staff);
         $router->post('/admin/orders/{uuid}/ship', [ShipmentController::class, 'book'], $staff);
+        $router->post('/admin/orders/{uuid}/ship-manual', [ShipmentController::class, 'shipManual'], $staff);
+        $router->post('/admin/shipments/{uuid}/manual-status', [ShipmentController::class, 'manualStatus'], $staff);
 
         // --- Coupons -------------------------------------------------------
         $router->get('/admin/coupons', [PromotionController::class, 'adminCoupons'], $administrator);

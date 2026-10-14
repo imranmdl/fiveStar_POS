@@ -242,6 +242,12 @@ function CodCard({ order, onChanged }) {
   );
 }
 
+const DELIVERY_DRIVER_LABELS = {
+  shiprocket: 'Shiprocket ON — book couriers through Shiprocket',
+  manual: 'Shiprocket OFF — I ship myself and enter the tracking number',
+  sandbox: 'Sandbox courier (local testing only)',
+};
+
 const PAYMENT_DRIVER_LABELS = {
   razorpay: 'Razorpay (online UPI)',
   manual: 'Manual UPI QR (staff confirm)',
@@ -386,18 +392,24 @@ function SettingsPanel() {
           </select>
         </label>
         <label className="settings-field">
-          <span>Delivery mode</span>
+          <span>Shipping (Shiprocket on / off)</span>
           <select
             value={form.delivery_driver}
             onChange={(event) => setForm((f) => ({ ...f, delivery_driver: event.target.value }))}
           >
             {(settings.delivery_driver_options || []).map((opt) => (
               <option key={opt} value={opt}>
-                {opt}
+                {DELIVERY_DRIVER_LABELS[opt] || opt}
               </option>
             ))}
           </select>
         </label>
+      </div>
+
+      <div className="settings-note">
+        {form.delivery_driver === 'shiprocket'
+          ? 'Orders offer “Book with Shiprocket”, and “Ship with my own courier” for parcels you send another way.'
+          : 'Orders offer “Ship with my own courier”: pick the courier (India Post, DTDC, local delivery…), enter the tracking number from its receipt, and the customer is sent it. Mark the parcel delivered from the order when it arrives.'}
       </div>
 
       {form.payment_driver === 'manual' && !settings.manual_payment_qr_url && !form.manual_payment_vpa && (

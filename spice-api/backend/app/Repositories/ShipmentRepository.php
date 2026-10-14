@@ -16,7 +16,7 @@ final class ShipmentRepository extends BaseRepository
     protected function fillable(): array
     {
         return [
-            'shipment_number', 'order_id', 'courier_id', 'awb_number', 'courier_shipment_id',
+            'shipment_number', 'order_id', 'courier_id', 'carrier_name', 'awb_number', 'tracking_url', 'courier_shipment_id',
             'label_url', 'label_generated_date', 'manifest_id', 'pickup_request_id', 'status',
             'actual_weight_grams', 'volumetric_weight_grams', 'chargeable_weight_grams',
             'length_mm', 'width_mm', 'height_mm', 'used_default_dimensions',
