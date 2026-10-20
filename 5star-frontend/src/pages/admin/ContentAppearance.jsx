@@ -22,6 +22,7 @@ const DESIGN_DEFAULTS = {
   announcement: 'Dispatched within 24 hours · All prices include GST',
   announcement_bg: '#2a2829',
   announcement_text: '#ffffff',
+  store_name: '5 Star',
   tagline: 'Spices & Dry Fruits',
   banner_seconds: 5,
   show_deals: true,
@@ -78,7 +79,7 @@ function Preview({ theme }) {
           <img src={BRAND_LOGO_URL} alt="" style={{ width: 30, height: 30 }} />
         </div>
         <div style={{ color: theme.header_text, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <b style={{ font: "800 16px/1 'Bricolage Grotesque', system-ui" }}>5 Star</b>
+          <b style={{ font: "800 16px/1 'Bricolage Grotesque', system-ui" }}>{theme.store_name}</b>
           <span style={{ font: 'italic 600 10px/1 system-ui', opacity: 0.85 }}>{theme.tagline}</span>
         </div>
         <div style={{ flex: '1 1 140px', display: 'flex', height: 32, background: '#fff', borderRadius: 5, overflow: 'hidden' }}>
@@ -181,6 +182,12 @@ export default function ContentAppearance() {
           {COLOR_FIELDS.slice(0, 5).map(([field, label, hint]) => (
             <ColorInput key={field} id={`t_${field}`} label={label} hint={hint} value={theme[field]} onChange={update(field)} />
           ))}
+
+          <div className="content-field">
+            <label htmlFor="t_store_name">Store name (header)</label>
+            <input id="t_store_name" maxLength={40} value={theme.store_name} onChange={(e) => update('store_name')(e.target.value)} />
+            <div className="content-hint">Shown beside the logo on every page, in the footer and the browser tab, e.g. &quot;Five Star&quot;.</div>
+          </div>
 
           <div className="content-field">
             <label htmlFor="t_tagline">Line under the store name</label>

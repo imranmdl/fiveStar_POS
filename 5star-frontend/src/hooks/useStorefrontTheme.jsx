@@ -18,6 +18,7 @@ export const DEFAULT_THEME = {
   announcement: 'Dispatched within 24 hours · All prices include GST',
   announcement_bg: '#2a2829',
   announcement_text: '#ffffff',
+  store_name: '5 Star',
   tagline: 'Spices & Dry Fruits',
   banner_seconds: 5,
   show_deals: true,
