@@ -63,7 +63,7 @@ final class InventoryBatchRepository extends BaseRepository
         $this->db->execute(
             'UPDATE `inventory_batches`
                 SET `quantity` = `quantity` + :delta,
-                    `unit_cost` = COALESCE(:unit_cost2, `unit_cost`),
+                    `unit_cost` = CASE WHEN :delta_sign > 0 THEN COALESCE(:unit_cost2, `unit_cost`) ELSE `unit_cost` END,
                     `expiry_date` = COALESCE(:expiry_date2, `expiry_date`),
                     `mrp` = COALESCE(:mrp2, `mrp`),
                     `selling_price` = COALESCE(:selling_price2, `selling_price`),
@@ -71,6 +71,9 @@ final class InventoryBatchRepository extends BaseRepository
               WHERE `product_variant_id` = :variant_id AND `warehouse_id` = :warehouse_id AND `batch_no` = :batch_no',
             [
                 'delta' => $quantityDelta,
+                // Only stock coming in sets the batch's cost: a return to the
+                // vendor carries the vendor price, not what the batch cost.
+                'delta_sign' => $quantityDelta > 0 ? 1 : 0,
                 'unit_cost2' => $unitCost,
                 'expiry_date2' => $expiryDate,
                 'mrp2' => $mrp,

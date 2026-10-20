@@ -51,6 +51,7 @@ final class ProductRepository extends BaseRepository
             'hsn_code', 'gst_rate', 'fssai_license_no', 'is_organic', 'is_vegetarian',
             'is_gift_packable', 'status', 'published_date', 'is_featured', 'display_order',
             'search_keywords', 'meta_title', 'meta_description',
+            'admin_reviewed', 'review_reason', 'review_flagged_date', 'reviewed_by', 'reviewed_date',
         ];
     }
 

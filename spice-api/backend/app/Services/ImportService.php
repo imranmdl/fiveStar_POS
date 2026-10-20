@@ -91,6 +91,7 @@ final class ImportService
         private readonly Logger $logger,
         private readonly VendorService $vendorService,
         private readonly VariantOptionService $variantOptions,
+        private readonly ItemReviewService $review,
     ) {
     }
 
@@ -1039,6 +1040,12 @@ final class ImportService
                 $ids[] = $variantId;
             }
 
+            $this->review->flagIfEnteredByStaff(
+                $productId,
+                $request,
+                $fromImport ? 'spreadsheet import' : 'Purchase Inward / scan',
+            );
+
             $this->audit->log(
                 entityName: 'products',
                 entityId: $productId,
@@ -1129,6 +1136,8 @@ final class ImportService
                 'selling_price' => number_format($normalized['selling_price'], 2, '.', ''),
                 'is_default' => 1,
             ], $actorId);
+
+            $this->review->flagIfEnteredByStaff($productId, $request, 'spreadsheet import');
 
             $action = 'created';
         } else {

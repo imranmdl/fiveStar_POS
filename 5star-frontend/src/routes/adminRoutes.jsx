@@ -28,6 +28,7 @@ import CustomerDues from '../pages/admin/CustomerDues';
 import Backups from '../pages/admin/Backups';
 import Loyalty from '../pages/admin/Loyalty';
 import Referrals from '../pages/admin/Referrals';
+import ItemReview from '../pages/admin/ItemReview';
 
 /**
  * Admin console routes, rendered inside AdminLayout. The sidebar (see
@@ -44,6 +45,7 @@ export const adminRoutes = [
   { path: 'reviews', element: <Reviews /> },
   { path: 'products', element: <Products /> },
   { path: 'inventory', element: <Inventory /> },
+  { path: 'item-review', element: <ItemReview /> },
   { path: 'purchase-inward', element: <PurchaseInward /> },
   { path: 'mobile', element: <MobileScan /> },
   { path: 'pricing', element: <Pricing /> },

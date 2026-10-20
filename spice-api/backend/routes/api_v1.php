@@ -26,6 +26,7 @@ use App\Controllers\Api\V1\InventoryController;
 use App\Controllers\Api\V1\InvoiceController;
 use App\Controllers\Api\V1\LeadController;
 use App\Controllers\Api\V1\LoyaltyController;
+use App\Controllers\Api\V1\ItemReviewController;
 use App\Controllers\Api\V1\ManualPaymentController;
 use App\Controllers\Api\V1\PromotionController;
 use App\Controllers\Api\V1\NotificationController;
@@ -602,6 +603,11 @@ return static function (Router $router): void {
         // administrator can turn a pending attempt into a confirmed payment —
         // see ManualGateway and ManualPaymentService. Not opened to
         // supervisor/executive the way order status routes are.
+        // Item review: administrator corrects staff data-entry mistakes everywhere.
+        $router->get('/admin/item-review', [ItemReviewController::class, 'index'], $administrator);
+        $router->get('/admin/item-review/{uuid}', [ItemReviewController::class, 'show'], $administrator);
+        $router->patch('/admin/item-review/{uuid}', [ItemReviewController::class, 'update'], $administrator);
+
         $router->get('/admin/payments/pending', [ManualPaymentController::class, 'pending'], $administrator);
         $router->post('/admin/payments/{uuid}/verify', [ManualPaymentController::class, 'verify'], $administrator);
         $router->post('/admin/payments/{uuid}/reject', [ManualPaymentController::class, 'reject'], $administrator);

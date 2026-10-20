@@ -22,7 +22,7 @@ use App\Services\Orders\NumberingService;
  * What it does: reverses inventory for exactly the lines/quantities
  * returned (InventoryService::recordMovement(), the same unmodified engine
  * every other stock change in this system goes through — a negative delta
- * never touches average_cost, see InventoryService::recalculateAverageCost()),
+ * never touches average_cost, see InventoryService::blendAverageCost()),
  * and reduces what the business still owes the vendor via
  * purchase_orders.amount_returned.
  *
