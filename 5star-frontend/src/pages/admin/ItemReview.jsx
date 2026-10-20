@@ -156,6 +156,7 @@ function ItemEditor({ uuid, onClose, onSaved }) {
         ...v,
         mrp: String(v.mrp),
         selling_price: String(v.selling_price),
+        landing_cost: v.average_cost == null ? '' : String(Math.round(v.average_cost * 100) / 100),
         weight_grams: String(v.weight_grams),
         unit_label: v.unit_label || '',
         volume_ml: v.volume_ml ? String(v.volume_ml) : '',
@@ -201,6 +202,9 @@ function ItemEditor({ uuid, onClose, onSaved }) {
       if (Number(v.weight_grams) !== orig.weight_grams) row.weight_grams = Number(v.weight_grams);
       if (differs(v.mrp, orig.mrp)) row.mrp = v.mrp;
       if (differs(v.selling_price, orig.selling_price)) row.selling_price = v.selling_price;
+      if (v.landing_cost !== '' && (orig.average_cost == null || differs(v.landing_cost, Math.round(orig.average_cost * 100) / 100))) {
+        row.landing_cost = v.landing_cost;
+      }
       if (Object.keys(row).length > 1) variants.push(row);
     });
     const purchaseLines = [];
@@ -238,6 +242,7 @@ function ItemEditor({ uuid, onClose, onSaved }) {
     if (!v.variant_name.trim()) problems.push('Every pack needs a name.');
     if (!(num(v.mrp) > 0) || !(num(v.selling_price) > 0)) problems.push(`${v.variant_name || 'A pack'}: enter the MRP and selling price.`);
     else if (num(v.selling_price) > num(v.mrp)) problems.push(`${v.variant_name}: selling price is above the MRP.`);
+    if (v.landing_cost !== '' && Number(v.landing_cost) < 0) problems.push(`${v.variant_name || 'A pack'}: landing cost cannot be negative.`);
     if (v.stock_unit_type === 'volume' && !(num(v.volume_ml) > 0)) problems.push(`${v.variant_name || 'A pack'}: enter the content in ml (1 L = 1000 ml).`);
     if (!(num(v.weight_grams) > 0)) problems.push(`${v.variant_name || 'A pack'}: weight must be more than 0 g.`);
   });
@@ -324,6 +329,11 @@ function ItemEditor({ uuid, onClose, onSaved }) {
 
       <fieldset className="ir-section">
         <legend>Packs, units and prices</legend>
+        <p className="ir-hint">
+          Landing cost is what one pack cost you, delivered (the average cost of the stock). Set it here for stock with no
+          purchase behind it, such as opening stock. If a vendor bill was typed wrong, correct the cost in Purchases below
+          instead — that also fixes the purchase total and vendor balance.
+        </p>
         <div className="ir-table-wrap">
           <table className="admin-table ir-table">
             <thead>
@@ -335,6 +345,7 @@ function ItemEditor({ uuid, onClose, onSaved }) {
                 <th>Weight (g)</th>
                 <th>MRP ₹</th>
                 <th>Selling ₹</th>
+                <th>Landing cost ₹</th>
               </tr>
             </thead>
             <tbody>
@@ -383,6 +394,21 @@ function ItemEditor({ uuid, onClose, onSaved }) {
                     </td>
                     <td data-label="Selling ₹">
                       <input type="number" min="0" step="0.01" inputMode="decimal" className={differs(v.selling_price, orig.selling_price) ? 'is-changed' : ''} value={v.selling_price} onChange={(e) => setVariant(i, { selling_price: e.target.value })} />
+                    </td>
+                    <td data-label="Landing cost ₹">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        placeholder="Not set"
+                        className={v.landing_cost !== '' && (orig.average_cost == null || differs(v.landing_cost, Math.round(orig.average_cost * 100) / 100)) ? 'is-changed' : ''}
+                        value={v.landing_cost}
+                        onChange={(e) => setVariant(i, { landing_cost: e.target.value })}
+                      />
+                      {num(v.landing_cost) > 0 && num(v.selling_price) > 0 && num(v.landing_cost) > num(v.selling_price)
+                        ? <small className="ir-warn">Above the selling price</small>
+                        : <small className="ir-muted">Average cost of stock</small>}
                     </td>
                   </tr>
                 );

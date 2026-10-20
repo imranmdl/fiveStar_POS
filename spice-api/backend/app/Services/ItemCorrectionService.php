@@ -8,6 +8,7 @@ use App\Core\Database;
 use App\Core\Exceptions\HttpException;
 use App\Core\Exceptions\NotFoundException;
 use App\Core\Request;
+use App\Repositories\InventoryStockRepository;
 use App\Helpers\PackSize;
 
 /**
@@ -47,6 +48,7 @@ final class ItemCorrectionService
         private readonly ProductService $products,
         private readonly AuditService $audit,
         private readonly InventoryService $inventory,
+        private readonly InventoryStockRepository $stockRows,
     ) {
     }
 
@@ -321,7 +323,9 @@ final class ItemCorrectionService
         $variantChanges = $this->variantChanges($productId, (array) ($data['variants'] ?? []));
         $costChanges = $this->costChanges($productId, (array) ($data['purchase_lines'] ?? []));
         $stockChanges = $this->stockChanges($productId, (array) ($data['stock'] ?? []));
-        $corrects = $productChanges !== [] || $variantChanges !== [] || $costChanges !== [] || $stockChanges !== [];
+        $landingChanges = $this->landingChanges($productId, (array) ($data['variants'] ?? []));
+        $corrects = $productChanges !== [] || $variantChanges !== [] || $costChanges !== [] || $stockChanges !== []
+            || $landingChanges !== [];
 
         if (!$corrects && !$markReviewed) {
             throw new HttpException('Nothing to correct — no value differs from what is saved.', 422);
@@ -336,6 +340,7 @@ final class ItemCorrectionService
             $variantChanges,
             $costChanges,
             $stockChanges,
+            $landingChanges,
             $corrects,
             $markReviewed,
             $note,
@@ -371,7 +376,13 @@ final class ItemCorrectionService
                 }
             }
 
-            // 5. Review flag.
+            // 5. Landing cost typed for a pack: the stock's average cost is
+            //    set to it (applied last, so it is the figure that stands).
+            foreach ($landingChanges as $change) {
+                $summary[] = $this->applyLandingCost($change, $actorId);
+            }
+
+            // 6. Review flag.
             if ($markReviewed) {
                 $this->db->execute(
                     'UPDATE `products`
@@ -1134,6 +1145,89 @@ final class ItemCorrectionService
         }
 
         return $out;
+    }
+
+    /**
+     * Landing cost per pack, as typed on the pack row: [{uuid, landing_cost}].
+     * For stock with no purchase behind it (opening stock, items added by
+     * scan) this is the only place its cost can be set; for purchased stock
+     * it overrides the average — correct the purchase line instead when the
+     * vendor's bill was wrong.
+     *
+     * @return array<int, array{variant_id:int, variant_name:string, old:?float, new:float}>
+     */
+    private function landingChanges(int $productId, array $rows): array
+    {
+        $out = [];
+
+        foreach ($rows as $row) {
+            if (!is_array($row) || empty($row['uuid']) || !isset($row['landing_cost']) || $row['landing_cost'] === '') {
+                continue;
+            }
+
+            $variant = $this->db->selectOne(
+                'SELECT v.`id`, v.`variant_name`,
+                        (SELECT CASE WHEN SUM(GREATEST(s.`quantity`, 0)) > 0
+                                     THEN SUM(GREATEST(s.`quantity`, 0) * s.`average_cost`) / SUM(GREATEST(s.`quantity`, 0))
+                                     ELSE MAX(s.`average_cost`) END
+                           FROM `inventory_stock` s
+                          WHERE s.`product_variant_id` = v.`id` AND s.`is_deleted` = 0) AS `average_cost`
+                   FROM `product_variants` v
+                  WHERE v.`uuid` = :uuid AND v.`product_id` = :pid AND v.`is_deleted` = 0',
+                ['uuid' => (string) $row['uuid'], 'pid' => $productId]
+            );
+
+            if ($variant === null) {
+                throw new HttpException('A pack size in the correction does not belong to this item.', 422);
+            }
+
+            $new = round((float) $row['landing_cost'], 4);
+
+            if ($new < 0) {
+                throw new HttpException(sprintf('%s: landing cost cannot be negative.', $variant['variant_name']), 422);
+            }
+
+            $old = $variant['average_cost'] === null ? null : (float) $variant['average_cost'];
+
+            if ($old === null || abs($new - $old) > 0.005) {
+                $out[] = [
+                    'variant_id' => (int) $variant['id'],
+                    'variant_name' => (string) $variant['variant_name'],
+                    'old' => $old,
+                    'new' => $new,
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    private function applyLandingCost(array $change, ?int $actorId): string
+    {
+        $rows = $this->db->select(
+            'SELECT `id` FROM `inventory_stock` WHERE `product_variant_id` = :vid AND `is_deleted` = 0',
+            ['vid' => $change['variant_id']]
+        );
+
+        // No stock row yet (never received): create one at the main warehouse
+        // so the cost is there for the first sale and Stock Audit.
+        if ($rows === []) {
+            $this->stockRows->lockOrCreate($change['variant_id'], $this->inventory->defaultWarehouseId(), $actorId);
+        }
+
+        $this->db->execute(
+            'UPDATE `inventory_stock`
+                SET `average_cost` = :cost, `updated_by` = :actor, `updated_date` = NOW(), `version` = `version` + 1
+              WHERE `product_variant_id` = :vid AND `is_deleted` = 0',
+            ['cost' => number_format($change['new'], 4, '.', ''), 'actor' => $actorId, 'vid' => $change['variant_id']]
+        );
+
+        return sprintf(
+            '%s: landing cost ₹%s → ₹%s',
+            $change['variant_name'],
+            $change['old'] === null ? '—' : number_format($change['old'], 2),
+            number_format($change['new'], 2)
+        );
     }
 
     /**

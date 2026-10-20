@@ -105,3 +105,5 @@
   .ir-table td[data-label='Pack name'] input, .ir-table td[data-label='Sold by'] select,
   .ir-table td[data-label='Unit'] input, .ir-table td input[type='number'] { width: 100%; min-width: 0; }
 }
+
+.ir-warn { display: block; color: #a05a00; font-size: 12px; }
