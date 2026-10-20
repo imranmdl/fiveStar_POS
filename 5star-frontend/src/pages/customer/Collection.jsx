@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { api, ApiError, formatMoney } from '../../lib/api';
 import './Collection.css';
 import SafeImage from '../../components/customer/SafeImage';
+import { volumeLabel } from '../../lib/store';
 
 function perKilo(price, grams) {
   if (!price || !grams || grams <= 0) return '';
@@ -18,7 +19,9 @@ function Card({ item, wide }) {
   const saving = Number(pricing.max_discount_percentage) || 0;
 
   const packs = [];
-  if (!item.has_size_options) {
+  if (!item.has_size_options && item.volume_ml_min) {
+    packs.push(volumeLabel(item.volume_ml_min));
+  } else if (!item.has_size_options) {
     if (weight.min) packs.push(weight.min >= 1000 ? `${weight.min / 1000}kg` : `${weight.min}g`);
     if (weight.max && weight.max !== weight.min) {
       packs.push(weight.max >= 1000 ? `${weight.max / 1000}kg` : `${weight.max}g`);

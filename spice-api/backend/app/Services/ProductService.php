@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Helpers\PackSize;
+
 use App\Core\Config;
 use App\Core\Database;
 use App\Core\Exceptions\HttpException;
@@ -496,6 +498,7 @@ final class ProductService
         }
 
         $this->assertVariantPricingIsCoherent(array_merge($variant, $data));
+        $data = self::normaliseUnit(array_merge($variant, $data), $data);
 
         $this->db->transaction(function () use ($variant, $data, $productId, $actorId): void {
             $this->variants->update((int) $variant['id'], $data, $actorId);
@@ -883,6 +886,7 @@ final class ProductService
         }
 
         $this->assertVariantPricingIsCoherent($variant);
+        $variant = array_merge($variant, self::normaliseUnit($variant, $variant));
 
         $isDefault = $forceDefault || (int) ($variant['is_default'] ?? 0) === 1;
 
@@ -900,6 +904,13 @@ final class ProductService
                 ? (int) $variant['packed_weight_grams']
                 : null,
             'pack_type' => $variant['pack_type'] ?? 'pouch',
+            'stock_unit_type' => $variant['stock_unit_type'] ?? 'weight',
+            'unit_label' => isset($variant['unit_label']) && trim((string) $variant['unit_label']) !== ''
+                ? trim((string) $variant['unit_label'])
+                : null,
+            'volume_ml' => ($variant['stock_unit_type'] ?? 'weight') === 'volume' && isset($variant['volume_ml'])
+                ? number_format((float) $variant['volume_ml'], 2, '.', '')
+                : null,
             'mrp' => $variant['mrp'],
             'selling_price' => $variant['selling_price'],
             'offer_price' => $variant['offer_price'] ?? null,
@@ -918,6 +929,44 @@ final class ProductService
      *
      * @param array<string, mixed> $variant
      */
+    /**
+     * Keeps a pack's unit coherent: a volume pack needs its content in ml;
+     * a pack moved off volume drops it.
+     *
+     * @param array<string, mixed> $merged The pack as it will be after the change
+     * @param array<string, mixed> $data   The change
+     *
+     * @return array<string, mixed> The change, completed
+     */
+    private static function normaliseUnit(array $merged, array $data): array
+    {
+        if (!array_key_exists('stock_unit_type', $data) && !array_key_exists('volume_ml', $data)) {
+            return $data;
+        }
+
+        $type = (string) ($merged['stock_unit_type'] ?? 'weight');
+
+        if (!in_array($type, PackSize::UNIT_TYPES, true)) {
+            throw new HttpException('Sold by must be weight, volume or count.', 422, ['stock_unit_type' => ['Unknown unit.']]);
+        }
+
+        if ($type === 'volume') {
+            $ml = (float) ($merged['volume_ml'] ?? 0);
+            if ($ml <= 0) {
+                throw new HttpException(
+                    'Enter the pack content in ml or litres for an item sold by volume.',
+                    422,
+                    ['volume_ml' => ['Required for a volume pack, e.g. 500 ml or 1 L.']]
+                );
+            }
+            $data['volume_ml'] = number_format($ml, 2, '.', '');
+        } else {
+            $data['volume_ml'] = null;
+        }
+
+        return $data;
+    }
+
     private function assertVariantPricingIsCoherent(array $variant): void
     {
         $errors = [];
@@ -1110,6 +1159,8 @@ final class ProductService
                 'min' => (int) $row['min_weight_grams'],
                 'max' => (int) $row['max_weight_grams'],
             ],
+            // Smallest volume pack, for liquids ("500 ml") — null otherwise.
+            'volume_ml_min' => isset($row['min_volume_ml']) && $row['min_volume_ml'] !== null ? (float) $row['min_volume_ml'] : null,
             'has_size_options' => $hasSizeOptions,
             // The shopper must pick a size / colour on the product page; a
             // card must not add a variant on their behalf.
@@ -1172,6 +1223,11 @@ final class ProductService
             'weight_grams' => (int) $variant['weight_grams'],
             'shipping_weight_grams' => (int) $variant['shipping_weight_grams'],
             'pack_type' => $variant['pack_type'],
+            'stock_unit_type' => $variant['stock_unit_type'] ?? 'weight',
+            'unit_label' => $variant['unit_label'] ?? null,
+            'volume_ml' => isset($variant['volume_ml']) && $variant['volume_ml'] !== null ? (float) $variant['volume_ml'] : null,
+            // "500 ml", "1 kg" — null when the size is not a measure.
+            'pack_size' => PackSize::label($variant),
             'size_label' => $variantOptions[(int) $variant['id']]['size']['value'] ?? null,
             // Every dimension this variant carries, e.g. {size: "M", color: "Red"}.
             'options' => array_map(

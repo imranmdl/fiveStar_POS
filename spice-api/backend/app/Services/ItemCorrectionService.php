@@ -8,6 +8,7 @@ use App\Core\Database;
 use App\Core\Exceptions\HttpException;
 use App\Core\Exceptions\NotFoundException;
 use App\Core\Request;
+use App\Helpers\PackSize;
 
 /**
  * Administrator's "Item review": correct an item's data-entry mistakes in
@@ -166,6 +167,7 @@ final class ItemCorrectionService
             'variant_name' => $v['variant_name'],
             'stock_unit_type' => $v['stock_unit_type'],
             'unit_label' => $v['unit_label'],
+            'volume_ml' => $v['volume_ml'] === null ? null : (float) $v['volume_ml'],
             'weight_grams' => (int) $v['weight_grams'],
             'mrp' => (float) $v['mrp'],
             'selling_price' => (float) $v['selling_price'],
@@ -485,16 +487,34 @@ final class ItemCorrectionService
                 }
             }
 
+            $sold = ['weight' => 'weight', 'volume' => 'volume (ml / L)', 'quantity' => 'count'];
+
             if (array_key_exists('stock_unit_type', $row)) {
                 $type = (string) $row['stock_unit_type'];
-                if (!in_array($type, ['weight', 'quantity'], true)) {
-                    throw new HttpException(sprintf('Pack "%s": unit must be by weight or by count.', $label), 422);
+                if (!isset($sold[$type])) {
+                    throw new HttpException(sprintf('Pack "%s": sold by must be weight, volume or count.', $label), 422);
                 }
                 if ($type !== $variant['stock_unit_type']) {
                     $payload['stock_unit_type'] = $type;
                     $lines[] = sprintf('%s: sold by %s → by %s', $label,
-                        $variant['stock_unit_type'] === 'weight' ? 'weight' : 'count',
-                        $type === 'weight' ? 'weight' : 'count');
+                        $sold[(string) $variant['stock_unit_type']] ?? (string) $variant['stock_unit_type'], $sold[$type]);
+                }
+            }
+
+            $finalType = $payload['stock_unit_type'] ?? (string) $variant['stock_unit_type'];
+
+            if ($finalType === 'volume') {
+                $ml = array_key_exists('volume_ml', $row) && $row['volume_ml'] !== null && $row['volume_ml'] !== ''
+                    ? round((float) $row['volume_ml'], 2)
+                    : (float) ($variant['volume_ml'] ?? 0);
+                if ($ml <= 0) {
+                    throw new HttpException(sprintf('Pack "%s": enter the content in ml (1 L = 1000 ml).', $label), 422);
+                }
+                if (abs($ml - (float) ($variant['volume_ml'] ?? 0)) > 0.004) {
+                    $payload['volume_ml'] = $ml;
+                    $lines[] = sprintf('%s: content %s → %s', $label,
+                        (float) ($variant['volume_ml'] ?? 0) > 0 ? PackSize::volume((float) $variant['volume_ml']) : '—',
+                        PackSize::volume($ml));
                 }
             }
 

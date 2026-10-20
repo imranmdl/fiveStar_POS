@@ -74,7 +74,7 @@ final class ImportService
     ];
 
     private const PACK_TYPES = ['pouch', 'jar', 'box', 'tin', 'gift_box', 'refill', 'other'];
-    private const STOCK_UNIT_TYPES = ['weight', 'quantity'];
+    private const STOCK_UNIT_TYPES = ['weight', 'quantity', 'volume'];
     private const MAX_ROWS = 5000;
     private const TEMP_FILE_MAX_AGE_SECONDS = 86400;
 
@@ -886,6 +886,7 @@ final class ImportService
                 'pack_type' => $data['pack_type'] ?? null,
                 'stock_unit_type' => $data['stock_unit_type'] ?? null,
                 'unit_label' => $data['unit_label'] ?? null,
+                'volume_ml' => $data['volume_ml'] ?? null,
                 'options' => $data['options'] ?? [],
             ]];
         }
@@ -946,7 +947,7 @@ final class ImportService
                 $seenBarcodes[$barcode] = true;
             }
 
-            $unitType = in_array($spec['stock_unit_type'] ?? null, ['weight', 'quantity'], true)
+            $unitType = in_array($spec['stock_unit_type'] ?? null, ['weight', 'quantity', 'volume'], true)
                 ? $spec['stock_unit_type']
                 : ($weightRequired ? 'weight' : 'quantity');
 
@@ -966,6 +967,9 @@ final class ImportService
                 'pack_type' => $packType,
                 'stock_unit_type' => $unitType,
                 'unit_label' => $unitLabel !== '' ? mb_substr($unitLabel, 0, 20) : null,
+                'volume_ml' => $unitType === 'volume' && (float) ($spec['volume_ml'] ?? 0) > 0
+                    ? number_format((float) $spec['volume_ml'], 2, '.', '')
+                    : null,
                 'options' => is_array($spec['options'] ?? null) ? $spec['options'] : [],
             ];
         }
@@ -1027,6 +1031,7 @@ final class ImportService
                     'pack_type' => $v['pack_type'],
                     'stock_unit_type' => $v['stock_unit_type'],
                     'unit_label' => $v['unit_label'],
+                    'volume_ml' => $v['volume_ml'],
                     'mrp' => number_format($v['mrp'], 2, '.', ''),
                     'selling_price' => number_format($v['selling'], 2, '.', ''),
                     'is_default' => $index === 0 ? 1 : 0,

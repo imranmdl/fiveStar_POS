@@ -106,8 +106,9 @@ final class ImportController extends BaseController
             'mrp' => 'nullable|numeric|min:0',
             'selling_price' => 'nullable|numeric|min:0',
             'pack_type' => 'nullable|in:pouch,jar,box,tin,gift_box,refill,other',
-            'stock_unit_type' => 'nullable|in:weight,quantity',
+            'stock_unit_type' => 'nullable|in:weight,quantity,volume',
             'unit_label' => 'nullable|string|max:20',
+            'volume_ml' => 'nullable|numeric|min:1|max:1000000',
         ]);
 
         $variants = $request->all()['variants'] ?? null;

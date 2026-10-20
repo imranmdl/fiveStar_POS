@@ -393,6 +393,7 @@ function ProductForm({ product, categories, onCategoryCreated, sizeType, onSubmi
               <input className="admin-input" id="v_weight_grams" name="v_weight_grams" type="number" min="1" max="100000" required />
               <div className="admin-hint">Always required — used for courier weight.</div>
             </div>
+            <PackUnitFields prefix="v_" idPrefix="first-pack" />
             <div className="col-2">
               <label className="admin-label" htmlFor="v_size_value">Size (optional)</label>
               <input className="admin-input" id="v_size_value" name="v_size_value" list="size-suggestions" placeholder="e.g. M, or 8" />
@@ -435,9 +436,51 @@ function ProductForm({ product, categories, onCategoryCreated, sizeType, onSubmi
   );
 }
 
-/** Inline editor for one existing pack: pricing and limits only. */
+const SOLD_BY = [
+  ['weight', 'Weight (g / kg)'],
+  ['volume', 'Volume (ml / litre)'],
+  ['quantity', 'Count (pcs, box…)'],
+];
+
+/** "Sold by" + content (ml) + unit label for the new-pack forms (uncontrolled; read through FormData). */
+function PackUnitFields({ prefix = '', idPrefix = 'pu' }) {
+  const [type, setType] = useState('weight');
+  return (
+    <>
+      <div className="col-2">
+        <label className="admin-label" htmlFor={`${idPrefix}-sold-by`}>Sold by</label>
+        <select className="admin-input" id={`${idPrefix}-sold-by`} name={`${prefix}stock_unit_type`} value={type} onChange={(e) => setType(e.target.value)}>
+          {SOLD_BY.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+      </div>
+      {type === 'volume' && (
+        <div className="col-2">
+          <label className="admin-label" htmlFor={`${idPrefix}-volume`}>Content (ml) <span className="text-danger">*</span></label>
+          <input className="admin-input" id={`${idPrefix}-volume`} name={`${prefix}volume_ml`} type="number" min="1" step="any" required placeholder="500" />
+          <div className="admin-hint">1 litre = 1000 ml. Shown to customers as &quot;500 ml&quot;, &quot;1 L&quot;.</div>
+        </div>
+      )}
+      {type !== 'weight' && (
+        <div className="col-2">
+          <label className="admin-label" htmlFor={`${idPrefix}-unit`}>Unit (optional)</label>
+          <input className="admin-input" id={`${idPrefix}-unit`} name={`${prefix}unit_label`} maxLength={30} list="pack-unit-suggestions" placeholder={type === 'volume' ? 'bottle, can, jar' : 'pcs, box, pack'} />
+        </div>
+      )}
+      <datalist id="pack-unit-suggestions">
+        {['bottle', 'can', 'jar', 'pouch', 'pcs', 'box', 'pack', 'pair', 'dozen', 'set'].map((u) => <option key={u} value={u} />)}
+      </datalist>
+    </>
+  );
+}
+
+/** Inline editor for one existing pack: name, unit, pricing and limits. */
 function VariantEditRow({ variant, onSave, onCancel }) {
   const [form, setForm] = useState({
+    variant_name: variant.variant_name || '',
+    stock_unit_type: variant.stock_unit_type || 'weight',
+    volume_ml: variant.volume_ml ? String(variant.volume_ml) : '',
+    unit_label: variant.unit_label || '',
+    weight_grams: String(variant.weight_grams ?? ''),
     mrp: String(variant.mrp ?? ''),
     selling_price: String(variant.selling_price ?? ''),
     max_order_quantity: Number(variant.max_order_quantity) > 0 ? String(variant.max_order_quantity) : '',
@@ -454,8 +497,20 @@ function VariantEditRow({ variant, onSave, onCancel }) {
       return;
     }
 
+    if (!form.variant_name.trim()) { toast('Enter the pack name.', 'danger'); return; }
+    if (form.stock_unit_type === 'volume' && !(Number(form.volume_ml) > 0)) {
+      toast('Enter the content in ml (1 litre = 1000 ml).', 'danger');
+      return;
+    }
+    if (!(Number(form.weight_grams) > 0)) { toast('Weight must be more than 0 g — couriers charge by it.', 'danger'); return; }
+
     // Only what actually changed, so the price history records real changes.
     const changes = {};
+    if (form.variant_name.trim() !== (variant.variant_name || '')) changes.variant_name = form.variant_name.trim();
+    if (form.stock_unit_type !== (variant.stock_unit_type || 'weight')) changes.stock_unit_type = form.stock_unit_type;
+    if (form.stock_unit_type === 'volume' && Number(form.volume_ml) !== Number(variant.volume_ml || 0)) changes.volume_ml = Number(form.volume_ml);
+    if (form.unit_label.trim() !== (variant.unit_label || '')) changes.unit_label = form.unit_label.trim();
+    if (Number(form.weight_grams) !== Number(variant.weight_grams)) changes.weight_grams = Number(form.weight_grams);
     if (Number(form.mrp) !== Number(variant.mrp)) changes.mrp = form.mrp;
     if (Number(form.selling_price) !== Number(variant.selling_price)) changes.selling_price = form.selling_price;
     const oldMax = Number(variant.max_order_quantity) > 0 ? String(variant.max_order_quantity) : '';
@@ -484,10 +539,34 @@ function VariantEditRow({ variant, onSave, onCancel }) {
           <div className="variant-edit__fixed">
             <b>{variant.variant_name}</b>
             <span>SKU {variant.sku}</span>
-            <span>{variant.weight_grams} g</span>
-            <span className="text-muted small">Pack name, SKU and weight come from Purchase Inward and stay as they are.</span>
           </div>
           <div className="admin-grid">
+            <div className="col-3">
+              <label className="admin-label">Pack name</label>
+              <input className="admin-input" value={form.variant_name} maxLength={80} onChange={set('variant_name')} />
+            </div>
+            <div className="col-2">
+              <label className="admin-label">Sold by</label>
+              <select className="admin-input" value={form.stock_unit_type} onChange={set('stock_unit_type')}>
+                {SOLD_BY.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </div>
+            {form.stock_unit_type === 'volume' && (
+              <div className="col-2">
+                <label className="admin-label">Content (ml)</label>
+                <input className="admin-input" type="number" min="1" step="any" placeholder="500" value={form.volume_ml} onChange={set('volume_ml')} />
+                <div className="admin-hint">1 litre = 1000 ml</div>
+              </div>
+            )}
+            <div className="col-2">
+              <label className="admin-label">Unit (optional)</label>
+              <input className="admin-input" maxLength={30} list="pack-unit-suggestions" placeholder={form.stock_unit_type === 'volume' ? 'bottle' : form.stock_unit_type === 'weight' ? 'pouch' : 'pcs'} value={form.unit_label} onChange={set('unit_label')} />
+            </div>
+            <div className="col-2">
+              <label className="admin-label">Weight (g)</label>
+              <input className="admin-input" type="number" min="1" max="100000" value={form.weight_grams} onChange={set('weight_grams')} />
+              <div className="admin-hint">Packed weight, for courier charges.</div>
+            </div>
             <div className="col-2">
               <label className="admin-label">MRP</label>
               <input className="admin-input" type="number" step="0.01" min="1" value={form.mrp} onChange={set('mrp')} />
@@ -592,7 +671,7 @@ function VariantsPanel({ product, sizeType, onAdded, onUpdated, onRemoved }) {
               <tr>
                 <th>Pack</th>
                 <th>SKU / barcode</th>
-                <th className="text-end">Weight</th>
+                <th className="text-end">Size / weight</th>
                 <th className="text-end">MRP</th>
                 <th className="text-end">Selling</th>
                 <th className="text-center">Max/order</th>
@@ -611,6 +690,9 @@ function VariantsPanel({ product, sizeType, onAdded, onUpdated, onRemoved }) {
                       {variant.barcode && variant.barcode !== variant.sku && <div className="text-muted">▮ {variant.barcode}</div>}
                     </td>
                     <td className="text-end small">
+                      {variant.stock_unit_type === 'volume' && Number(variant.volume_ml) > 0 && (
+                        <div><b>{Number(variant.volume_ml) >= 1000 ? `${+(variant.volume_ml / 1000).toFixed(2)} L` : `${+Number(variant.volume_ml).toFixed(2)} ml`}</b></div>
+                      )}
                       {variant.weight_grams} g
                       {variant.size_label && <div className="text-muted">Size {variant.size_label}</div>}
                     </td>
@@ -621,7 +703,7 @@ function VariantsPanel({ product, sizeType, onAdded, onUpdated, onRemoved }) {
                     </td>
                     <td className="text-end" style={{ whiteSpace: 'nowrap' }}>
                       <button className="admin-btn" type="button" disabled={editing === variant.uuid} onClick={() => setEditing(variant.uuid)}>
-                        Edit price &amp; limits
+                        Edit pack
                       </button>{' '}
                       <button className="admin-btn admin-btn--danger-outline" type="button" onClick={() => handleRemove(variant)}>
                         Remove
@@ -663,6 +745,7 @@ function VariantsPanel({ product, sizeType, onAdded, onUpdated, onRemoved }) {
               <label className="admin-label" htmlFor="weight_grams">Weight (g) <span className="text-danger">*</span></label>
               <input className="admin-input" id="weight_grams" name="weight_grams" type="number" min="1" max="100000" required />
             </div>
+            <PackUnitFields idPrefix="new-pack" />
             <div className="col-2">
               <label className="admin-label" htmlFor="sku">SKU</label>
               <input className="admin-input" id="sku" name="sku" minLength={3} placeholder="Auto" />

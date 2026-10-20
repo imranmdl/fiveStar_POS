@@ -158,6 +158,7 @@ function ItemEditor({ uuid, onClose, onSaved }) {
         selling_price: String(v.selling_price),
         weight_grams: String(v.weight_grams),
         unit_label: v.unit_label || '',
+        volume_ml: v.volume_ml ? String(v.volume_ml) : '',
       })),
       costs: Object.fromEntries(data.purchase_lines.map((l) => [l.uuid, String(l.unit_cost)])),
       qtys: Object.fromEntries(data.purchase_lines.map((l) => [l.uuid, String(l.quantity)])),
@@ -195,6 +196,7 @@ function ItemEditor({ uuid, onClose, onSaved }) {
       const row = { uuid: v.uuid };
       if (v.variant_name.trim() !== orig.variant_name) row.variant_name = v.variant_name.trim();
       if (v.stock_unit_type !== orig.stock_unit_type) row.stock_unit_type = v.stock_unit_type;
+      if (v.stock_unit_type === 'volume' && Number(v.volume_ml) !== Number(orig.volume_ml || 0)) row.volume_ml = v.volume_ml;
       if ((v.unit_label.trim() || null) !== (orig.unit_label || null)) row.unit_label = v.unit_label.trim();
       if (Number(v.weight_grams) !== orig.weight_grams) row.weight_grams = Number(v.weight_grams);
       if (differs(v.mrp, orig.mrp)) row.mrp = v.mrp;
@@ -236,6 +238,7 @@ function ItemEditor({ uuid, onClose, onSaved }) {
     if (!v.variant_name.trim()) problems.push('Every pack needs a name.');
     if (!(num(v.mrp) > 0) || !(num(v.selling_price) > 0)) problems.push(`${v.variant_name || 'A pack'}: enter the MRP and selling price.`);
     else if (num(v.selling_price) > num(v.mrp)) problems.push(`${v.variant_name}: selling price is above the MRP.`);
+    if (v.stock_unit_type === 'volume' && !(num(v.volume_ml) > 0)) problems.push(`${v.variant_name || 'A pack'}: enter the content in ml (1 L = 1000 ml).`);
     if (!(num(v.weight_grams) > 0)) problems.push(`${v.variant_name || 'A pack'}: weight must be more than 0 g.`);
   });
   Object.values(form.costs).forEach((c) => { if (c === '' || Number(c) < 0) problems.push('A purchase cost is empty or negative.'); });
@@ -327,6 +330,7 @@ function ItemEditor({ uuid, onClose, onSaved }) {
               <tr>
                 <th>Pack name</th>
                 <th>Sold by</th>
+                <th>Content (ml)</th>
                 <th>Unit</th>
                 <th>Weight (g)</th>
                 <th>MRP ₹</th>
@@ -344,12 +348,32 @@ function ItemEditor({ uuid, onClose, onSaved }) {
                     </td>
                     <td data-label="Sold by">
                       <select value={v.stock_unit_type} onChange={(e) => setVariant(i, { stock_unit_type: e.target.value })}>
-                        <option value="weight">Weight</option>
-                        <option value="quantity">Count</option>
+                        <option value="weight">Weight (g / kg)</option>
+                        <option value="volume">Volume (ml / L)</option>
+                        <option value="quantity">Count (pcs)</option>
                       </select>
                     </td>
+                    <td data-label="Content (ml)">
+                      {v.stock_unit_type === 'volume'
+                        ? (
+                          <>
+                            <input
+                              type="number"
+                              min="1"
+                              step="any"
+                              inputMode="decimal"
+                              placeholder="500"
+                              aria-invalid={showErrors && !(num(v.volume_ml) > 0) ? 'true' : 'false'}
+                              value={v.volume_ml}
+                              onChange={(e) => setVariant(i, { volume_ml: e.target.value })}
+                            />
+                            <small className="ir-muted">1 L = 1000 ml</small>
+                          </>
+                        )
+                        : <span className="ir-muted">—</span>}
+                    </td>
                     <td data-label="Unit">
-                      <input value={v.unit_label} placeholder="pouch, pc, box…" maxLength={30} onChange={(e) => setVariant(i, { unit_label: e.target.value })} />
+                      <input value={v.unit_label} placeholder={v.stock_unit_type === 'volume' ? 'bottle, can…' : 'pouch, pc, box…'} maxLength={30} onChange={(e) => setVariant(i, { unit_label: e.target.value })} />
                     </td>
                     <td data-label="Weight (g)">
                       <input type="number" min="1" step="1" inputMode="numeric" value={v.weight_grams} onChange={(e) => setVariant(i, { weight_grams: e.target.value })} />

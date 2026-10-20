@@ -36,20 +36,37 @@ export function packLabel(grams) {
   return `${g} g`;
 }
 
-/** Label for a variant: its size / colour ("M / Red"), size label, or weight. */
+/** "500 ml", "1.5 L" from millilitres. */
+export function volumeLabel(ml) {
+  const v = Number(ml || 0);
+  if (!v) return '';
+  if (v >= 1000) return `${Number((v / 1000).toFixed(2))} L`;
+  return `${Number(v.toFixed(2))} ml`;
+}
+
+/** Label for a variant: its size / colour ("M / Red"), size label, volume or weight. */
 export function variantLabel(variant) {
   if (!variant) return '';
   if (variant.option_label) return variant.option_label;
   if (variant.label) return variant.label;
   if (variant.size_label) return variant.size_label;
+  // Liquids are sold by volume: "500 ml", not their shipping weight.
+  if (variant.stock_unit_type === 'volume' && Number(variant.volume_ml) > 0) return volumeLabel(variant.volume_ml);
+  if (variant.stock_unit_type === 'quantity') return variant.variant_name || variant.name || '';
   // Clothing / footwear packs carry a 1 g placeholder weight; their name
   // ("Small", "Free size") is the label, not "1 g".
   if (Number(variant.weight_grams || 0) <= 1) return variant.variant_name || variant.name || '';
   return packLabel(variant.weight_grams) || variant.variant_name || variant.name || '';
 }
 
-/** "₹129 per 100 g" from a variant, when weight is known. */
+/** "₹129 per 100 g" (or "per 100 ml" for liquids), when the size is known. */
 export function perHundredGrams(variant) {
+  const price0 = Number(variant?.effective_price ?? variant?.selling_price ?? 0);
+  if (variant?.stock_unit_type === 'volume') {
+    const ml = Number(variant?.volume_ml || 0);
+    return ml && price0 ? `${rupees(Math.round((price0 / ml) * 100))} per 100 ml` : '';
+  }
+  if (variant?.stock_unit_type === 'quantity') return '';
   const grams = Number(variant?.weight_grams || 0);
   const price = Number(variant?.effective_price ?? variant?.selling_price ?? 0);
   if (!grams || !price) return '';
@@ -82,7 +99,7 @@ export function cardFromListItem(item) {
     price: Number(pricing.min_price || 0),
     mrp: Number(pricing.min_mrp || 0),
     off,
-    size: item.has_size_options ? '' : packLabel(weight.min),
+    size: item.has_size_options ? '' : (item.volume_ml_min ? volumeLabel(item.volume_ml_min) : packLabel(weight.min)),
     multiple: Number(pricing.variant_count || 1) > 1,
     // Size / colour must be picked on the product page (clothing, footwear…).
     requiresChoice: Boolean(item.requires_choice),
