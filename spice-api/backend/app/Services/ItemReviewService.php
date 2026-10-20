@@ -15,6 +15,8 @@ use App\Core\Request;
  * vendor balances and the shop. Anything that may carry such a typo is put
  * in the administrator's review queue (Item review page) with the reason:
  *
+ *  - every item, until an administrator has actually checked it (items an
+ *    administrator enters themselves count as checked by them);
  *  - an item added by anyone who is not an administrator;
  *  - live prices changed by a non-administrator's purchase entry;
  *  - a purchase cost that looks wrong — far from what the item usually
@@ -55,12 +57,23 @@ final class ItemReviewService
         );
     }
 
-    /** An item created by staff: queued unless an administrator entered it. */
+    /**
+     * A new item: an administrator entering it has checked it themselves
+     * (recorded as reviewed by them); anyone else's goes to the queue.
+     */
     public function flagIfEnteredByStaff(int $productId, Request $request, string $where): void
     {
         $role = $request->authRole();
 
         if (self::isAdmin($role)) {
+            $this->db->execute(
+                'UPDATE `products`
+                    SET `admin_reviewed` = 1, `review_reason` = NULL, `review_flagged_date` = NULL,
+                        `reviewed_by` = :actor, `reviewed_date` = NOW()
+                  WHERE `id` = :id',
+                ['actor' => $request->authUserId(), 'id' => $productId]
+            );
+
             return;
         }
 

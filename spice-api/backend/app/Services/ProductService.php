@@ -66,6 +66,7 @@ final class ProductService
         private readonly Config $config,
         private readonly ProductVariantOptionRepository $variantOptions,
         private readonly PriceChangeLogRepository $priceLog,
+        private readonly ItemReviewService $review,
     ) {
     }
 
@@ -204,7 +205,7 @@ final class ProductService
             );
         }
 
-        $productId = $this->db->transaction(function () use ($data, $category, $slug, $productCode, $variantRows, $actorId): int {
+        $productId = $this->db->transaction(function () use ($data, $category, $slug, $productCode, $variantRows, $actorId, $request): int {
             $productId = $this->products->create([
                 'category_id' => (int) $category['id'],
                 'product_code' => $productCode,
@@ -238,6 +239,8 @@ final class ProductService
             foreach ($variantRows as $index => $variant) {
                 $this->insertVariant($productId, $variant, $index === 0 && $this->noDefaultRequested($variantRows), $actorId);
             }
+
+            $this->review->flagIfEnteredByStaff($productId, $request, 'Products → New product');
 
             $this->variants->ensureDefaultExists($productId);
 
