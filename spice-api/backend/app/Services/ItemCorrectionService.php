@@ -45,6 +45,7 @@ final class ItemCorrectionService
         private readonly Database $db,
         private readonly ProductService $products,
         private readonly AuditService $audit,
+        private readonly InventoryService $inventory,
     ) {
     }
 
@@ -185,6 +186,35 @@ final class ItemCorrectionService
             ['id' => $productId]
         ));
 
+        // Stock per warehouse, including warehouses that hold none yet, so a
+        // count can be entered anywhere.
+        $warehouses = $this->db->select(
+            'SELECT `id`, `uuid`, `name`, `is_default` FROM `warehouses`
+              WHERE `is_deleted` = 0 AND `is_active` = 1 ORDER BY `is_default` DESC, `name` ASC'
+        );
+        $stockRows = $this->db->select(
+            'SELECT v.`uuid` AS `variant_uuid`, s.`warehouse_id`, s.`quantity`, s.`average_cost`
+               FROM `inventory_stock` s INNER JOIN `product_variants` v ON v.`id` = s.`product_variant_id`
+              WHERE v.`product_id` = :id AND v.`is_deleted` = 0 AND s.`is_deleted` = 0',
+            ['id' => $productId]
+        );
+        $stockIndex = [];
+        foreach ($stockRows as $r) {
+            $stockIndex[$r['variant_uuid'] . '|' . $r['warehouse_id']] = $r;
+        }
+        foreach ($variants as $i => $v) {
+            $variants[$i]['stock'] = array_map(static function (array $w) use ($v, $stockIndex): array {
+                $r = $stockIndex[$v['uuid'] . '|' . $w['id']] ?? null;
+
+                return [
+                    'warehouse_uuid' => $w['uuid'],
+                    'warehouse_name' => $w['name'],
+                    'quantity' => $r === null ? 0.0 : (float) $r['quantity'],
+                    'average_cost' => $r === null || $r['average_cost'] === null ? null : (float) $r['average_cost'],
+                ];
+            }, $warehouses);
+        }
+
         $lines = array_map(static fn (array $l): array => [
             'uuid' => $l['uuid'],
             'variant_uuid' => $l['variant_uuid'],
@@ -288,8 +318,10 @@ final class ItemCorrectionService
         $productChanges = $this->productChanges($product, $data);
         $variantChanges = $this->variantChanges($productId, (array) ($data['variants'] ?? []));
         $costChanges = $this->costChanges($productId, (array) ($data['purchase_lines'] ?? []));
+        $stockChanges = $this->stockChanges($productId, (array) ($data['stock'] ?? []));
+        $corrects = $productChanges !== [] || $variantChanges !== [] || $costChanges !== [] || $stockChanges !== [];
 
-        if ($productChanges === [] && $variantChanges === [] && $costChanges === [] && !$markReviewed) {
+        if (!$corrects && !$markReviewed) {
             throw new HttpException('Nothing to correct — no value differs from what is saved.', 422);
         }
 
@@ -301,6 +333,8 @@ final class ItemCorrectionService
             $productChanges,
             $variantChanges,
             $costChanges,
+            $stockChanges,
+            $corrects,
             $markReviewed,
             $note,
             $actorId,
@@ -323,10 +357,19 @@ final class ItemCorrectionService
 
             // 3. Purchase costs: purchase totals, vendor balance, returns, batches, average cost.
             if ($costChanges !== []) {
-                $summary = array_merge($summary, $this->applyCostChanges($costChanges, $actorId));
+                $summary = array_merge($summary, $this->applyCostChanges($costChanges, $request));
             }
 
-            // 4. Review flag.
+            // 4. Stock on hand, counted: the figure entered is final, so it is
+            //    applied after any quantity-received fix above.
+            foreach ($stockChanges as $change) {
+                $line = $this->applyStockCount($change, $note, $request);
+                if ($line !== null) {
+                    $summary[] = $line;
+                }
+            }
+
+            // 5. Review flag.
             if ($markReviewed) {
                 $this->db->execute(
                     'UPDATE `products`
@@ -342,9 +385,7 @@ final class ItemCorrectionService
             $this->audit->log(
                 entityName: 'products',
                 entityId: $productId,
-                action: $productChanges === [] && $variantChanges === [] && $costChanges === []
-                    ? 'item_reviewed'
-                    : 'item_correction',
+                action: $corrects ? 'item_correction' : 'item_reviewed',
                 oldValues: ['admin_reviewed' => (int) $product['admin_reviewed'], 'review_reason' => $product['review_reason']],
                 newValues: ['summary' => $summary],
                 request: $request,
@@ -548,19 +589,30 @@ final class ItemCorrectionService
     }
 
     /**
-     * @return array<int, array{po_id:int, item_id:int, old:float, new:float}>
+     * Purchase-line corrections: the cost per unit and/or the quantity received.
+     *
+     * @return array<int, array{po_id:int, item_id:int, cost:float, quantity:float}>
      */
     private function costChanges(int $productId, array $rows): array
     {
         $out = [];
 
         foreach ($rows as $row) {
-            if (!is_array($row) || empty($row['uuid']) || !isset($row['unit_cost']) || $row['unit_cost'] === '') {
+            if (!is_array($row) || empty($row['uuid'])) {
+                continue;
+            }
+
+            $hasCost = isset($row['unit_cost']) && $row['unit_cost'] !== '';
+            $hasQuantity = isset($row['quantity']) && $row['quantity'] !== '';
+
+            if (!$hasCost && !$hasQuantity) {
                 continue;
             }
 
             $line = $this->db->selectOne(
-                'SELECT poi.`id`, poi.`purchase_order_id`, poi.`unit_cost`
+                'SELECT poi.`id`, poi.`purchase_order_id`, poi.`unit_cost`, poi.`quantity`, v.`variant_name`,
+                        (SELECT COALESCE(SUM(ri.`quantity`), 0) FROM `purchase_return_items` ri
+                          WHERE ri.`purchase_order_item_id` = poi.`id` AND ri.`is_deleted` = 0) AS `returned`
                    FROM `purchase_order_items` poi
                    INNER JOIN `product_variants` v ON v.`id` = poi.`product_variant_id`
                   WHERE poi.`uuid` = :uuid AND poi.`is_deleted` = 0 AND v.`product_id` = :pid',
@@ -571,18 +623,34 @@ final class ItemCorrectionService
                 throw new HttpException('A purchase line in the correction does not belong to this item.', 422);
             }
 
-            $new = round((float) $row['unit_cost'], 4);
+            $cost = $hasCost ? round((float) $row['unit_cost'], 4) : (float) $line['unit_cost'];
+            $quantity = $hasQuantity ? round((float) $row['quantity'], 3) : (float) $line['quantity'];
 
-            if ($new < 0) {
+            if ($cost < 0) {
                 throw new HttpException('A purchase cost cannot be negative.', 422);
             }
 
-            if (abs($new - (float) $line['unit_cost']) > 0.00005) {
+            if ($quantity <= 0) {
+                throw new HttpException(
+                    sprintf('%s: the quantity received must be more than 0. To cancel a whole line, use Purchase Inward.', $line['variant_name']),
+                    422
+                );
+            }
+
+            if ($quantity + 0.0005 < (float) $line['returned']) {
+                throw new HttpException(
+                    sprintf('%s: %s were already returned to the vendor from this purchase, so the quantity received cannot be less than that.',
+                        $line['variant_name'], self::qty((float) $line['returned'])),
+                    422
+                );
+            }
+
+            if (abs($cost - (float) $line['unit_cost']) > 0.00005 || abs($quantity - (float) $line['quantity']) > 0.0005) {
                 $out[] = [
                     'po_id' => (int) $line['purchase_order_id'],
                     'item_id' => (int) $line['id'],
-                    'old' => (float) $line['unit_cost'],
-                    'new' => $new,
+                    'cost' => $cost,
+                    'quantity' => $quantity,
                 ];
             }
         }
@@ -591,16 +659,20 @@ final class ItemCorrectionService
     }
 
     /**
-     * @param array<int, array{po_id:int, item_id:int, old:float, new:float}> $changes
+     * @param array<int, array{po_id:int, item_id:int, cost:float, quantity:float}> $changes
      *
      * @return array<int, string> Summary lines
      */
-    private function applyCostChanges(array $changes, ?int $actorId): array
+    private function applyCostChanges(array $changes, Request $request): array
     {
+        $actorId = $request->authUserId();
         $byPo = [];
         foreach ($changes as $c) {
-            $byPo[$c['po_id']][$c['item_id']] = $c['new'];
+            $byPo[$c['po_id']][$c['item_id']] = $c;
         }
+
+        /** @var array<string, array<int, array<string, mixed>>> $quantityMoves "variant|warehouse" => stock moves to post */
+        $quantityMoves = [];
 
         $summary = [];
         /** @var array<string, array{0:int, 1:int}> $affectedStock */
@@ -610,7 +682,7 @@ final class ItemCorrectionService
         /** @var array<string, float> $oldLandingByMovementKey same key => landing cost before */
         $oldLandingByMovementKey = [];
 
-        foreach ($byPo as $poId => $newCosts) {
+        foreach ($byPo as $poId => $lineChanges) {
             $po = $this->db->selectOne(
                 'SELECT * FROM `purchase_orders` WHERE `id` = :id AND `is_deleted` = 0 FOR UPDATE',
                 ['id' => $poId]
@@ -631,10 +703,13 @@ final class ItemCorrectionService
             // Re-work the purchase exactly as Purchase Inward computes it.
             $subtotal = 0.0;
             foreach ($items as $i => $item) {
-                $cost = $newCosts[(int) $item['id']] ?? (float) $item['unit_cost'];
+                $change = $lineChanges[(int) $item['id']] ?? null;
+                $cost = $change['cost'] ?? (float) $item['unit_cost'];
+                $quantity = $change['quantity'] ?? (float) $item['quantity'];
                 $items[$i]['new_unit_cost'] = $cost;
-                $items[$i]['new_line_subtotal'] = round((float) $item['quantity'] * $cost, 2);
-                $subtotal += (float) $item['quantity'] * $cost;
+                $items[$i]['new_quantity'] = $quantity;
+                $items[$i]['new_line_subtotal'] = round($quantity * $cost, 2);
+                $subtotal += $quantity * $cost;
             }
 
             $included = (int) $po['transport_included_in_cost'] === 1;
@@ -670,10 +745,11 @@ final class ItemCorrectionService
 
                 $this->db->execute(
                     'UPDATE `purchase_order_items`
-                        SET `unit_cost` = :cost, `landing_cost` = :landing, `line_subtotal` = :subtotal,
+                        SET `quantity` = :qty, `unit_cost` = :cost, `landing_cost` = :landing, `line_subtotal` = :subtotal,
                             `gst_amount` = :gst, `updated_by` = :actor, `updated_date` = NOW(), `version` = `version` + 1
                       WHERE `id` = :id',
                     [
+                        'qty' => number_format((float) $item['new_quantity'], 3, '.', ''),
                         'cost' => number_format($newCost, 4, '.', ''),
                         'landing' => number_format($newLanding, 4, '.', ''),
                         'subtotal' => number_format($item['new_line_subtotal'], 2, '.', ''),
@@ -687,10 +763,39 @@ final class ItemCorrectionService
                 $warehouseId = (int) $po['warehouse_id'];
                 $key = $poId . '|' . $variantId . '|' . (string) $item['batch_no'];
 
-                if (abs($newLanding - $oldLanding) > 0.00005) {
+                $quantityDelta = round((float) $item['new_quantity'] - (float) $item['quantity'], 3);
+
+                if (abs($newLanding - $oldLanding) > 0.00005 || abs($quantityDelta) > 0.0005) {
                     $landingByMovementKey[$key] = $newLanding;
                     $oldLandingByMovementKey[$key] = $oldLanding;
                     $affectedStock[$variantId . '|' . $warehouseId] = [$variantId, $warehouseId];
+                }
+
+                if (abs($quantityDelta) > 0.0005) {
+                    // Received quantity typed wrong: stock moves by the
+                    // difference, against this purchase and its batch, at
+                    // the line's landing cost (so the movement history can
+                    // value it — see rebuildAverageCost()).
+                    $quantityMoves[$variantId . '|' . $warehouseId][] = [
+                        'delta' => $quantityDelta,
+                        'landing' => $newLanding,
+                        'po_id' => $poId,
+                        'po_number' => (string) $po['po_number'],
+                        'batch_no' => $item['batch_no'],
+                        'expiry_date' => $item['expiry_date'],
+                    ];
+                    $summary[] = sprintf(
+                        'Purchase %s, %s: quantity received %s → %s (stock %s%s)',
+                        $po['po_number'],
+                        $item['variant_name'],
+                        self::qty((float) $item['quantity']),
+                        self::qty((float) $item['new_quantity']),
+                        $quantityDelta > 0 ? '+' : '−',
+                        self::qty(abs($quantityDelta))
+                    );
+                }
+
+                if (abs($newLanding - $oldLanding) > 0.00005) {
 
                     if ($item['batch_no'] !== null) {
                         $this->db->execute(
@@ -708,7 +813,7 @@ final class ItemCorrectionService
                     }
                 }
 
-                if (isset($newCosts[$itemId])) {
+                if (isset($lineChanges[$itemId]) && abs($newCost - (float) $item['unit_cost']) > 0.00005) {
                     $summary[] = sprintf(
                         'Purchase %s, %s: cost ₹%s → ₹%s (landing ₹%s → ₹%s)',
                         $po['po_number'],
@@ -784,11 +889,15 @@ final class ItemCorrectionService
             }
         }
 
-        foreach ($affectedStock as [$variantId, $warehouseId]) {
-            $line = $this->rebuildAverageCost($variantId, $warehouseId, $landingByMovementKey, $oldLandingByMovementKey, $actorId);
-            if ($line !== null) {
-                $summary[] = $line;
-            }
+        foreach ($affectedStock as $stockKey => [$variantId, $warehouseId]) {
+            $summary = array_merge($summary, $this->rebuildAverageCost(
+                $variantId,
+                $warehouseId,
+                $landingByMovementKey,
+                $oldLandingByMovementKey,
+                $quantityMoves[$stockKey] ?? [],
+                $request,
+            ));
         }
 
         return $summary;
@@ -796,22 +905,30 @@ final class ItemCorrectionService
 
     /**
      * Re-works the stock's average cost from its movement history twice — as
-     * recorded, and with the corrected purchase costs — and shifts the saved
+     * recorded, and with the corrected purchase lines — and shifts the saved
      * average by the difference. When the history fully explains today's
      * figure this gives exactly the average the stock would have had; when
      * some of it predates the history (opening figures), the correction is
      * still applied without disturbing the part that history cannot explain.
      *
+     * Quantity corrections are posted in between: the "before" replay runs on
+     * the ledger as it was, the "after" replay includes the new movements.
+     *
      * @param array<string, float> $newLanding
      * @param array<string, float> $oldLanding
+     * @param array<int, array<string, mixed>> $quantityMoves
+     *
+     * @return array<int, string> Summary lines
      */
     private function rebuildAverageCost(
         int $variantId,
         int $warehouseId,
         array $newLanding,
         array $oldLanding,
-        ?int $actorId,
-    ): ?string {
+        array $quantityMoves,
+        Request $request,
+    ): array {
+        $actorId = $request->authUserId();
         $stock = $this->db->selectOne(
             'SELECT s.`id`, s.`quantity`, s.`average_cost`, v.`variant_name`
                FROM `inventory_stock` s INNER JOIN `product_variants` v ON v.`id` = s.`product_variant_id`
@@ -820,60 +937,58 @@ final class ItemCorrectionService
         );
 
         if ($stock === null) {
-            return null;
-        }
-
-        $movements = $this->db->select(
-            'SELECT `movement_type`, `reference_type`, `reference_id`, `quantity_delta`, `unit_cost`, `batch_no`
-               FROM `inventory_movements`
-              WHERE `product_variant_id` = :vid AND `warehouse_id` = :wid
-              ORDER BY `id` ASC',
-            ['vid' => $variantId, 'wid' => $warehouseId]
-        );
-
-        $replay = static function (bool $corrected) use ($movements, $variantId, $newLanding, $oldLanding): ?float {
-            $quantity = 0.0;
-            $average = null;
-
-            foreach ($movements as $m) {
-                $delta = (float) $m['quantity_delta'];
-                $cost = $m['unit_cost'] === null ? null : (float) $m['unit_cost'];
-
-                if ($cost !== null && $delta > 0 && $m['reference_type'] === 'purchase_order') {
-                    $key = $m['reference_id'] . '|' . $variantId . '|' . (string) $m['batch_no'];
-                    // The ledger keeps the cost as first typed; the purchase
-                    // line holds the cost as last corrected. Replaying this
-                    // inward at the line's cost before and after this
-                    // correction keeps repeated corrections consistent.
-                    if (isset($newLanding[$key])) {
-                        $cost = $corrected ? $newLanding[$key] : $oldLanding[$key];
-                    }
-                }
-
-                if ($cost !== null && $delta > 0) {
-                    $average = InventoryService::blendAverageCost($quantity, $average, $delta, $cost);
-                }
-
-                $quantity += $delta;
-            }
-
-            return $average;
-        };
-
-        $before = $replay(false);
-        $after = $replay(true);
-
-        if ($after === null) {
-            return null;
+            return [];
         }
 
         $current = $stock['average_cost'] !== null ? (float) $stock['average_cost'] : null;
-        $newAverage = $current === null ? $after : max(0.0, round($current + ($after - ($before ?? $current)), 4));
+        $before = self::replay($this->movementsOf($variantId, $warehouseId), $variantId, $oldLanding);
+        $summary = [];
 
-        if ($current !== null && abs($newAverage - $current) < 0.00005) {
-            return null;
+        if ($quantityMoves !== []) {
+            $net = array_sum(array_map(static fn (array $m): float => (float) $m['delta'], $quantityMoves));
+
+            if ((float) $stock['quantity'] + $net < -0.0005) {
+                throw new HttpException(
+                    sprintf(
+                        '%s: only %s is in stock now — the rest has already been sold or moved — so the quantity received '
+                        . 'cannot be lowered by %s. Lower it by at most %s, or correct the stock count instead.',
+                        $stock['variant_name'],
+                        self::qty((float) $stock['quantity']),
+                        self::qty(abs($net)),
+                        self::qty(max(0.0, (float) $stock['quantity']))
+                    ),
+                    422
+                );
+            }
+
+            foreach ($quantityMoves as $move) {
+                $this->inventory->recordMovement(
+                    variantId: $variantId,
+                    warehouseId: $warehouseId,
+                    movementType: 'adjustment',
+                    quantityDelta: (float) $move['delta'],
+                    unitCost: (float) $move['landing'],
+                    referenceType: 'purchase_order',
+                    referenceId: (int) $move['po_id'],
+                    batchNo: $move['batch_no'],
+                    expiryDate: $move['delta'] > 0 ? $move['expiry_date'] : null,
+                    reason: 'Item review: quantity received corrected on ' . $move['po_number'],
+                    performedBy: $actorId,
+                    request: $request,
+                );
+            }
         }
 
+        $after = self::replay($this->movementsOf($variantId, $warehouseId), $variantId, $newLanding);
+
+        if ($after === null) {
+            return $summary;
+        }
+
+        $newAverage = $current === null ? $after : max(0.0, round($current + ($after - ($before ?? $current)), 4));
+
+        // Always written: recordMovement() above blends a positive correction
+        // on its own terms; the replayed figure is the one that stands.
         $this->db->execute(
             'UPDATE `inventory_stock`
                 SET `average_cost` = :avg, `updated_by` = :actor, `updated_date` = NOW(), `version` = `version` + 1
@@ -881,12 +996,166 @@ final class ItemCorrectionService
             ['avg' => number_format($newAverage, 4, '.', ''), 'actor' => $actorId, 'id' => (int) $stock['id']]
         );
 
-        return sprintf(
-            '%s: average stock cost ₹%s → ₹%s',
-            $stock['variant_name'],
-            $current === null ? '—' : number_format($current, 2),
-            number_format($newAverage, 2)
+        if ($current === null || abs($newAverage - $current) >= 0.00005) {
+            $summary[] = sprintf(
+                '%s: average stock cost ₹%s → ₹%s',
+                $stock['variant_name'],
+                $current === null ? '—' : number_format($current, 2),
+                number_format($newAverage, 2)
+            );
+        }
+
+        return $summary;
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function movementsOf(int $variantId, int $warehouseId): array
+    {
+        return $this->db->select(
+            'SELECT `movement_type`, `reference_type`, `reference_id`, `quantity_delta`, `unit_cost`, `batch_no`
+               FROM `inventory_movements`
+              WHERE `product_variant_id` = :vid AND `warehouse_id` = :wid
+              ORDER BY `id` ASC',
+            ['vid' => $variantId, 'wid' => $warehouseId]
         );
+    }
+
+    /**
+     * Weighted-average cost from a movement history, the way recordMovement()
+     * builds it — with each purchase line's goods valued at that line's
+     * landing cost from $landing ("po|variant|batch" => cost). The ledger
+     * keeps the cost as first typed; the purchase line holds it as last
+     * corrected, so repeated corrections stay consistent.
+     *
+     * One addition: a quantity-received correction that takes goods back out
+     * ('adjustment' against a purchase, with a cost) removes their value too,
+     * since they never really arrived.
+     *
+     * @param array<int, array<string, mixed>> $movements
+     * @param array<string, float> $landing
+     */
+    private static function replay(array $movements, int $variantId, array $landing): ?float
+    {
+        $quantity = 0.0;
+        $average = null;
+
+        foreach ($movements as $m) {
+            $delta = (float) $m['quantity_delta'];
+            $cost = $m['unit_cost'] === null ? null : (float) $m['unit_cost'];
+            $fromPurchase = $m['reference_type'] === 'purchase_order' && $cost !== null;
+
+            if ($fromPurchase) {
+                $key = $m['reference_id'] . '|' . $variantId . '|' . (string) $m['batch_no'];
+                if (isset($landing[$key])) {
+                    $cost = $landing[$key];
+                }
+            }
+
+            if ($cost !== null && $delta > 0) {
+                $average = InventoryService::blendAverageCost($quantity, $average, $delta, $cost);
+            } elseif ($fromPurchase && $delta < 0 && $m['movement_type'] === 'adjustment' && $average !== null) {
+                $remaining = $quantity + $delta;
+                if ($remaining > 0.0005 && $quantity > 0) {
+                    $average = max(0.0, round(($quantity * $average + $delta * $cost) / $remaining, 4));
+                }
+            }
+
+            $quantity += $delta;
+        }
+
+        return $average;
+    }
+
+    /**
+     * Stock-on-hand corrections: [{variant_uuid, warehouse_uuid, quantity}],
+     * quantity being what is really on the shelf.
+     *
+     * @return array<int, array{variant_id:int, warehouse_id:int, variant_name:string, warehouse_name:string, quantity:float}>
+     */
+    private function stockChanges(int $productId, array $rows): array
+    {
+        $out = [];
+
+        foreach ($rows as $row) {
+            if (!is_array($row) || empty($row['variant_uuid']) || empty($row['warehouse_uuid'])
+                || !isset($row['quantity']) || $row['quantity'] === '') {
+                continue;
+            }
+
+            $pair = $this->db->selectOne(
+                'SELECT v.`id` AS `variant_id`, v.`variant_name`, w.`id` AS `warehouse_id`, w.`name` AS `warehouse_name`,
+                        (SELECT s.`quantity` FROM `inventory_stock` s
+                          WHERE s.`product_variant_id` = v.`id` AND s.`warehouse_id` = w.`id` LIMIT 1) AS `quantity`
+                   FROM `product_variants` v
+                   INNER JOIN `warehouses` w ON w.`uuid` = :wuuid AND w.`is_deleted` = 0
+                  WHERE v.`uuid` = :vuuid AND v.`product_id` = :pid AND v.`is_deleted` = 0',
+                ['wuuid' => (string) $row['warehouse_uuid'], 'vuuid' => (string) $row['variant_uuid'], 'pid' => $productId]
+            );
+
+            if ($pair === null) {
+                throw new HttpException('A stock line in the correction does not belong to this item.', 422);
+            }
+
+            $target = round((float) $row['quantity'], 3);
+
+            if ($target < 0) {
+                throw new HttpException(sprintf('%s: stock cannot be less than 0.', $pair['variant_name']), 422);
+            }
+
+            if (abs($target - (float) ($pair['quantity'] ?? 0)) > 0.0005) {
+                $out[] = [
+                    'variant_id' => (int) $pair['variant_id'],
+                    'warehouse_id' => (int) $pair['warehouse_id'],
+                    'variant_name' => (string) $pair['variant_name'],
+                    'warehouse_name' => (string) $pair['warehouse_name'],
+                    'quantity' => $target,
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Brings recorded stock to the counted figure with an ordinary stock
+     * adjustment (the ledger shows who, when and why). The average cost is
+     * left as it is: a counting error says nothing about what goods cost.
+     */
+    private function applyStockCount(array $change, string $note, Request $request): ?string
+    {
+        $row = $this->db->selectOne(
+            'SELECT `quantity` FROM `inventory_stock` WHERE `product_variant_id` = :vid AND `warehouse_id` = :wid',
+            ['vid' => $change['variant_id'], 'wid' => $change['warehouse_id']]
+        );
+        $now = $row === null ? 0.0 : (float) $row['quantity'];
+        $delta = round($change['quantity'] - $now, 3);
+
+        if (abs($delta) < 0.0005) {
+            return null;
+        }
+
+        $this->inventory->manualAdjustment(
+            variantId: $change['variant_id'],
+            warehouseId: $change['warehouse_id'],
+            quantityDelta: $delta,
+            movementType: 'adjustment',
+            reason: mb_substr('Item review: stock corrected by administrator' . ($note !== '' ? ' — ' . $note : ''), 0, 255),
+            performedBy: $request->authUserId(),
+            request: $request,
+        );
+
+        return sprintf(
+            '%s at %s: stock %s → %s',
+            $change['variant_name'],
+            $change['warehouse_name'],
+            self::qty($now),
+            self::qty($change['quantity'])
+        );
+    }
+
+    private static function qty(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 3, '.', ''), '0'), '.');
     }
 
     private static function path(?string $parent, string $name): string

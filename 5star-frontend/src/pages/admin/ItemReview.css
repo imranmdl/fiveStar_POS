@@ -66,6 +66,7 @@
 
 .ir-table-wrap { overflow-x: auto; }
 .ir-table { min-width: 860px; }
+.ir-table--stock { min-width: 560px; }
 .ir-table td { vertical-align: top; }
 .ir-table td input[type='number'] { width: 96px; }
 .ir-table td[data-label='Pack name'] input { min-width: 150px; }
@@ -85,12 +86,22 @@
   .ir-list { position: static; max-height: none; }
 }
 
-@media (max-width: 640px) {
-  .ir-table { min-width: 0; }
+/* Tables turn into cards whenever their section is too narrow for the
+   columns — the editor pane on a laptop as well as a phone. */
+.ir-section { container-type: inline-size; }
+
+@container (max-width: 860px) {
+  .ir-table, .ir-table--stock { min-width: 0; }
   .ir-table thead { display: none; }
-  .ir-table, .ir-table tbody, .ir-table tr, .ir-table td { display: block; width: 100%; }
-  .ir-table tr { border: 1px solid #eee; border-radius: 8px; padding: 6px 8px; margin-bottom: 8px; }
-  .ir-table td { display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center; border: 0; padding: 4px 0; }
-  .ir-table td::before { content: attr(data-label); color: #777; font-size: 12px; }
-  .ir-table td input[type='number'], .ir-table td input, .ir-table td select { width: 100%; min-width: 0; }
+  .ir-table, .ir-table tbody { display: block; width: 100%; }
+  .ir-table tbody tr {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px 12px;
+    border: 1px solid #eee; border-radius: 8px; padding: 10px; margin-bottom: 8px; background: #fff;
+  }
+  .ir-table tbody tr:nth-child(even) { background: #fff; }
+  .ir-table td { display: flex; flex-direction: column; gap: 3px; border: 0; padding: 0; min-width: 0; }
+  .ir-table td::before { content: attr(data-label); color: #777; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .ir-table td input, .ir-table td select,
+  .ir-table td[data-label='Pack name'] input, .ir-table td[data-label='Sold by'] select,
+  .ir-table td[data-label='Unit'] input, .ir-table td input[type='number'] { width: 100%; min-width: 0; }
 }
