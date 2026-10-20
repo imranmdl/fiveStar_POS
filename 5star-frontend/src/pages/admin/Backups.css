@@ -107,3 +107,8 @@
   border-color: #c0392b;
   color: #fff;
 }
+
+.backups-actions { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.backups-explain { margin: 0; padding: 10px 16px 0; }
+.backups-type { font-size: 12px; border-radius: 999px; padding: 2px 8px; background: #f0f0f0; color: #555; white-space: nowrap; }
+.backups-type--full { background: #e3f3e8; color: #1e5136; }

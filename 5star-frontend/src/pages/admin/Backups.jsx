@@ -8,7 +8,8 @@ function formatBytes(bytes) {
   const n = Number(bytes) || 0;
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
 async function triggerDownload(filename) {
@@ -26,7 +27,7 @@ async function triggerDownload(filename) {
 function BackupsList({ refreshKey }) {
   const [backups, setBackups] = useState(null);
   const [error, setError] = useState(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState('');
   const [busyFile, setBusyFile] = useState(null);
 
   function load() {
@@ -39,16 +40,19 @@ function BackupsList({ refreshKey }) {
 
   useEffect(load, [refreshKey]);
 
-  async function createBackup() {
-    setCreating(true);
+  async function createBackup(type) {
+    setCreating(type);
     try {
-      await api.post('/admin/backups');
-      toast('Backup created.');
+      const r = await api.post('/admin/backups', type === 'full' ? { type: 'full' } : {});
+      const b = r.data.backup || {};
+      toast(type === 'full'
+        ? `Full backup created: data + ${b.upload_files ?? 0} image file(s), ${formatBytes(b.bytes)}.`
+        : 'Backup created.');
       load();
     } catch (error) {
       toast(error instanceof ApiError ? error.message : 'Could not create a backup.', 'danger');
     } finally {
-      setCreating(false);
+      setCreating('');
     }
   }
 
@@ -64,9 +68,10 @@ function BackupsList({ refreshKey }) {
   }
 
   async function restore(filename) {
+    const full = filename.endsWith('.zip');
     if (
       !window.confirm(
-        `Put the whole database back to how it was in "${filename}"?\n\nEverything added or changed since then is replaced. A safety backup of the current data is taken first. You may need to sign in again afterwards.`
+        `Put the whole ${full ? 'shop (data and images)' : 'database'} back to how it was in "${filename}"?\n\nEverything added or changed since then is replaced. A safety backup of the current data is taken first. You may need to sign in again afterwards.`
       )
     ) {
       return;
@@ -74,7 +79,7 @@ function BackupsList({ refreshKey }) {
     setBusyFile(filename);
     try {
       const result = await api.post(`/admin/backups/${encodeURIComponent(filename)}/restore`, { confirm: 'yes' });
-      toast(`Restored. Safety backup of what was there: ${result.data.safety_backup.filename}`);
+      toast(`Restored${result.data.files_restored != null ? ` (data + ${result.data.files_restored} image files)` : ''}. Safety backup of what was there: ${result.data.safety_backup.filename}`);
       load();
     } catch (error) {
       toast(error instanceof ApiError ? error.message : 'Could not restore this backup.', 'danger');
@@ -100,11 +105,21 @@ function BackupsList({ refreshKey }) {
   return (
     <div className="pl-card">
       <div className="pl-card__header">
-        <span>Database backups</span>
-        <button type="button" className="admin-btn admin-btn--primary" onClick={createBackup} disabled={creating}>
-          {creating ? 'Creating…' : 'Create backup'}
-        </button>
+        <span>Backups</span>
+        <span className="backups-actions">
+          <button type="button" className="admin-btn" onClick={() => createBackup('database')} disabled={Boolean(creating)}>
+            {creating === 'database' ? 'Creating…' : 'Data only (.sql)'}
+          </button>
+          <button type="button" className="admin-btn admin-btn--primary" onClick={() => createBackup('full')} disabled={Boolean(creating)}>
+            {creating === 'full' ? 'Creating full backup… (can take a few minutes)' : 'Full backup — data + images (.zip)'}
+          </button>
+        </span>
       </div>
+      <p className="pl-sub backups-explain">
+        <b>Full backup</b> = every table (products, orders, customers, stock, vendors, settings…) plus every uploaded image
+        (product photos, banners, logo, payment QR). Download it, then restore it on a test copy of the shop to get an exact
+        copy for testing — or back here if something goes wrong.
+      </p>
       <div style={{ padding: backups && backups.length === 0 ? 0 : undefined }}>
         {error && <ErrorState error={error} />}
         {!backups && !error && <LoadingState />}
@@ -115,6 +130,7 @@ function BackupsList({ refreshKey }) {
             <thead>
               <tr>
                 <th>File</th>
+                <th>Type</th>
                 <th>Size</th>
                 <th>Created</th>
                 <th></th>
@@ -124,6 +140,11 @@ function BackupsList({ refreshKey }) {
               {backups.map((b) => (
                 <tr key={b.filename}>
                   <td>{b.filename}</td>
+                  <td>
+                    {b.type === 'full'
+                      ? <span className="backups-type backups-type--full">Data + images{b.upload_files != null ? ` (${b.upload_files} files)` : ''}</span>
+                      : <span className="backups-type">Data only</span>}
+                  </td>
                   <td>{formatBytes(b.bytes)}</td>
                   <td>{b.created_date}</td>
                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -161,7 +182,7 @@ function RestoreForm({ onRestored }) {
   async function handleSubmit(event) {
     event.preventDefault();
     if (!file) {
-      toast('Choose a .sql file first.', 'danger');
+      toast('Choose a backup file (.sql or .zip) first.', 'danger');
       return;
     }
     if (
@@ -179,7 +200,7 @@ function RestoreForm({ onRestored }) {
 
     try {
       const result = await api.upload('/admin/backups/restore', formData);
-      toast(`Restore complete. Safety backup: ${result.data.safety_backup.filename}`);
+      toast(`Restore complete${result.data.files_restored != null ? ` — data and ${result.data.files_restored} image files` : ''}. Safety backup: ${result.data.safety_backup.filename}`);
       setFile(null);
       event.currentTarget.reset();
       onRestored();
@@ -195,10 +216,12 @@ function RestoreForm({ onRestored }) {
       <div className="pl-card__header">Restore from a file on your computer</div>
       <div style={{ padding: 16 }}>
         <p className="pl-sub" style={{ marginBottom: 12 }}>
-          Replaces live data with what's in the file. A safety backup of the current database is always taken first.
+          Choose a <b>.sql</b> (data only) or a <b>full backup .zip</b> (data + images). It replaces live data with what&apos;s in
+          the file; images in the backup are put back too. A safety backup of the current database is always taken first.
+          Large full backups can take several minutes to upload — keep this page open.
         </p>
         <form onSubmit={handleSubmit}>
-          <input type="file" accept=".sql" required onChange={(e) => setFile(e.target.files[0] || null)} style={{ marginBottom: 12 }} />
+          <input type="file" accept=".sql,.zip" required onChange={(e) => setFile(e.target.files[0] || null)} style={{ marginBottom: 12 }} />
           <div>
             <button type="submit" className="admin-btn" style={{ color: '#c0392b' }} disabled={busy}>
               {busy ? 'Restoring…' : 'Restore'}
