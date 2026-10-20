@@ -58,6 +58,15 @@ final class SettingsController extends BaseController
         );
     }
 
+    /** PUT /api/v1/admin/settings/india-post — rate card + tracking link */
+    public function saveIndiaPost(Request $request): Response
+    {
+        return Response::success(
+            $this->settings->saveIndiaPost($request, $request->all()),
+            'India Post settings saved'
+        );
+    }
+
     /** PATCH /api/v1/admin/settings/price-change-mode */
     public function setPriceChangeMode(Request $request): Response
     {

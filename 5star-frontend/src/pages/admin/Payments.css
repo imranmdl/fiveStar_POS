@@ -155,3 +155,14 @@
   font-size: 13px;
   color: #8a5a00;
 }
+
+.india-post { border: 1px solid #e3e3e3; border-radius: 10px; padding: 14px; margin: 12px 0; display: flex; flex-direction: column; gap: 10px; background: #fff; }
+.india-post h3 { margin: 0; font-size: 16px; }
+.india-post__table { max-width: 480px; }
+.india-post__table input { width: 100%; min-width: 0; padding: 6px 8px; border: 1px solid #d8d8d8; border-radius: 6px; font: inherit; }
+.india-post__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 14px; }
+.india-post__url { grid-column: 1 / -1; }
+.india-post__url small { color: #777; font-size: 12px; }
+.india-post__check { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; }
+.india-post__check input { width: 90px; padding: 5px 8px; border: 1px solid #d8d8d8; border-radius: 6px; font: inherit; }
+.india-post > .admin-btn { align-self: flex-start; }

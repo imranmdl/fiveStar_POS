@@ -165,3 +165,5 @@
 
 .sf-otp-inline { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
 .sf-otp-inline .sf-field { flex: 1 1 160px; }
+
+.sf-track__head .sf-track__actions { display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; }

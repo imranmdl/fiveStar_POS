@@ -82,6 +82,7 @@ function VerifyOrder({ order, onVerified }) {
 // Shipment tracking: courier, AWB, scan history.
 // ---------------------------------------------------------------------------
 function Tracking({ order, shipments, shipping }) {
+  const [copied, setCopied] = useState('');
   const list = shipments || [];
 
   if (list.length === 0) {
@@ -131,10 +132,29 @@ function Tracking({ order, shipments, shipping }) {
                   </span>
                 )}
               </div>
-              {s.tracking_url && (
-                <a className="sf-btn sf-btn--outline sf-btn--sm" href={s.tracking_url} target="_blank" rel="noopener noreferrer">TRACK ON COURIER SITE</a>
-              )}
+              <div className="sf-track__actions">
+                {s.awb_number && (
+                  <button
+                    type="button"
+                    className="sf-btn sf-btn--outline sf-btn--sm"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(s.awb_number).then(
+                        () => { setCopied(s.uuid); setTimeout(() => setCopied(''), 2000); },
+                        () => {},
+                      );
+                    }}
+                  >
+                    {copied === s.uuid ? 'COPIED' : 'COPY NUMBER'}
+                  </button>
+                )}
+                {s.tracking_url && (
+                  <a className="sf-btn sf-btn--outline sf-btn--sm" href={s.tracking_url} target="_blank" rel="noopener noreferrer">
+                    {/india post/i.test(s.courier_name || '') ? 'TRACK ON INDIA POST' : 'TRACK ON COURIER SITE'}
+                  </a>
+                )}
+              </div>
             </div>
+            {s.tracking_hint && <p className="sf-small" style={{ margin: '4px 0 0' }}>{s.tracking_hint}</p>}
             {events.length > 0 ? (
               <ul className="sf-events">
                 {events.map((e, i) => (

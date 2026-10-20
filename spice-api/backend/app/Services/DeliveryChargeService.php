@@ -8,6 +8,7 @@ use App\Core\Config;
 use App\Helpers\Money;
 use App\Repositories\DeliveryZoneRepository;
 use App\Repositories\SettingRepository;
+use App\Services\Delivery\IndiaPost;
 use App\Services\Pricing\DeliveryQuote;
 
 /**
@@ -36,6 +37,7 @@ final class DeliveryChargeService
         private readonly DeliveryZoneRepository $zones,
         private readonly SettingRepository $settings,
         private readonly Config $config,
+        private readonly IndiaPost $indiaPost,
     ) {
     }
 
@@ -72,6 +74,30 @@ final class DeliveryChargeService
                 chargeableWeightGrams: $weightGrams,
                 isServiceable: false,
                 waiverReason: null,
+            );
+        }
+
+        // Post-office delivery: one rate card by weight (Payments → India
+        // Post), the post office's delivery days, the shop's usual
+        // free-delivery threshold.
+        if ($this->indiaPost->isActive()) {
+            $ip = $this->indiaPost->config();
+            $charge = Money::fromDecimal(number_format($this->indiaPost->charge($weightGrams), 2, '.', ''));
+            $chargeBeforeWaiver = $charge;
+            [$waived, $reason, $shortfall] = $this->evaluateWaiver(['free_above_order_value' => null], $orderValue, $charge);
+
+            return new DeliveryQuote(
+                zoneCode: (string) $zone['code'],
+                zoneName: (string) $zone['name'],
+                charge: $waived ? Money::zero() : $charge,
+                chargeBeforeWaiver: $chargeBeforeWaiver,
+                gstRate: $this->deliveryGstRate(),
+                slaMinDays: (int) $ip['min_days'],
+                slaMaxDays: (int) $ip['max_days'],
+                chargeableWeightGrams: $weightGrams,
+                isServiceable: true,
+                waiverReason: $reason,
+                spendMoreForFreeDelivery: $shortfall,
             );
         }
 
@@ -133,6 +159,12 @@ final class DeliveryChargeService
         }
 
         $serviceable = (int) $zone['is_serviceable'] === 1;
+
+        if ($this->indiaPost->isActive()) {
+            $ip = $this->indiaPost->config();
+            $zone['sla_min_days'] = $ip['min_days'];
+            $zone['sla_max_days'] = $ip['max_days'];
+        }
 
         return [
             'pincode' => $digits,
