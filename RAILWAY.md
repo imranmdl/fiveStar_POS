@@ -186,6 +186,14 @@ full Hostinger dump — its schema contains MariaDB-only definitions. Instead:
 - **Backups:** turn on Railway's MySQL backups; the in-app backup (Admin →
   Backups) writes to `/data/storage/backups` on the volume. Any saved
   backup can be put back with its **Restore** button.
+- **Full backup (data + images):** Admin → Backups → *Full backup — data +
+  images (.zip)*. The .zip holds `database.sql`, every file under
+  `uploads/` and a `manifest.json`. To get an exact copy for testing, start a
+  second Railway service (its own MySQL and `/data` volume) or a local
+  Docker run, sign in as admin there, and *Restore from a file* with the
+  .zip — data and images both come back. Uploads up to 2 GB are allowed
+  (`docker/php.ini`, `docker/apache.conf`). Download the .zip off the server
+  now and then: a backup kept only on the volume goes with the volume.
 - **Testing from a clean start:** with `ALLOW_DATA_RESET=true`, Admin →
   Backups → *Reset data* wipes the chosen kinds of data (a backup is taken
   first; restore it to undo). Staff logins, roles, settings, warehouses,

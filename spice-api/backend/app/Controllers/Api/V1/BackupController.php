@@ -34,9 +34,20 @@ final class BackupController extends BaseController
         return Response::success(['backups' => $this->backups->list()], 'Backups loaded');
     }
 
-    /** POST /api/v1/admin/backups */
+    /**
+     * POST /api/v1/admin/backups
+     * { "type": "full" } = database + all uploaded images in one .zip;
+     * anything else = database only (.sql).
+     */
     public function store(Request $request): Response
     {
+        if ($request->input('type') === 'full') {
+            return Response::created(
+                ['backup' => $this->backups->createFull($request)],
+                'Full backup created (data and images)'
+            );
+        }
+
         return Response::created(
             ['backup' => $this->backups->create($request)],
             'Backup created'
@@ -49,7 +60,7 @@ final class BackupController extends BaseController
         $filename = (string) $request->routeParam('filename');
         $path = $this->backups->pathFor($filename);
 
-        return Response::file($path, $filename, 'application/sql');
+        return Response::file($path, $filename, str_ends_with($filename, '.zip') ? 'application/zip' : 'application/sql');
     }
 
     /** DELETE /api/v1/admin/backups/{filename} */
@@ -68,7 +79,7 @@ final class BackupController extends BaseController
     {
         if (!isset($request->files['file'])) {
             throw new HttpException('No file was received.', 422, [
-                'file' => ['Attach the .sql file as a multipart field named "file".'],
+                'file' => ['Attach the .sql or full-backup .zip as a multipart field named "file".'],
             ]);
         }
 
