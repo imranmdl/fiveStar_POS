@@ -110,7 +110,7 @@ final class InventoryService
             $averageCostAfter = $averageCostBefore;
 
             if ($unitCost !== null && $quantityDelta > 0) {
-                $averageCostAfter = $this->recalculateAverageCost(
+                $averageCostAfter = self::blendAverageCost(
                     $quantityBefore,
                     $averageCostBefore,
                     $quantityDelta,
@@ -1159,7 +1159,7 @@ final class InventoryService
      * the brief's own worked example: 100 units @ Rs.400 already in stock,
      * 50 more inwarded @ Rs.450, gives (100*400 + 50*450) / 150 = Rs.416.67.
      */
-    private function recalculateAverageCost(
+    public static function blendAverageCost(
         float $priorQuantity,
         ?float $priorAverageCost,
         float $inwardQuantity,

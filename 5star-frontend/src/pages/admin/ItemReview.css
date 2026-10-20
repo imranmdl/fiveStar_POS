@@ -1,0 +1,96 @@
+.ir-page { display: flex; flex-direction: column; gap: 12px; }
+.ir-lead { margin: 0; color: #555; font-size: 14px; max-width: 80ch; }
+.ir-count {
+  margin-left: 10px; font-size: 13px; font-weight: 600; vertical-align: middle;
+  background: #fff3d6; color: #6b4a00; border: 1px solid #ecd49a; border-radius: 999px; padding: 2px 10px;
+}
+
+.ir-layout { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 16px; align-items: start; }
+
+.ir-list, .ir-editor {
+  background: #fff; border: 1px solid var(--border, #e3e3e3); border-radius: 10px; padding: 12px; min-width: 0;
+}
+.ir-list { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; }
+
+.ir-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+.ir-tabs button {
+  flex: 1; border: 1px solid #d8d8d8; background: #f7f7f7; border-radius: 6px; padding: 6px 4px; font: inherit; font-size: 13px; cursor: pointer;
+}
+.ir-tabs button.active { background: #1e5136; border-color: #1e5136; color: #fff; }
+
+.ir-search { display: flex; gap: 6px; margin-bottom: 10px; }
+.ir-search input { flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid #d8d8d8; border-radius: 6px; font: inherit; }
+
+.ir-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ir-item {
+  width: 100%; text-align: left; display: flex; flex-direction: column; gap: 3px;
+  border: 1px solid #e6e6e6; background: #fff; border-radius: 8px; padding: 8px 10px; cursor: pointer; font: inherit;
+}
+.ir-item:hover { border-color: #b9d3c3; background: #f6fbf8; }
+.ir-item.is-on { border-color: #1e5136; box-shadow: inset 3px 0 0 #1e5136; background: #f2f8f4; }
+.ir-item__top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.ir-item__top strong { font-size: 14px; overflow-wrap: anywhere; }
+.ir-item__meta { font-size: 12px; color: #666; }
+.ir-item__why { font-size: 12px; color: #7a4f00; overflow-wrap: anywhere; }
+
+.ir-tag { font-size: 11px; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.ir-tag--ok { background: #e3f3e8; color: #1e5136; }
+.ir-tag--wait { background: #fff3d6; color: #6b4a00; }
+
+.ir-pager { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; }
+
+.ir-form { display: flex; flex-direction: column; gap: 14px; }
+.ir-form__head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.ir-form__head h2 { margin: 0; font-size: 20px; overflow-wrap: anywhere; }
+.ir-sub, .ir-muted { color: #777; font-size: 12px; }
+.ir-muted { display: block; }
+
+.ir-banner { border-radius: 8px; padding: 9px 12px; font-size: 14px; }
+.ir-banner--ok { background: #eef7f1; color: #1e5136; border: 1px solid #b9d3c3; }
+.ir-banner--wait { background: #fff8e8; color: #6b4a00; border: 1px solid #ecd49a; }
+
+.ir-applied { background: #eef7f1; border: 1px solid #b9d3c3; border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+.ir-applied ul { margin: 6px 0 0; padding-left: 18px; }
+
+.ir-section { border: 1px solid #eee; border-radius: 8px; padding: 12px; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.ir-section legend { font-weight: 600; padding: 0 6px; }
+.ir-hint { margin: 0; font-size: 13px; color: #666; }
+
+.ir-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.ir-field > span { color: #555; }
+.ir-field input, .ir-table input, .ir-table select {
+  padding: 6px 8px; border: 1px solid #d8d8d8; border-radius: 6px; font: inherit; min-width: 0; width: 100%; background: #fff;
+}
+.ir-field input[aria-invalid='true'] { border-color: #c0392b; }
+.ir-table input.is-changed { border-color: #c48a00; background: #fffaf0; }
+
+.ir-table-wrap { overflow-x: auto; }
+.ir-table { min-width: 860px; }
+.ir-table td { vertical-align: top; }
+.ir-table td input[type='number'] { width: 96px; }
+.ir-table td[data-label='Pack name'] input { min-width: 150px; }
+.ir-table td[data-label='Sold by'] select { min-width: 96px; }
+.ir-table td[data-label='Unit'] input { min-width: 90px; }
+
+.ir-check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.ir-problems { margin: 0; padding-left: 18px; color: #c0392b; font-size: 13px; }
+.ir-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.ir-actions .ir-muted { margin-right: auto; display: inline; }
+
+.ir-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.ir-history ul { margin: 4px 0 0; padding-left: 18px; }
+
+@media (max-width: 900px) {
+  .ir-layout { grid-template-columns: 1fr; }
+  .ir-list { position: static; max-height: none; }
+}
+
+@media (max-width: 640px) {
+  .ir-table { min-width: 0; }
+  .ir-table thead { display: none; }
+  .ir-table, .ir-table tbody, .ir-table tr, .ir-table td { display: block; width: 100%; }
+  .ir-table tr { border: 1px solid #eee; border-radius: 8px; padding: 6px 8px; margin-bottom: 8px; }
+  .ir-table td { display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center; border: 0; padding: 4px 0; }
+  .ir-table td::before { content: attr(data-label); color: #777; font-size: 12px; }
+  .ir-table td input[type='number'], .ir-table td input, .ir-table td select { width: 100%; min-width: 0; }
+}

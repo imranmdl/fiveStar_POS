@@ -26,6 +26,7 @@ const NAV_GROUPS = [
       ['/admin/products', 'Products', 'Catalogue'],
       ['/admin/inventory', 'Inventory', 'Stock levels and the movement ledger'],
       ['/admin/purchase-inward', 'Purchase Inward', 'Record purchases from vendors'],
+      ['/admin/item-review', 'Item Review', 'Check and correct items staff entered — fixes stock, purchases and vendors too'],
       ['/admin/mobile', 'Mobile Scan', 'Scan barcodes to record inward on the move'],
       ['/admin/pricing', 'Pricing', 'Markup/margin rules and price-change behaviour'],
       ['/admin/vendors', 'Vendors', 'Suppliers stock is bought from'],

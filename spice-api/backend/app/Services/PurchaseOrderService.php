@@ -63,6 +63,7 @@ final class PurchaseOrderService
         private readonly Logger $logger,
         private readonly VendorPaymentRepository $paymentsLedger,
         private readonly PurchaseReturnRepository $returnsLedger,
+        private readonly ItemReviewService $review,
     ) {
     }
 
@@ -259,6 +260,17 @@ final class PurchaseOrderService
                 // get on the shelf. mrp/sellingPrice here only ever reach the
                 // BATCH record (inventory_batches) — recordMovement() never
                 // touches the variant's own live price from this argument.
+                //
+                // Checked first, while the stock's average still reflects the
+                // item's usual cost: a cost far from it is a likely typo and
+                // goes to the administrator's Item review queue.
+                $this->review->checkPurchaseCost(
+                    $line['variant_id'],
+                    (int) $warehouse['id'],
+                    (float) $line['landing_cost'],
+                    $poNumber,
+                );
+
                 $stockAfter = $this->inventory->recordMovement(
                     variantId: $line['variant_id'],
                     warehouseId: (int) $warehouse['id'],
@@ -298,7 +310,11 @@ final class PurchaseOrderService
         // Run after the transaction commits, same reasoning as
         // evaluatePricingImpact() just below: a rejected price update must
         // not undo inventory that has already, correctly, posted.
-        $this->applyDeclaredPrices($resolvedLines, $request);
+        $this->applyDeclaredPrices(
+            $resolvedLines,
+            $request,
+            (string) $this->orders->findById($purchaseOrderId)['po_number'],
+        );
 
         // A line where the admin explicitly declared mrp/selling_price has
         // already had that price applied above — the rule-based pricing
@@ -331,7 +347,7 @@ final class PurchaseOrderService
      *
      * @param array<int, array<string, mixed>> $resolvedLines
      */
-    private function applyDeclaredPrices(array $resolvedLines, Request $request): void
+    private function applyDeclaredPrices(array $resolvedLines, Request $request, string $poNumber): void
     {
         foreach ($resolvedLines as $line) {
             if ($line['new_mrp'] === null && $line['new_selling_price'] === null) {
@@ -348,6 +364,7 @@ final class PurchaseOrderService
 
             try {
                 $this->products->updateVariant($line['variant_uuid'], $data, $request);
+                $this->review->flagPriceChangeByStaff($line['variant_id'], $request, $poNumber);
             } catch (HttpException $exception) {
                 $this->logger->error('Live price update failed after purchase inward', [
                     'variant_uuid' => $line['variant_uuid'],
@@ -535,7 +552,7 @@ final class PurchaseOrderService
      * What this does NOT do: reconstruct history. It reverses the line's
      * original inventory effect (a 'return' movement for -oldQuantity — a
      * negative delta never touches average_cost, see
-     * InventoryService::recalculateAverageCost()) and posts the corrected
+     * InventoryService::blendAverageCost()) and posts the corrected
      * line as a fresh 'inward' movement, blended against whatever the
      * average cost happens to be *right now* — not "what it would have
      * been had this been entered correctly the first time," which isn't
