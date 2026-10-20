@@ -10,7 +10,7 @@ use App\Repositories\SettingRepository;
 
 /**
  * Storefront look-and-feel the administrator controls from the console:
- * header colours, accent, page background, announcement bar, banner rotation
+ * store name, header colours, accent, page background, announcement bar, banner rotation
  * speed and whether Deals of the Day shows. Stored as `storefront_*` rows in
  * `settings` (migration 050) and read publicly by the web and Android apps.
  */
@@ -26,12 +26,13 @@ final class StorefrontThemeService
         'announcement' => ['storefront_announcement', 'text', 'Dispatched within 24 hours · All prices include GST'],
         'announcement_bg' => ['storefront_announcement_bg', 'color', '#2a2829'],
         'announcement_text' => ['storefront_announcement_text', 'color', '#ffffff'],
+        'store_name' => ['storefront_store_name', 'text', '5 Star'],
         'tagline' => ['storefront_tagline', 'text', 'Spices & Dry Fruits'],
         'banner_seconds' => ['storefront_banner_seconds', 'int', '5'],
         'show_deals' => ['storefront_show_deals', 'bool', '1'],
     ];
 
-    private const TEXT_LIMITS = ['announcement' => 160, 'tagline' => 60];
+    private const TEXT_LIMITS = ['announcement' => 160, 'tagline' => 60, 'store_name' => 40];
 
     public function __construct(
         private readonly SettingRepository $settings,
@@ -87,6 +88,10 @@ final class StorefrontThemeService
                     $text = trim((string) $value);
                     if (mb_strlen($text) > self::TEXT_LIMITS[$field]) {
                         $errors[$field][] = 'Keep it under ' . self::TEXT_LIMITS[$field] . ' characters.';
+                        break;
+                    }
+                    if ($field === 'store_name' && $text === '') {
+                        $errors[$field][] = 'The store name cannot be empty.';
                         break;
                     }
                     $changes[$field] = $text;

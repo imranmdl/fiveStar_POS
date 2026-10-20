@@ -324,7 +324,10 @@ function HomeContent() {
   const shelvesFor = useRef('');
 
   useEffect(() => {
-    document.title = '5 Star — Spices & Dry Fruits since 1984';
+    document.title = `${theme.store_name || '5 Star'} — ${theme.tagline || 'Spices & Dry Fruits'} since 1984`;
+  }, [theme.store_name, theme.tagline]);
+
+  useEffect(() => {
 
     api.get('/banners', { placement: 'home_hero' })
       .then((response) => setBanners(response.data.banners || []))

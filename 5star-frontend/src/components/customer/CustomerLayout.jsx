@@ -20,12 +20,12 @@ function totalProducts(category) {
     + (category.children || []).reduce((sum, child) => sum + totalProducts(child), 0);
 }
 
-function Brand({ tagline }) {
+function Brand({ name, tagline }) {
   return (
-    <Link to="/" className="sf-brand" aria-label="5 Star — home">
+    <Link to="/" className="sf-brand" aria-label={`${name} — home`}>
       <span className="sf-brand__logo"><img src={BRAND_LOGO_URL} alt={BRAND_LOGO_ALT} width="38" height="38" /></span>
       <span className="sf-brand__words">
-        <span className="sf-brand__name">5 Star</span>
+        <span className="sf-brand__name">{name}</span>
         {tagline && <span className="sf-brand__tag">{tagline}</span>}
       </span>
     </Link>
@@ -80,7 +80,8 @@ function CartToast() {
   );
 }
 
-function Footer({ categories }) {
+function Footer({ categories, theme }) {
+  const fullName = `${theme?.store_name || '5 Star'} ${theme?.tagline || 'Spices & Dry Fruits'}`.trim();
   return (
     <footer className="sf-footer">
       <div className="sf-footer__cols">
@@ -111,13 +112,13 @@ function Footer({ categories }) {
         <div className="sf-footer__col">
           <div className="sf-footer__brand">
             <span className="sf-brand__logo"><img src={BRAND_LOGO_URL} alt="" width="36" height="36" /></span>
-            <span>5 Star Spices &amp; Dry Fruits<br />Since 1984</span>
+            <span>{fullName}<br />Since 1984</span>
           </div>
         </div>
       </div>
       <div className="sf-footer__bar">
         <div>
-          <span>© {new Date().getFullYear()} 5 Star Spices &amp; Dry Fruits</span>
+          <span>© {new Date().getFullYear()} {fullName}</span>
           <span>Secure UPI payments · All prices include GST</span>
         </div>
       </div>
@@ -144,7 +145,7 @@ function Shell({ signedIn }) {
     <div className="sf" style={themeVars(theme)}>
       <header className="sf-header">
         <div className="sf-header__row">
-          <Brand tagline={theme.tagline} />
+          <Brand name={theme.store_name || '5 Star'} tagline={theme.tagline} />
           <SearchBox />
           <div className="sf-header__actions">
             <nav className="sf-nav" aria-label="Main">
@@ -167,7 +168,7 @@ function Shell({ signedIn }) {
         <Outlet context={{ categories }} />
       </main>
 
-      <Footer categories={categories} />
+      <Footer categories={categories} theme={theme} />
       <CartToast />
     </div>
   );
