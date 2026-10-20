@@ -177,7 +177,9 @@ $container->bind(CourierAdapterInterface::class, static function (Container $c):
             (string) $config->get('app.env', 'production'),
             $logger,
         ),
-        'manual' => new ManualCourierAdapter($logger),
+        // India Post: booked at the post office counter; staff enter the
+        // article number on the order (ShipmentService::shipManually).
+        'manual', 'india_post' => new ManualCourierAdapter($logger),
         default => throw new RuntimeException(
             'Unknown courier adapter "' . $driver . '". Set COURIER_DRIVER (or the delivery_driver '
             . 'setting) to shiprocket, sandbox, or manual.'

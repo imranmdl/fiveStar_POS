@@ -245,6 +245,7 @@ function CodCard({ order, onChanged }) {
 const DELIVERY_DRIVER_LABELS = {
   shiprocket: 'Shiprocket ON — book couriers through Shiprocket',
   manual: 'Shiprocket OFF — I ship myself and enter the tracking number',
+  india_post: 'India Post — I book at the post office and enter the tracking number',
   sandbox: 'Sandbox courier (local testing only)',
 };
 
@@ -253,6 +254,121 @@ const PAYMENT_DRIVER_LABELS = {
   manual: 'Manual UPI QR (staff confirm)',
   sandbox: 'Sandbox (local testing only)',
 };
+
+/**
+ * India Post rate card: delivery charge by parcel weight, delivery days and
+ * the tracking link customers open. Used at checkout when shipping is set to
+ * India Post.
+ */
+function IndiaPostRates({ value, onSaved }) {
+  const initial = value || {};
+  const [slabs, setSlabs] = useState(() => (initial.slabs || []).map((r) => ({ up_to_grams: String(r.up_to_grams), charge: String(r.charge) })));
+  const [extra, setExtra] = useState(String(initial.extra_per_500g ?? ''));
+  const [minDays, setMinDays] = useState(String(initial.min_days ?? 3));
+  const [maxDays, setMaxDays] = useState(String(initial.max_days ?? 7));
+  const [url, setUrl] = useState(initial.tracking_url || 'https://www.indiapost.gov.in/');
+  const [saving, setSaving] = useState(false);
+  const [testWeight, setTestWeight] = useState('750');
+
+  const setSlab = (i, k) => (e) => setSlabs((list) => list.map((r, j) => (j === i ? { ...r, [k]: e.target.value } : r)));
+
+  function preview(grams) {
+    const g = Number(grams);
+    if (!(g > 0)) return null;
+    const rows = slabs.map((r) => ({ up: Number(r.up_to_grams), charge: Number(r.charge) })).filter((r) => r.up > 0);
+    if (rows.length === 0) return null;
+    const hit = rows.find((r) => g <= r.up);
+    if (hit) return hit.charge;
+    const last = rows[rows.length - 1];
+    return last.charge + Math.ceil((g - last.up) / 500) * Number(extra || 0);
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await api.put('/admin/settings/india-post', {
+        slabs: slabs.map((r) => ({ up_to_grams: Number(r.up_to_grams), charge: Number(r.charge) })),
+        extra_per_500g: Number(extra || 0),
+        min_days: Number(minDays),
+        max_days: Number(maxDays),
+        tracking_url: url.trim(),
+      });
+      toast('India Post rates saved. Checkout uses them from now on.');
+      onSaved();
+    } catch (error) {
+      errorToast(error, 'Could not save the India Post rates.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const sample = preview(testWeight);
+
+  return (
+    <div className="india-post">
+      <h3>India Post rate card</h3>
+      {initial.is_placeholder && (
+        <div className="settings-note settings-note--warn">
+          These are starting placeholder rates. Enter your post office&apos;s Speed Post / parcel charges before customers order.
+        </div>
+      )}
+      <p className="settings-note">
+        Delivery charge at checkout, by total parcel weight. Orders above your free-delivery amount still ship free.
+      </p>
+      <table className="admin-table india-post__table">
+        <thead>
+          <tr><th>Parcel weight up to (g)</th><th>Charge (₹)</th><th aria-label="Remove" /></tr>
+        </thead>
+        <tbody>
+          {slabs.map((r, i) => (
+            // eslint-disable-next-line react/no-array-index-key
+            <tr key={i}>
+              <td><input type="number" min="1" step="1" inputMode="numeric" value={r.up_to_grams} onChange={setSlab(i, 'up_to_grams')} aria-label={`Row ${i + 1} weight`} /></td>
+              <td><input type="number" min="0" step="0.01" inputMode="decimal" value={r.charge} onChange={setSlab(i, 'charge')} aria-label={`Row ${i + 1} charge`} /></td>
+              <td>
+                <button type="button" className="admin-btn" disabled={slabs.length <= 1} onClick={() => setSlabs((list) => list.filter((_, j) => j !== i))}>Remove</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button
+        type="button"
+        className="admin-btn"
+        onClick={() => setSlabs((list) => [...list, { up_to_grams: String((Number(list[list.length - 1]?.up_to_grams) || 0) + 500), charge: '' }])}
+      >
+        + Add weight band
+      </button>
+      <div className="india-post__grid">
+        <label className="settings-field">
+          <span>Each further 500 g above the last band (₹)</span>
+          <input type="number" min="0" step="0.01" value={extra} onChange={(e) => setExtra(e.target.value)} />
+        </label>
+        <label className="settings-field">
+          <span>Delivery days (from)</span>
+          <input type="number" min="1" max="60" value={minDays} onChange={(e) => setMinDays(e.target.value)} />
+        </label>
+        <label className="settings-field">
+          <span>Delivery days (to)</span>
+          <input type="number" min="1" max="60" value={maxDays} onChange={(e) => setMaxDays(e.target.value)} />
+        </label>
+        <label className="settings-field india-post__url">
+          <span>Tracking link customers open</span>
+          <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} />
+          <small>Write {'{awb}'} where the tracking number goes, if the page accepts it in the link.</small>
+        </label>
+      </div>
+      <div className="india-post__check">
+        <span>Check: a parcel of</span>
+        <input type="number" min="1" value={testWeight} onChange={(e) => setTestWeight(e.target.value)} aria-label="Test weight in grams" />
+        <span>g costs <b>{sample == null ? '—' : formatMoney(sample)}</b></span>
+      </div>
+      <button type="button" className="admin-btn admin-btn--primary" disabled={saving} onClick={save}>
+        {saving ? 'Saving…' : 'Save India Post rates'}
+      </button>
+    </div>
+  );
+}
 
 /** The driver toggle + manual QR/logo settings, collapsed by default so the queue stays the focus. */
 function SettingsPanel() {
@@ -392,7 +508,7 @@ function SettingsPanel() {
           </select>
         </label>
         <label className="settings-field">
-          <span>Shipping (Shiprocket on / off)</span>
+          <span>Shipping (Shiprocket / India Post / own courier)</span>
           <select
             value={form.delivery_driver}
             onChange={(event) => setForm((f) => ({ ...f, delivery_driver: event.target.value }))}
@@ -409,8 +525,14 @@ function SettingsPanel() {
       <div className="settings-note">
         {form.delivery_driver === 'shiprocket'
           ? 'Orders offer “Book with Shiprocket”, and “Ship with my own courier” for parcels you send another way.'
-          : 'Orders offer “Ship with my own courier”: pick the courier (India Post, DTDC, local delivery…), enter the tracking number from its receipt, and the customer is sent it. Mark the parcel delivered from the order when it arrives.'}
+          : form.delivery_driver === 'india_post'
+            ? 'Pack the order, book it at the post office, then on the order press “Shipped by India Post — enter tracking no.” and type the article number (e.g. EA123456789IN). The customer gets the number and the India Post tracking link. Checkout charges delivery from the India Post rate card below.'
+            : 'Orders offer “Ship with my own courier”: pick the courier (India Post, DTDC, local delivery…), enter the tracking number from its receipt, and the customer is sent it. Mark the parcel delivered from the order when it arrives.'}
       </div>
+
+      {(form.delivery_driver === 'india_post' || settings.delivery_driver === 'india_post') && (
+        <IndiaPostRates value={settings.india_post} onSaved={load} />
+      )}
 
       {form.payment_driver === 'manual' && !settings.manual_payment_qr_url && !form.manual_payment_vpa && (
         <div className="settings-note settings-note--warn">

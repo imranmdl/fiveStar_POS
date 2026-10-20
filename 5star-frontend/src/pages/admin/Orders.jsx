@@ -368,10 +368,16 @@ const todayIso = () => new Date().toISOString().slice(0, 10);
  * tracking number, optionally its tracking link. With `initial` it corrects
  * the details of a parcel already sent this way.
  */
-function ManualShipForm({ uuid, initial, onDone, onCancel }) {
+const INDIA_POST_PATTERN = /^[A-Z]{2}\d{9}[A-Z]{2}$/;
+const isIndiaPost = (name) => ['india post', 'indiapost', 'speed post', 'speedpost', 'post office', 'india post (speed post)']
+  .includes(String(name || '').trim().toLowerCase());
+
+function ManualShipForm({ uuid, initial, deliveryMode, onDone, onCancel }) {
   const editing = Boolean(initial && initial.awb_number);
   const [form, setForm] = useState({
-    carrier_name: (initial && initial.courier_name && initial.courier_name !== 'Own courier' ? initial.courier_name : ''),
+    carrier_name: (initial && initial.courier_name && initial.courier_name !== 'Own courier'
+      ? initial.courier_name
+      : (deliveryMode === 'india_post' ? 'India Post' : '')),
     tracking_number: (initial && initial.awb_number) || '',
     tracking_url: (initial && initial.tracking_url) || '',
     shipped_date: todayIso(),
@@ -385,6 +391,10 @@ function ManualShipForm({ uuid, initial, onDone, onCancel }) {
     event.preventDefault();
     if (form.carrier_name.trim().length < 2) { setError('Enter the courier name.'); return; }
     if (form.tracking_number.trim().length < 3) { setError('Enter the tracking number from the courier receipt.'); return; }
+    if (isIndiaPost(form.carrier_name) && !INDIA_POST_PATTERN.test(form.tracking_number.replace(/\s+/g, '').toUpperCase())) {
+      setError('An India Post number looks like EA123456789IN — 2 letters, 9 digits, 2 letters. Check the post office receipt.');
+      return;
+    }
     if (form.tracking_url.trim() && !/^https?:\/\//i.test(form.tracking_url.trim())) {
       setError('The tracking link must start with http:// or https:// (or leave it empty).');
       return;
@@ -412,7 +422,9 @@ function ManualShipForm({ uuid, initial, onDone, onCancel }) {
       <p className="orders-hint">
         {editing
           ? 'Correct the courier or tracking number for this parcel.'
-          : 'Sending this parcel yourself (not through Shiprocket)? Enter the courier and the tracking number from its receipt — the order moves to Shipped and the customer gets the tracking number.'}
+          : isIndiaPost(form.carrier_name)
+            ? 'Booked at the post office? Enter the article number from the India Post receipt (e.g. EA123456789IN). The order moves to Shipped and the customer gets the number and the India Post tracking link.'
+            : 'Sending this parcel yourself (not through Shiprocket)? Enter the courier and the tracking number from its receipt — the order moves to Shipped and the customer gets the tracking number.'}
       </p>
       <div className="orders-form-row">
         <label className="orders-field">
@@ -421,12 +433,12 @@ function ManualShipForm({ uuid, initial, onDone, onCancel }) {
           <datalist id="orders-carriers">{COMMON_CARRIERS.map((c) => <option key={c} value={c} />)}</datalist>
         </label>
         <label className="orders-field">
-          <span>Tracking / AWB number *</span>
-          <input value={form.tracking_number} onChange={set('tracking_number')} placeholder="From the courier receipt" maxLength={60} required style={{ fontFamily: 'monospace' }} />
+          <span>{isIndiaPost(form.carrier_name) ? 'India Post article number *' : 'Tracking / AWB number *'}</span>
+          <input value={form.tracking_number} onChange={(e) => { setForm((f) => ({ ...f, tracking_number: isIndiaPost(f.carrier_name) ? e.target.value.toUpperCase() : e.target.value })); setError(''); }} placeholder={isIndiaPost(form.carrier_name) ? 'EA123456789IN' : 'From the courier receipt'} maxLength={60} required style={{ fontFamily: 'monospace' }} />
         </label>
         <label className="orders-field">
           <span>Tracking link (optional)</span>
-          <input type="url" value={form.tracking_url} onChange={set('tracking_url')} placeholder="https://…" maxLength={500} />
+          <input type="url" value={form.tracking_url} onChange={set('tracking_url')} placeholder={isIndiaPost(form.carrier_name) ? 'Added automatically' : 'https://…'} maxLength={500} />
         </label>
         {!editing && (
           <label className="orders-field">
@@ -472,6 +484,7 @@ function OrderActions({ uuid, order, detail, onChanged }) {
       <ManualShipForm
         uuid={uuid}
         initial={mode === 'edit-tracking' ? detail.shipment : null}
+        deliveryMode={detail.delivery_mode}
         onDone={() => { setMode(null); onChanged(); }}
         onCancel={() => setMode(null)}
       />
@@ -569,6 +582,7 @@ function OrderActions({ uuid, order, detail, onChanged }) {
   const shipment = detail.shipment || null;
   const ownCourier = shipment && shipment.is_manual;
   const useShiprocket = detail.delivery_mode === 'shiprocket';
+  const useIndiaPost = detail.delivery_mode === 'india_post';
 
   const buttons = [];
   if (order.status === 'confirmed') {
@@ -578,7 +592,12 @@ function OrderActions({ uuid, order, detail, onChanged }) {
     if (useShiprocket && order.status !== 'confirmed') {
       buttons.push(['__ship', 'Book with Shiprocket', 'admin-btn--primary', () => setMode('courier')]);
     }
-    buttons.push(['__manual', 'Ship with my own courier', useShiprocket || order.status === 'confirmed' ? '' : 'admin-btn--primary', () => setMode('manual-ship')]);
+    buttons.push([
+      '__manual',
+      useIndiaPost ? 'Shipped by India Post — enter tracking no.' : 'Ship with my own courier',
+      useShiprocket || order.status === 'confirmed' ? '' : 'admin-btn--primary',
+      () => setMode('manual-ship'),
+    ]);
   }
   // Booked while the store was in manual delivery mode: no tracking number yet.
   if (ownCourier && !shipment.awb_number) {

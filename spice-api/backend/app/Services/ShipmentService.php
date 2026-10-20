@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Services\Delivery\IndiaPost;
+
 use App\Core\Database;
 use App\Core\Exceptions\HttpException;
 use App\Core\Exceptions\NotFoundException;
@@ -54,6 +56,7 @@ final class ShipmentService
         private readonly AuditService $audit,
         private readonly Database $db,
         private readonly Logger $logger,
+        private readonly IndiaPost $indiaPost,
     ) {
     }
 
@@ -326,6 +329,22 @@ final class ShipmentService
         $url = isset($data['tracking_url']) && trim((string) $data['tracking_url']) !== '' ? trim((string) $data['tracking_url']) : null;
         $shippedAt = !empty($data['shipped_date']) ? date('Y-m-d H:i:s', (int) strtotime((string) $data['shipped_date'])) : date('Y-m-d H:i:s');
         $note = isset($data['note']) && trim((string) $data['note']) !== '' ? trim((string) $data['note']) : null;
+
+        // India Post: the article number has a fixed shape, and the tracking
+        // link comes from Payments → India Post when none is typed.
+        if (IndiaPost::isIndiaPost($carrier)) {
+            $carrier = IndiaPost::CARRIER_NAME;
+
+            if (preg_match(IndiaPost::ARTICLE_PATTERN, $awb) !== 1) {
+                throw new HttpException(
+                    'An India Post tracking number looks like EA123456789IN — 2 letters, 9 digits, 2 letters. Check the receipt from the post office.',
+                    422,
+                    ['tracking_number' => ['Use the article number on the post office receipt, e.g. EA123456789IN.']]
+                );
+            }
+
+            $url ??= $this->indiaPost->trackingUrl($awb);
+        }
 
         if ($url !== null && preg_match('~^https?://\S+$~i', $url) !== 1) {
             throw new HttpException(
@@ -1209,6 +1228,10 @@ final class ShipmentService
                 : ($shipment['tracking_url'] ?? ($this->isManual($shipment) ? null : $this->trackingUrl($courier, (string) $shipment['awb_number']))),
             // Sent outside Shiprocket: staff record its progress by hand.
             'is_manual' => $this->isManual($shipment),
+            // India Post's site asks for the number on its page: say so.
+            'tracking_hint' => $shipment['awb_number'] !== null && IndiaPost::isIndiaPost((string) ($shipment['carrier_name'] ?? ''))
+                ? 'Open India Post tracking and enter ' . $shipment['awb_number'] . ' to see where your parcel is.'
+                : null,
             'estimated_delivery_date' => $shipment['estimated_delivery_date'],
             'delivered_date' => $shipment['delivered_date'],
             'last_scan_status' => $shipment['last_scan_status'],

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Services\Delivery\IndiaPost;
+
 use App\Core\Config;
 use App\Core\Database;
 use App\Core\Exceptions\HttpException;
@@ -38,7 +40,7 @@ use App\Repositories\SettingRepository;
 final class SettingsService
 {
     private const PAYMENT_DRIVERS = ['manual', 'sandbox', 'razorpay'];
-    private const DELIVERY_DRIVERS = ['manual', 'sandbox', 'shiprocket'];
+    private const DELIVERY_DRIVERS = ['manual', 'india_post', 'sandbox', 'shiprocket'];
     private const PRICE_CHANGE_MODES = ['always_ask', 'ask_on_increase', 'ask_on_decrease', 'auto_apply', 'never'];
 
     /** Keys this service will read/write. Anything else in `settings` is out of scope here. */
@@ -96,6 +98,7 @@ final class SettingsService
         private readonly AuditService $audit,
         private readonly Config $config,
         private readonly Database $db,
+        private readonly IndiaPost $indiaPost,
     ) {
     }
 
@@ -118,6 +121,9 @@ final class SettingsService
             // active; see CheckoutService::review()/place() for where a
             // customer actually sees and chooses it.
             'cod_enabled' => $this->settings->boolValue('cod_enabled', false),
+            // Post-office delivery: rate card and tracking link (used when
+            // delivery_driver is "india_post").
+            'india_post' => $this->indiaPost->config(),
             'shop' => $this->shopDetails(),
             'razorpay' => $this->razorpayStatus(),
             // Text messages (OTP codes, order updates). Any SMS_DRIVER but "http" means
@@ -287,6 +293,31 @@ final class SettingsService
         }
 
         $this->write('payment_driver', $driver, $request);
+
+        return $this->current();
+    }
+
+    /**
+     * India Post rate card and tracking link.
+     *
+     * @param array<string, mixed> $input
+     *
+     * @return array<string, mixed>
+     */
+    public function saveIndiaPost(Request $request, array $input): array
+    {
+        $before = $this->indiaPost->config();
+        $after = $this->indiaPost->save($input, $request->authUserId());
+
+        $this->audit->log(
+            entityName: 'settings',
+            entityId: null,
+            action: 'setting_updated',
+            oldValues: ['india_post_settings' => $before],
+            newValues: ['india_post_settings' => $after],
+            request: $request,
+            notes: 'india_post_settings',
+        );
 
         return $this->current();
     }

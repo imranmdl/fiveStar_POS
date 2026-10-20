@@ -146,7 +146,8 @@ final class OrderService
         $detail['internal_note'] = $order['internal_note'];
         // Which shipping options the order page offers: Shiprocket booking
         // (and own-courier shipping as an alternative), or own courier only.
-        $detail['delivery_mode'] = $this->settings->value('delivery_driver') === 'shiprocket' ? 'shiprocket' : 'manual';
+        $driver = (string) $this->settings->value('delivery_driver');
+        $detail['delivery_mode'] = in_array($driver, ['shiprocket', 'india_post'], true) ? $driver : 'manual';
 
         // The live parcel, so the order page can offer the right next step
         // (enter tracking / mark delivered for one sent with the store's own
