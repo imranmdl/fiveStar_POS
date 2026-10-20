@@ -160,6 +160,9 @@ function ItemEditor({ uuid, onClose, onSaved }) {
         unit_label: v.unit_label || '',
       })),
       costs: Object.fromEntries(data.purchase_lines.map((l) => [l.uuid, String(l.unit_cost)])),
+      qtys: Object.fromEntries(data.purchase_lines.map((l) => [l.uuid, String(l.quantity)])),
+      stock: Object.fromEntries(data.variants.flatMap((v) => (v.stock || [])
+        .map((w) => [`${v.uuid}|${w.warehouse_uuid}`, String(w.quantity)]))),
       markReviewed: true,
       note: '',
     });
@@ -198,13 +201,24 @@ function ItemEditor({ uuid, onClose, onSaved }) {
       if (differs(v.selling_price, orig.selling_price)) row.selling_price = v.selling_price;
       if (Object.keys(row).length > 1) variants.push(row);
     });
-    const purchaseLines = data.purchase_lines
-      .filter((l) => form.costs[l.uuid] !== '' && Math.abs(Number(form.costs[l.uuid]) - l.unit_cost) > 0.00005)
-      .map((l) => ({ uuid: l.uuid, unit_cost: form.costs[l.uuid] }));
-    const body = { variants, purchase_lines: purchaseLines };
+    const purchaseLines = [];
+    data.purchase_lines.forEach((l) => {
+      const row = { uuid: l.uuid };
+      if (form.costs[l.uuid] !== '' && Math.abs(Number(form.costs[l.uuid]) - l.unit_cost) > 0.00005) row.unit_cost = form.costs[l.uuid];
+      if (form.qtys[l.uuid] !== '' && Math.abs(Number(form.qtys[l.uuid]) - l.quantity) > 0.0005) row.quantity = form.qtys[l.uuid];
+      if (Object.keys(row).length > 1) purchaseLines.push(row);
+    });
+    const stock = [];
+    data.variants.forEach((v) => (v.stock || []).forEach((w) => {
+      const value = form.stock[`${v.uuid}|${w.warehouse_uuid}`];
+      if (value !== '' && value !== undefined && Math.abs(Number(value) - w.quantity) > 0.0005) {
+        stock.push({ variant_uuid: v.uuid, warehouse_uuid: w.warehouse_uuid, quantity: value });
+      }
+    }));
+    const body = { variants, purchase_lines: purchaseLines, stock };
     if (form.name.trim() !== data.product.name) body.name = form.name;
     if (leaf && leaf !== data.product.category_uuid) body.category_uuid = leaf;
-    const count = (body.name ? 1 : 0) + (body.category_uuid ? 1 : 0) + variants.length + purchaseLines.length;
+    const count = (body.name ? 1 : 0) + (body.category_uuid ? 1 : 0) + variants.length + purchaseLines.length + stock.length;
     return { body, count, leaf };
   }, [data, form, categories]);
 
@@ -225,6 +239,12 @@ function ItemEditor({ uuid, onClose, onSaved }) {
     if (!(num(v.weight_grams) > 0)) problems.push(`${v.variant_name || 'A pack'}: weight must be more than 0 g.`);
   });
   Object.values(form.costs).forEach((c) => { if (c === '' || Number(c) < 0) problems.push('A purchase cost is empty or negative.'); });
+  data.purchase_lines.forEach((l) => {
+    const q = form.qtys[l.uuid];
+    if (q === '' || !(Number(q) > 0)) problems.push(`${l.po_number}: quantity received must be more than 0.`);
+    else if (Number(q) < l.returned_quantity) problems.push(`${l.po_number}: ${l.returned_quantity} already returned — quantity cannot be lower.`);
+  });
+  Object.values(form.stock).forEach((q) => { if (q === '' || Number(q) < 0) problems.push('Stock cannot be empty or below 0.'); });
   const uniqueProblems = [...new Set(problems)];
   const nothing = changes.count === 0 && !(form.markReviewed && !p.admin_reviewed);
 
@@ -311,8 +331,6 @@ function ItemEditor({ uuid, onClose, onSaved }) {
                 <th>Weight (g)</th>
                 <th>MRP ₹</th>
                 <th>Selling ₹</th>
-                <th>In stock</th>
-                <th>Avg cost</th>
               </tr>
             </thead>
             <tbody>
@@ -342,8 +360,6 @@ function ItemEditor({ uuid, onClose, onSaved }) {
                     <td data-label="Selling ₹">
                       <input type="number" min="0" step="0.01" inputMode="decimal" className={differs(v.selling_price, orig.selling_price) ? 'is-changed' : ''} value={v.selling_price} onChange={(e) => setVariant(i, { selling_price: e.target.value })} />
                     </td>
-                    <td data-label="In stock">{orig.stock_quantity}</td>
-                    <td data-label="Avg cost">{orig.average_cost == null ? '—' : formatMoney(orig.average_cost)}</td>
                   </tr>
                 );
               })}
@@ -353,14 +369,14 @@ function ItemEditor({ uuid, onClose, onSaved }) {
       </fieldset>
 
       <fieldset className="ir-section">
-        <legend>Purchase costs</legend>
+        <legend>Purchases — quantity and cost</legend>
         {data.purchase_lines.length === 0
           ? <p className="ir-muted">No purchases recorded for this item.</p>
           : (
             <>
               <p className="ir-hint">
-                Correcting a cost re-works that purchase's total and transport share, the vendor balance, any return to
-                the vendor, and the average stock cost.
+                Fix a wrongly typed quantity received or cost. The purchase total and transport share, the vendor
+                balance, any return to the vendor, stock and the average stock cost are all corrected with it.
               </p>
               <div className="ir-table-wrap">
                 <table className="admin-table ir-table">
@@ -369,7 +385,7 @@ function ItemEditor({ uuid, onClose, onSaved }) {
                       <th>Purchase</th>
                       <th>Vendor</th>
                       <th>Pack</th>
-                      <th>Qty</th>
+                      <th>Qty received</th>
                       <th>Cost ₹ / unit</th>
                       <th>Landing</th>
                       <th>Purchase total · paid</th>
@@ -379,6 +395,8 @@ function ItemEditor({ uuid, onClose, onSaved }) {
                     {data.purchase_lines.map((l) => {
                       const value = form.costs[l.uuid];
                       const changed = value !== '' && Math.abs(Number(value) - l.unit_cost) > 0.00005;
+                      const qty = form.qtys[l.uuid];
+                      const qtyChanged = qty !== '' && Math.abs(Number(qty) - l.quantity) > 0.0005;
                       return (
                         <tr key={l.uuid}>
                           <td data-label="Purchase">
@@ -387,8 +405,21 @@ function ItemEditor({ uuid, onClose, onSaved }) {
                           </td>
                           <td data-label="Vendor">{l.vendor_name || '—'}</td>
                           <td data-label="Pack">{l.variant_name}</td>
-                          <td data-label="Qty">
-                            {l.quantity}
+                          <td data-label="Qty received">
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              inputMode="decimal"
+                              className={qtyChanged ? 'is-changed' : ''}
+                              value={qty}
+                              onChange={(e) => setForm((f) => ({ ...f, qtys: { ...f.qtys, [l.uuid]: e.target.value } }))}
+                            />
+                            {qtyChanged && (
+                              <small className="ir-muted">
+                                stock {Number(qty) > l.quantity ? '+' : '−'}{+Math.abs(Number(qty) - l.quantity).toFixed(3)}
+                              </small>
+                            )}
                             {l.returned_quantity > 0 && <small className="ir-muted">{l.returned_quantity} returned</small>}
                           </td>
                           <td data-label="Cost ₹ / unit">
@@ -415,6 +446,59 @@ function ItemEditor({ uuid, onClose, onSaved }) {
               </div>
             </>
           )}
+      </fieldset>
+
+      <fieldset className="ir-section">
+        <legend>Stock on hand</legend>
+        <p className="ir-hint">
+          If the shelf count differs from what is recorded (a miscount, or opening stock typed wrong), enter the real
+          count. It is recorded as a stock adjustment with your note; the average cost stays as it is. Fix a wrong
+          purchase quantity in the table above instead, so the vendor's bill is corrected too.
+        </p>
+        <div className="ir-table-wrap">
+          <table className="admin-table ir-table ir-table--stock">
+            <thead>
+              <tr>
+                <th>Pack</th>
+                <th>Warehouse</th>
+                <th>Recorded</th>
+                <th>Actual count</th>
+                <th>Avg cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.variants.flatMap((v) => (v.stock || []).map((w) => {
+                const key = `${v.uuid}|${w.warehouse_uuid}`;
+                const value = form.stock[key];
+                const changed = value !== '' && value !== undefined && Math.abs(Number(value) - w.quantity) > 0.0005;
+                return (
+                  <tr key={key}>
+                    <td data-label="Pack">{v.variant_name}</td>
+                    <td data-label="Warehouse">{w.warehouse_name}</td>
+                    <td data-label="Recorded">{w.quantity}</td>
+                    <td data-label="Actual count">
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        inputMode="decimal"
+                        className={changed ? 'is-changed' : ''}
+                        value={value ?? ''}
+                        onChange={(e) => setForm((f) => ({ ...f, stock: { ...f.stock, [key]: e.target.value } }))}
+                      />
+                      {changed && (
+                        <small className="ir-muted">
+                          {Number(value) > w.quantity ? '+' : '−'}{+Math.abs(Number(value) - w.quantity).toFixed(3)}
+                        </small>
+                      )}
+                    </td>
+                    <td data-label="Avg cost">{w.average_cost == null ? '—' : formatMoney(w.average_cost)}</td>
+                  </tr>
+                );
+              }))}
+            </tbody>
+          </table>
+        </div>
       </fieldset>
 
       <fieldset className="ir-section">

@@ -47,7 +47,7 @@ final class ItemReviewController extends BaseController
     {
         $body = $request->all();
 
-        foreach (['variants', 'purchase_lines'] as $list) {
+        foreach (['variants', 'purchase_lines', 'stock'] as $list) {
             if (isset($body[$list]) && !is_array($body[$list])) {
                 throw new HttpException('The correction is not in the expected format.', 422, [$list => ['Must be a list.']]);
             }
