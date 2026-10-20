@@ -617,9 +617,14 @@ final class CartService
         $lines = [];
 
         $optionsByVariant = $this->variantOptions->forVariants(array_column($rawLines, 'variant_id'));
+        $volumeLabels = $this->volumeLabels(array_column($rawLines, 'variant_id'));
 
         foreach ($rawLines as $line) {
-            $presented = $this->presentLine($line, $optionsByVariant[(int) $line['variant_id']] ?? []);
+            $presented = $this->presentLine(
+                $line,
+                $optionsByVariant[(int) $line['variant_id']] ?? [],
+                $volumeLabels[(int) $line['variant_id']] ?? null,
+            );
 
             if ((int) $line['is_saved_for_later'] === 1) {
                 $saved[] = $presented;
@@ -844,12 +849,43 @@ final class CartService
     }
 
     /**
+     * "500 ml" / "1 L" for packs sold by volume, keyed by variant id.
+     *
+     * @param array<int, int|string> $variantIds
+     *
+     * @return array<int, string>
+     */
+    private function volumeLabels(array $variantIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $variantIds)));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $rows = $this->db->select(
+            "SELECT `id`, `stock_unit_type`, `volume_ml`, `weight_grams` FROM `product_variants`
+              WHERE `stock_unit_type` = 'volume' AND `id` IN (" . implode(',', $ids) . ')'
+        );
+        $out = [];
+
+        foreach ($rows as $row) {
+            $label = \App\Helpers\PackSize::label($row);
+            if ($label !== null) {
+                $out[(int) $row['id']] = $label;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * @param array<string, mixed> $line
      * @param array<string, array<string, mixed>> $options
      *
      * @return array<string, mixed>
      */
-    private function presentLine(array $line, array $options = []): array
+    private function presentLine(array $line, array $options = [], ?string $volumeLabel = null): array
     {
         $unitPrice = Money::fromDecimal((string) $line['unit_price_snapshot']);
         $unitMrp = Money::fromDecimal((string) $line['unit_mrp_snapshot']);
@@ -873,8 +909,9 @@ final class CartService
                 'max_order_quantity' => (int) $line['max_order_quantity'],
                 // Size / colour as chosen ("M / Red"), when the pack has them.
                 'options' => array_map(static fn (array $o): string => $o['value'], $options),
+                // Liquids read "500 ml", not their shipping weight.
                 'label' => $options === []
-                    ? null
+                    ? $volumeLabel
                     : implode(' / ', array_map(static fn (array $o): string => $o['value'], $options)),
             ],
             'unit_mrp' => $unitMrp->toDecimal(),

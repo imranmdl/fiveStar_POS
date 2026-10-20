@@ -15,6 +15,14 @@ import './CategoryPicker.css';
  *  - when the category has sub-categories, one of them is required.
  */
 
+/** Kind of business a new top-level category is for (inherited by its sub-categories). */
+export const ITEM_TYPE_OPTIONS = [
+  ['grocery', 'Grocery (spices, dry fruits, staples)'], ['oils', 'Oils & ghee'], ['clothing', 'Clothing'],
+  ['footwear', 'Footwear'], ['perfumes', 'Perfumes & attar'], ['personal_care', 'Personal care'],
+  ['pooja', 'Pooja items'], ['home_kitchen', 'Home & kitchen'], ['toys', 'Toys'], ['stationery', 'Stationery'],
+  ['general', 'Other / general'],
+];
+
 export const topsOf = (categories) => (categories || []).filter((c) => !c.parent_uuid);
 export const childrenOf = (categories, uuid) => (categories || []).filter((c) => c.parent_uuid === uuid);
 
@@ -157,6 +165,47 @@ export default function CategoryPicker({
   const tops = topsOf(categories);
   const subs = value.topUuid ? childrenOf(categories, value.topUuid) : [];
   const subRef = useRef(null);
+  // Inline "+ New category" / "+ New sub-category".
+  const [adding, setAdding] = useState(null); // 'top' | 'sub' | null
+  const [newName, setNewName] = useState('');
+  const [newType, setNewType] = useState('grocery');
+  const [creating, setCreating] = useState(false);
+  const parent = value.topUuid ? (categories || []).find((c) => c.uuid === value.topUuid) : null;
+
+  function openAdd(kind) {
+    setAdding(kind);
+    setNewName('');
+    setNewType(parent?.item_type || 'grocery');
+  }
+
+  async function createNew() {
+    const name = newName.trim();
+    if (name.length < 2) { toast('Type a name of at least 2 letters.', 'danger'); return; }
+    setCreating(true);
+    try {
+      const body = adding === 'sub'
+        ? { name, parent_uuid: value.topUuid }
+        : { name, item_type: newType };
+      const r = await api.post('/admin/inventory/quick-category', body);
+      const c = r.data.category;
+      const node = {
+        uuid: c.uuid,
+        slug: c.slug,
+        name: c.name,
+        parent_uuid: adding === 'sub' ? value.topUuid : null,
+        item_type: c.item_type || (adding === 'sub' ? parent?.item_type : newType) || 'general',
+        has_children: false,
+      };
+      if (!(categories || []).some((x) => x.uuid === node.uuid)) onCreated?.(node);
+      onChange(adding === 'sub' ? { topUuid: value.topUuid, subUuid: node.uuid } : { topUuid: node.uuid, subUuid: '' });
+      toast(c.existing ? `"${c.name}" already exists — selected it.` : `Added ${adding === 'sub' ? 'sub-category' : 'category'} "${c.name}".`);
+      setAdding(null);
+    } catch (error) {
+      toast(error instanceof ApiError ? error.message : 'Could not add the category.', 'danger');
+    } finally {
+      setCreating(false);
+    }
+  }
   const leaf = leafOf(categories, value.topUuid, value.subUuid);
   const missingTop = showErrors && !value.topUuid;
   const missingSub = showErrors && value.topUuid && subs.length > 0 && !value.subUuid;
@@ -187,6 +236,9 @@ export default function CategoryPicker({
             {tops.map((c) => <option key={c.uuid} value={c.uuid}>{c.name}</option>)}
           </select>
           {missingTop && <small className="cp-err">Choose a category.</small>}
+          {!disabled && (
+            <button type="button" className="cp-add" onClick={() => openAdd('top')}>+ New category</button>
+          )}
         </label>
         <label className="cp-field">
           <span>Sub-category {subs.length > 0 && <b className="cp-req">*</b>}</span>
@@ -208,8 +260,47 @@ export default function CategoryPicker({
             )}
           </select>
           {missingSub && <small className="cp-err">Choose a sub-category.</small>}
+          {!disabled && value.topUuid && (
+            <button type="button" className="cp-add" onClick={() => openAdd('sub')}>
+              + New sub-category{parent ? ` in ${parent.name}` : ''}
+            </button>
+          )}
         </label>
       </div>
+      {adding && (
+        <div className="cp-new" role="group" aria-label={adding === 'sub' ? 'New sub-category' : 'New category'}>
+          <label className="cp-field">
+            <span>{adding === 'sub' ? `New sub-category in ${parent?.name || 'this category'}` : 'New category name'}</span>
+            <input
+              autoFocus
+              value={newName}
+              maxLength={120}
+              placeholder={adding === 'sub' ? 'e.g. Cold-pressed oils' : 'e.g. Oils & Ghee'}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); createNew(); } if (e.key === 'Escape') setAdding(null); }}
+            />
+          </label>
+          {adding === 'top' && (
+            <label className="cp-field">
+              <span>Kind of items</span>
+              <select value={newType} onChange={(e) => setNewType(e.target.value)}>
+                {ITEM_TYPE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </label>
+          )}
+          <div className="cp-new__actions">
+            <button type="button" className="admin-btn admin-btn--primary" disabled={creating} onClick={createNew}>
+              {creating ? 'Adding…' : 'Add'}
+            </button>
+            <button type="button" className="admin-btn" disabled={creating} onClick={() => setAdding(null)}>Cancel</button>
+          </div>
+          {adding === 'sub' && subs.length === 0 && (
+            <small className="cp-note">
+              Items already filed directly under {parent?.name || 'this category'} stay there until you move them.
+            </small>
+          )}
+        </div>
+      )}
     </div>
   );
 }

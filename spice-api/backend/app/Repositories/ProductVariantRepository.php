@@ -17,7 +17,7 @@ final class ProductVariantRepository extends BaseRepository
     {
         return [
             'product_id', 'sku', 'barcode', 'expiry_date', 'variant_name', 'weight_grams', 'pack_length_mm', 'pack_width_mm', 'pack_height_mm', 'is_fragile', 'packed_weight_grams',
-            'pack_type', 'stock_unit_type', 'unit_label', 'mrp', 'selling_price', 'offer_price', 'offer_start_date',
+            'pack_type', 'stock_unit_type', 'unit_label', 'volume_ml', 'mrp', 'selling_price', 'offer_price', 'offer_start_date',
             'offer_end_date', 'max_order_quantity', 'is_default', 'display_order',
         ];
     }

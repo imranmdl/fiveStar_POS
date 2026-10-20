@@ -35,7 +35,10 @@ final class ProductRepository extends BaseRepository
             c.`uuid` AS `category_uuid`, c.`slug` AS `category_slug`, c.`name` AS `category_name`,
             pr.`variant_count`, pr.`min_price`, pr.`max_price`, pr.`min_mrp`, pr.`max_mrp`,
             pr.`min_weight_grams`, pr.`max_weight_grams`,
-            pr.`max_discount_percentage`, pr.`has_live_offer`';
+            pr.`max_discount_percentage`, pr.`has_live_offer`,
+            (SELECT MIN(lv.`volume_ml`) FROM `product_variants` lv
+              WHERE lv.`product_id` = p.`id` AND lv.`is_deleted` = 0 AND lv.`is_active` = 1
+                AND lv.`stock_unit_type` = \'volume\' AND lv.`volume_ml` > 0) AS `min_volume_ml`';
 
     protected function table(): string
     {
@@ -257,7 +260,8 @@ final class ProductRepository extends BaseRepository
                     vp.`weight_grams`, vp.`shipping_weight_grams`,
                     vp.`pack_type`, vp.`mrp`, vp.`selling_price`, vp.`offer_price`, vp.`effective_price`,
                     vp.`discount_percentage`, vp.`price_per_kg`, vp.`offer_is_live`,
-                    vp.`max_order_quantity`, vp.`is_default`
+                    vp.`max_order_quantity`, vp.`is_default`,
+                    v.`stock_unit_type`, v.`unit_label`, v.`volume_ml`
                FROM `vw_variant_pricing` vp
                INNER JOIN `product_variants` v ON v.`id` = vp.`id`
               WHERE vp.`product_id` = :product_id
