@@ -34,6 +34,18 @@ final class ProductController extends BaseController
 
         $result = $this->products->list($filters, $params);
 
+        // No exact match for the search: these are the closest products
+        // (every word / any word / similar spelling) — the shop says so.
+        if (isset($result['search_fallback'])) {
+            return Response::success($result['items'], 'Closest matches', 200, [
+                'page' => $params['page'],
+                'per_page' => $params['per_page'],
+                'total' => $result['total'],
+                'total_pages' => $params['per_page'] > 0 ? (int) ceil($result['total'] / $params['per_page']) : 0,
+                'search_match' => $result['search_fallback'] === 3 ? 'similar_spelling' : 'partial',
+            ]);
+        }
+
         return $this->paginated($result['items'], $result['total'], $params, 'Products loaded');
     }
 
