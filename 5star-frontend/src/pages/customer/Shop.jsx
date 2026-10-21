@@ -172,6 +172,13 @@ export default function Shop() {
             )}
           </h1>
           {offer && offer.subtitle && <span className="sf-small">{offer.subtitle}</span>}
+          {q && status === 'ready' && meta && meta.search_match && products.length > 0 && (
+            <span className="sf-small">
+              {meta.search_match === 'similar_spelling'
+                ? <>No exact match for “{q}” — showing items with a similar name.</>
+                : <>No exact match for “{q}” — showing the closest items.</>}
+            </span>
+          )}
 
           <div className="sf-chips" aria-label="Quick filters">
             {categories.filter((c) => c.depth === 0).map((c) => (
@@ -200,8 +207,8 @@ export default function Shop() {
 
         {status !== 'loading' && status !== 'error' && products.length === 0 && (
           <div className="sf-empty">
-            <b>No products match</b>
-            <span className="sf-muted">Try removing a filter.</span>
+            <b>{q ? `Nothing found for “${q}”` : 'No products match'}</b>
+            <span className="sf-muted">{q ? 'Check the spelling, or try a shorter word like “almond” or “masala”.' : 'Try removing a filter.'}</span>
             <button type="button" className="sf-btn sf-btn--outline-red" onClick={() => setParams({}, { replace: true })}>CLEAR ALL</button>
           </div>
         )}

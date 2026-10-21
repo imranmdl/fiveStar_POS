@@ -73,6 +73,122 @@ final class ProductRepository extends BaseRepository
      */
     public function search(array $filters, array $params): array
     {
+        $result = $this->searchAt($filters, $params, 0);
+
+        if ($result['total'] > 0 || $params['search'] === null || trim((string) $params['search']) === '') {
+            return $result;
+        }
+
+        // Nothing for the exact words. A shopper typing in the search box
+        // means "find me this", so loosen step by step: every word, matched
+        // anywhere (singular/plural alike) → any of the words → a close
+        // spelling ("cardamon" → Cardamom).
+        foreach ([1, 2, 3] as $level) {
+            $result = $this->searchAt($filters, $params, $level);
+
+            if ($result['total'] > 0) {
+                return $result + ['search_fallback' => $level];
+            }
+        }
+
+        return $result;
+    }
+
+    /** Words a search box carries that say nothing about the product. */
+    private const SEARCH_STOPWORDS = [
+        'a', 'an', 'the', 'and', 'or', 'of', 'for', 'with', 'in', 'on', 'to', 'buy', 'online', 'best', 'pure',
+        'fresh', 'premium', 'price', 'pack', 'packet', 'gm', 'gms', 'g', 'kg', 'grams', 'gram', 'ml', 'ltr', 'litre',
+    ];
+
+    /**
+     * Search words, cleaned: punctuation and numbers-with-units removed,
+     * filler words dropped, plurals reduced ("almonds" → "almond").
+     *
+     * @return array<int, string>
+     */
+    private function searchWords(string $search): array
+    {
+        $clean = mb_strtolower(trim((string) preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $search)));
+        $words = [];
+
+        foreach (preg_split('/\s+/u', $clean) ?: [] as $word) {
+            if ($word === '' || in_array($word, self::SEARCH_STOPWORDS, true) || preg_match('/^\d+[a-z]*$/u', $word) === 1) {
+                continue;
+            }
+
+            if (mb_strlen($word) > 4 && str_ends_with($word, 'es') && !str_ends_with($word, 'ses')) {
+                $word = mb_substr($word, 0, -2);
+            } elseif (mb_strlen($word) > 3 && str_ends_with($word, 's') && !str_ends_with($word, 'ss')) {
+                $word = mb_substr($word, 0, -1);
+            }
+
+            $words[] = $word;
+        }
+
+        return array_values(array_unique($words));
+    }
+
+    /**
+     * Published products whose name is a close spelling of the search words
+     * (each word within a couple of letters of a word in the name).
+     *
+     * @param array<int, string> $words
+     *
+     * @return array<int, int> product ids, best first
+     */
+    private function fuzzyMatches(array $words, bool $includeUnpublished = false): array
+    {
+        if ($words === []) {
+            return [];
+        }
+
+        $rows = $this->db->select(
+            "SELECT p.`id`, p.`name`, c.`name` AS `category_name`
+               FROM `products` p INNER JOIN `categories` c ON c.`id` = p.`category_id`
+              WHERE p.`is_deleted` = 0 AND p.`is_active` = 1" . ($includeUnpublished ? '' : " AND p.`status` = 'published'") . "
+              LIMIT 5000"
+        );
+        $scores = [];
+
+        foreach ($rows as $row) {
+            $nameWords = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($row['name'] . ' ' . $row['category_name'])) ?: [];
+            $total = 0;
+            $matched = 0;
+
+            foreach ($words as $word) {
+                $best = PHP_INT_MAX;
+                foreach ($nameWords as $candidate) {
+                    if ($candidate === '' || mb_strlen($candidate) < 3) {
+                        continue;
+                    }
+                    // Compare against the start of longer words too ("cardam" ~ "cardamom").
+                    $slice = mb_substr($candidate, 0, max(mb_strlen($word), 3));
+                    $best = min($best, levenshtein($word, $candidate), levenshtein($word, $slice));
+                }
+                $allowed = mb_strlen($word) <= 4 ? 1 : 2;
+                if ($best <= $allowed) {
+                    ++$matched;
+                    $total += $best;
+                }
+            }
+
+            if ($matched > 0) {
+                $scores[(int) $row['id']] = [$matched, -$total];
+            }
+        }
+
+        uasort($scores, static fn (array $a, array $b): int => $b <=> $a);
+
+        return array_slice(array_keys($scores), 0, 60);
+    }
+
+    /**
+     * @param int $level 0 exact (full-text) · 1 every word anywhere · 2 any word · 3 close spelling
+     *
+     * @return array{items: array<int, array<string, mixed>>, total: int}
+     */
+    private function searchAt(array $filters, array $params, int $level): array
+    {
         $where = ['p.`is_deleted` = 0', 'p.`is_active` = 1'];
         $bindings = [];
 
@@ -142,7 +258,37 @@ final class ProductRepository extends BaseRepository
         $selectOnlyBindings = [];
         $orderBy = self::SORT_MAP[$filters['sort'] ?? 'relevance'] ?? self::SORT_MAP['relevance'];
 
-        if ($params['search'] !== null) {
+        if ($params['search'] !== null && $level > 0) {
+            $words = $this->searchWords((string) $params['search']);
+
+            if ($level === 3) {
+                $ids = $this->fuzzyMatches($words, ($filters['include_unpublished'] ?? false) === true);
+                if ($ids === []) {
+                    return ['items' => [], 'total' => 0];
+                }
+                $where[] = 'p.`id` IN (' . implode(',', $ids) . ')';
+                if (($filters['sort'] ?? 'relevance') === 'relevance') {
+                    $orderBy = 'FIELD(p.`id`, ' . implode(',', $ids) . ')';
+                }
+            } else {
+                if ($words === []) {
+                    return ['items' => [], 'total' => 0];
+                }
+                $parts = [];
+                foreach ($words as $i => $word) {
+                    $like = '%' . $word . '%';
+                    $parts[] = "(p.`name` LIKE :w{$i}a OR p.`search_keywords` LIKE :w{$i}b OR p.`short_description` LIKE :w{$i}c
+                                 OR p.`brand` LIKE :w{$i}d OR c.`name` LIKE :w{$i}e OR parent.`name` LIKE :w{$i}f
+                                 OR EXISTS (SELECT 1 FROM `product_variants` wv
+                                             WHERE wv.`product_id` = p.`id` AND wv.`is_deleted` = 0
+                                               AND (wv.`variant_name` LIKE :w{$i}g OR wv.`sku` LIKE :w{$i}h OR wv.`barcode` LIKE :w{$i}i)))";
+                    foreach (['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'] as $suffix) {
+                        $bindings["w{$i}{$suffix}"] = $like;
+                    }
+                }
+                $where[] = '(' . implode($level === 1 ? ' AND ' : ' OR ', $parts) . ')';
+            }
+        } elseif ($params['search'] !== null) {
             $term = $this->normaliseSearchTerm($params['search']);
             $rawLike = '%' . trim((string) $params['search']) . '%';
 
