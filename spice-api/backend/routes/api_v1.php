@@ -642,6 +642,9 @@ return static function (Router $router): void {
         $router->get('/admin/backups', [BackupController::class, 'index'], $administrator);
         $router->post('/admin/backups', [BackupController::class, 'store'], array_merge($administrator, ['throttle:10,3600']));
         $router->get('/admin/backups/{filename}/download', [BackupController::class, 'download'], $administrator);
+        $router->post('/admin/backups/{filename}/download-link', [BackupController::class, 'downloadLink'], $administrator);
+        // Signed, short-lived link (no bearer token): see BackupController::signedDownload.
+        $router->get('/backups/download', [BackupController::class, 'signedDownload'], ['throttle:30,3600']);
         $router->delete('/admin/backups/{filename}', [BackupController::class, 'destroy'], $administrator);
         $router->post(
             '/admin/backups/restore',

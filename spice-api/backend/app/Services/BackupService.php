@@ -374,6 +374,78 @@ final class BackupService
         return $this->assertValidFilename($filename);
     }
 
+    /** Download links stay valid this long — enough to start a big download. */
+    private const LINK_TTL_SECONDS = 1800;
+
+    /**
+     * A short-lived signed link for downloading a backup straight to disk
+     * with the browser's own download manager (progress, resume), instead
+     * of holding hundreds of MB in page memory first.
+     *
+     * @return array{url:string, expires_at:string}
+     */
+    public function downloadLink(string $filename, Request $request): array
+    {
+        $this->assertValidFilename($filename);
+        $expires = time() + self::LINK_TTL_SECONDS;
+        $user = (int) $request->authUserId();
+        $signature = $this->sign($filename, $expires, $user);
+
+        $this->audit->log(
+            entityName: 'database_backups',
+            entityId: null,
+            action: 'download_link',
+            newValues: ['filename' => $filename, 'expires' => date('c', $expires)],
+            request: $request
+        );
+
+        return [
+            'url' => '/api/v1/backups/download?' . http_build_query([
+                'file' => $filename,
+                'exp' => $expires,
+                'uid' => $user,
+                'sig' => $signature,
+            ]),
+            'expires_at' => date('c', $expires),
+        ];
+    }
+
+    /** Checks a signed link and returns the backup's path. */
+    public function pathForSignedLink(string $filename, int $expires, int $userId, string $signature): string
+    {
+        if ($expires < time()) {
+            throw new HttpException('This download link has expired. Press Download again in Admin → Backups.', 403);
+        }
+
+        if (!hash_equals($this->sign($filename, $expires, $userId), $signature)) {
+            throw new HttpException('This download link is not valid.', 403);
+        }
+
+        $isAdmin = (int) $this->db->scalar(
+            "SELECT COUNT(*) FROM `users` u INNER JOIN `roles` r ON r.`id` = u.`role_id`
+              WHERE u.`id` = :id AND u.`is_deleted` = 0 AND u.`is_active` = 1
+                AND r.`code` IN ('administrator', 'super_admin')",
+            ['id' => $userId]
+        ) > 0;
+
+        if (!$isAdmin) {
+            throw new HttpException('This download link is not valid.', 403);
+        }
+
+        return $this->assertValidFilename($filename);
+    }
+
+    private function sign(string $filename, int $expires, int $userId): string
+    {
+        $secret = (string) $this->config->get('auth.jwt.secret', '');
+
+        if ($secret === '') {
+            throw new HttpException('Downloads are not configured on this server (JWT_SECRET missing).', 500);
+        }
+
+        return hash_hmac('sha256', 'backup-download|' . $filename . '|' . $expires . '|' . $userId, $secret);
+    }
+
     public function delete(string $filename, Request $request): void
     {
         $path = $this->assertValidFilename($filename);
