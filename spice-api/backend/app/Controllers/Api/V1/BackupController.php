@@ -63,6 +63,34 @@ final class BackupController extends BaseController
         return Response::file($path, $filename, str_ends_with($filename, '.zip') ? 'application/zip' : 'application/sql');
     }
 
+    /** POST /api/v1/admin/backups/{filename}/download-link — signed link, valid 30 minutes */
+    public function downloadLink(Request $request): Response
+    {
+        return Response::success(
+            $this->backups->downloadLink((string) $request->routeParam('filename'), $request),
+            'Download link ready'
+        );
+    }
+
+    /**
+     * GET /api/v1/backups/download?file=&exp=&uid=&sig=
+     * No bearer token (a browser download cannot send one): the signature,
+     * the expiry and the signer still being an administrator are checked.
+     * Supports Range, so an interrupted download can resume.
+     */
+    public function signedDownload(Request $request): Response
+    {
+        $filename = (string) $request->query('file', '');
+        $path = $this->backups->pathForSignedLink(
+            $filename,
+            (int) $request->query('exp', 0),
+            (int) $request->query('uid', 0),
+            (string) $request->query('sig', ''),
+        );
+
+        return Response::file($path, $filename, str_ends_with($filename, '.zip') ? 'application/zip' : 'application/sql');
+    }
+
     /** DELETE /api/v1/admin/backups/{filename} */
     public function destroy(Request $request): Response
     {

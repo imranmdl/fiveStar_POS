@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, ApiError } from '../../lib/api';
+import { api, ApiError, API_BASE } from '../../lib/api';
 import { EmptyState, ErrorState, LoadingState } from '../../components/admin/shared';
 import { toast } from '../../components/admin/toast';
 import './Backups.css';
@@ -12,16 +12,22 @@ function formatBytes(bytes) {
   return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
+/**
+ * Downloads through a short-lived signed link, so the browser's own download
+ * manager saves the file straight to disk — with progress, and able to
+ * resume — instead of the page holding a backup of hundreds of MB in memory
+ * first (which large full backups could not survive).
+ */
 async function triggerDownload(filename) {
-  const blob = await api.downloadFile(`/admin/backups/${encodeURIComponent(filename)}/download`);
-  const url = URL.createObjectURL(blob);
+  const response = await api.post(`/admin/backups/${encodeURIComponent(filename)}/download-link`);
+  const path = String(response.data.url || '').replace(/^\/api\/v1/, '');
   const link = document.createElement('a');
-  link.href = url;
+  link.href = `${API_BASE}${path}`;
   link.download = filename;
+  link.rel = 'noopener';
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
 }
 
 function BackupsList({ refreshKey }) {
@@ -60,6 +66,9 @@ function BackupsList({ refreshKey }) {
     setBusyFile(filename);
     try {
       await triggerDownload(filename);
+      toast(filename.endsWith('.zip')
+        ? 'Download started — watch your browser\'s downloads. A large full backup takes a few minutes.'
+        : 'Download started.');
     } catch (error) {
       toast(error instanceof ApiError ? error.message : 'Could not download this backup.', 'danger');
     } finally {
